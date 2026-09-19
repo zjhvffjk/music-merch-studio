@@ -768,6 +768,15 @@ main.workspace-compact .studio-intro{margin:11px 20px 0;background:linear-gradie
 /* ===== 全局音乐搜索：对齐音乐平台的“输入即浏览”体验 ===== */
 .global-search{width:min(410px,36vw);position:relative;margin:0 auto}.global-search input{width:100%;height:36px;padding:0 33px 0 32px;border:1px solid #e1e4ef;border-radius:8px;background:#f7f8fc;color:#30344e;font:12px Inter,"Microsoft YaHei",sans-serif;outline:0;transition:.18s}.global-search input:focus{background:#fff;border-color:#8f9af0;box-shadow:0 0 0 3px rgba(88,104,238,.12)}.global-search__icon{position:absolute;left:11px;top:6px;color:#7d86ac;font-size:20px;line-height:22px;z-index:1}.global-search button{position:absolute;right:8px;top:5px;border:0;background:transparent;color:#8990ac;font-size:18px;cursor:pointer;z-index:1}.search-popover{position:absolute;left:0;top:43px;width:100%;max-height:480px;overflow:auto;padding:8px;background:#fff;border:1px solid #e2e5f0;border-radius:10px;box-shadow:0 16px 35px rgba(44,54,111,.2);z-index:20}.search-popover__label{padding:7px 9px 5px;color:#9298ab;font-size:10px;font-weight:700;letter-spacing:.04em}.search-popover__chips{display:flex;flex-wrap:wrap;gap:6px;padding:2px 8px 10px}.search-popover__chips button,.search-popover__action{position:static;height:auto;padding:5px 8px;border:0;border-radius:6px;background:#f3f4fa;color:#5d6580;font:11px Inter,"Microsoft YaHei",sans-serif;cursor:pointer}.search-popover__chips button:hover,.search-popover__action:hover{background:#e7eaff;color:#4f61db}.search-popover__actions{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:2px 8px 10px}.search-popover__action{text-align:left}.search-popover__action b{display:block;font-size:11px}.search-popover__action small{display:block;margin-top:2px;color:#8b91a5;font-size:9px}.search-popover__row{width:100%;display:flex;align-items:center;gap:8px;padding:7px 8px;border:0;border-radius:7px;background:transparent;color:#394057;text-align:left;font:11px Inter,"Microsoft YaHei",sans-serif;cursor:pointer}.search-popover__row:hover{background:#f3f5ff}.search-popover__cover{width:28px;height:28px;flex:none;border-radius:5px;object-fit:cover;background:#e8eaf3}.search-popover__row b{display:block;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px}.search-popover__row small{display:block;margin-top:1px;color:#8b91a4;font-size:9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.search-popover__row i{margin-left:auto;font-style:normal;color:#9ba1b4;font-size:9px}.search-popover__history{display:flex;justify-content:space-between;align-items:center;padding:7px 9px 5px;color:#9298ab;font-size:10px;font-weight:700}.search-popover__history button{position:static;padding:0;background:transparent;color:#9097b1;font-size:10px}.search-popover__empty{padding:17px 9px;color:#858ba0;font-size:11px}.bar{gap:16px}.bar .ttl{min-width:138px}.bar .acts{margin-left:0}@media(max-width:1050px){.global-search{width:min(340px,32vw)}.bar .ttl{min-width:110px}.bar .ttl small{display:none}}@media(max-width:760px){.global-search{order:3;width:100%;margin:0}.bar{flex-wrap:wrap}.bar .acts{margin-left:auto}.search-popover{position:fixed;left:14px;right:14px;width:auto;top:94px}}
 
+
+/* ===== 搜索结果页：按音乐详情页组织，不再展示成商品首页 ===== */
+.music-nav{height:35px;display:flex;align-items:center;gap:3px;padding:0 22px;background:#c20c0c;color:#fff}.music-nav button{height:35px;padding:0 16px;border:0;background:transparent;color:#f9d7d7;font:12px Inter,"Microsoft YaHei",sans-serif;cursor:pointer}.music-nav button:hover,.music-nav button.on{background:#a40000;color:#fff}.music-nav span{margin-left:auto;font-size:10px;color:#f0baba;letter-spacing:.03em}.bar{height:70px;padding:0 24px;background:#242424;border:0}.bar .ttl{color:#fff}.bar .ttl small{color:#aeb0ba}.bar .acts .btn{background:#2d2d2d;border-color:#444;color:#dadada}.bar .acts .btn:hover{background:#3d3d3d;color:#fff}.global-search input{background:#fff;border:0}.global-search input:focus{box-shadow:0 0 0 3px rgba(255,255,255,.12)}.global-search__icon{color:#777}.global-search button{color:#888}
+body.has-music-result #artistBox,body.has-music-result #topBox,body.has-music-result #exitBox{display:none!important}main.music-search-active .studio-intro,main.music-search-active .product-deck{display:none}main.music-search-active .prog{margin-top:0;height:3px;background:#e4e4e4}main.music-search-active .content{display:none}main.music-search-active .music-nav{position:sticky;top:70px;z-index:5}.music-page{width:min(1080px,calc(100% - 48px));margin:28px auto 42px;display:grid;grid-template-columns:minmax(0,1fr) 230px;gap:30px;color:#333}.music-page__main{min-width:0}.music-page__side{border-left:1px solid #ddd;padding-left:20px}.artist-info{display:flex;gap:22px;padding-bottom:25px;border-bottom:2px solid #c20c0c}.artist-info__cover{width:155px;height:155px;flex:none;object-fit:cover;border:1px solid #ddd;padding:3px;background:#fff}.artist-info__copy{min-width:0}.artist-info__tag{display:inline-block;background:#c20c0c;color:#fff;padding:3px 9px;border-radius:2px;font-size:10px}.artist-info h2{font-size:24px;font-weight:500;margin:9px 0 3px;color:#333}.artist-info__meta{font-size:12px;color:#777;line-height:1.8}.artist-info__actions{display:flex;gap:7px;margin-top:16px}.artist-info__actions button{padding:7px 12px;border:1px solid #c8c8c8;border-radius:3px;background:linear-gradient(#fff,#f2f2f2);color:#444;font:12px Inter,"Microsoft YaHei",sans-serif;cursor:pointer}.artist-info__actions button.primary{border-color:#1e73be;background:linear-gradient(#4aa3e9,#1f79c4);color:#fff}.artist-info__actions button:hover{filter:brightness(.96)}.artist-summary{margin:18px 0 27px;color:#666;font-size:12px;line-height:1.75}.artist-summary b{display:block;color:#333;margin-bottom:5px}.track-head{display:flex;align-items:baseline;border-bottom:2px solid #c20c0c;padding-bottom:7px}.track-head h3{font-size:18px;font-weight:500}.track-head span{margin-left:12px;color:#777;font-size:11px}.track-head button{margin-left:auto;border:0;background:transparent;color:#3173ad;font:11px Inter,"Microsoft YaHei",sans-serif;cursor:pointer}.track-table{width:100%;border-collapse:collapse;font-size:12px}.track-table thead{background:#f6f6f6;color:#666}.track-table th{padding:8px 10px;border:1px solid #ddd;text-align:left;font-weight:400}.track-table td{padding:9px 10px;border-bottom:1px solid #eee;color:#666}.track-table tr:nth-child(even) td{background:#f8f8f8}.track-table tbody tr{cursor:pointer}.track-table tbody tr:hover td{background:#eef5fb;color:#2a6eac}.track-table .no{width:38px;color:#999;text-align:center}.track-table .duration{width:65px;color:#999}.track-table .make{width:76px;text-align:right}.track-table .make button{border:0;background:transparent;color:#2f73af;font:11px Inter,"Microsoft YaHei",sans-serif;cursor:pointer}.side-title{font-size:12px;font-weight:700;padding-bottom:8px;border-bottom:1px solid #ddd}.side-album{display:flex;gap:9px;padding:11px 0;border-bottom:1px solid #eee;cursor:pointer}.side-album:hover b{color:#2672b1}.side-album img{width:48px;height:48px;object-fit:cover;flex:none}.side-album b{font-size:11px;font-weight:500;line-height:1.35;color:#333}.side-album small{display:block;color:#999;font-size:10px;margin-top:4px}.side-more{margin-top:10px;border:0;background:transparent;padding:0;color:#3673a9;font:11px Inter,"Microsoft YaHei",sans-serif;cursor:pointer}.album-grid-page{width:min(1080px,calc(100% - 48px));margin:24px auto}.album-grid-page .albHead{padding:0 0 12px;border-bottom:2px solid #c20c0c}.album-grid-page .selbar{margin:12px 0}.album-grid-page .albGrid{grid-template-columns:repeat(5,minmax(0,1fr));gap:14px}.album-grid-page .albC{border-radius:0;box-shadow:none}.album-grid-page .albC .go{border-color:#c20c0c;color:#c20c0c}.album-grid-page .albC .go:hover{background:#c20c0c}.album-grid-page .albC.sel{border-color:#c20c0c;box-shadow:0 0 0 1px #c20c0c}@media(max-width:1050px){.music-page{grid-template-columns:1fr;width:calc(100% - 32px)}.music-page__side{display:none}.album-grid-page{width:calc(100% - 32px)}.album-grid-page .albGrid{grid-template-columns:repeat(4,minmax(0,1fr))}}@media(max-width:720px){.music-nav{padding:0 8px;overflow:auto}.music-nav span{display:none}.music-nav button{padding:0 10px;white-space:nowrap}.artist-info{gap:14px}.artist-info__cover{width:104px;height:104px}.artist-info h2{font-size:20px}.artist-info__actions{flex-wrap:wrap}.music-page{margin-top:18px}.track-table th:nth-child(3),.track-table td:nth-child(3){display:none}.album-grid-page .albGrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+
+/* 搜索下拉内的按钮必须脱离顶部清空按钮的绝对定位规则 */
+.global-search .search-popover button,.global-search .search-popover .search-popover__action{position:static;right:auto;top:auto}.global-search .search-popover__actions .search-popover__action{display:block;width:100%}.global-search .search-popover__row{display:flex;width:100%}
+
 </style>
 </head>
 <body data-page-node-id="Na2JkVOieEwQ90ny6oba1N">
@@ -1045,6 +1054,7 @@ main.workspace-compact .studio-intro{margin:11px 20px 0;background:linear-gradie
         <button class="btn" id="btnTheme" title="切换深色 / 浅色" data-page-node-id="ThemeBtn0Xq7Lm2NvB4tRw">🌙 暗</button>
       </div>
     </div>
+    <nav class="music-nav" aria-label="音乐搜索导航"><button class="on" type="button">搜索结果</button><button type="button" data-nav-mode="artist">歌手</button><button type="button" data-nav-mode="song">单曲</button><button type="button" data-nav-mode="upload">上传封面</button><span>封面库 · 商品制作 · 作品库</span></nav>
     <section class="studio-intro" aria-labelledby="studioIntroTitle">
       <div class="intro-copy"><div class="intro-index">MUSIC OBJECTS / 01</div><h2 id="studioIntroTitle">从一张封面<br>开始做周边。</h2><p>搜索歌曲或上传封面，选择商品类型后，直接生成可上架的商品图、迷你 CD 制作文件和专辑视觉素材。</p></div>
       <div class="intro-art" aria-hidden="true"><div class="disc-shape"></div><div class="cover-shape"><span>FOLD</span><small>MAKE IT<br>PLAYABLE</small></div></div>
@@ -1359,6 +1369,25 @@ function albumParams(a){
   if(a && a.date)    u.set('date', a.date || '');
   return u;
 }
+/* ===== 歌手搜索结果：音乐详情页（热门曲目 + 关联专辑） ===== */
+function renderArtistResultStage(data){
+  const box=$('#albStage'); if(!box) return;
+  const artist=data.artist||{}; const songs=(data.songs||[]).slice(0,18); const albums=(data.albumList||ALBUM_LIST||[]).slice(0,6);
+  const fallbackPic=(albums[0]&&albums[0].pic)||''; const pic=artist.pic ? asset(artist.pic) : (fallbackPic ? asset(fallbackPic) : '');
+  const rows=songs.map((track,i)=>`<tr class="artist-track" data-track="${i}"><td class="no">${i+1}</td><td>${esc(track.name||'—')}</td><td>${esc(track.album||track.artist||'—')}</td><td class="duration">${esc(track.dur||'')}</td><td class="make"><button type="button" data-track="${i}">制作</button></td></tr>`).join('');
+  const albumRows=albums.map((album,i)=>`<div class="side-album" data-album="${i}"><img src="${esc(asset(album.pic||''))}" alt=""><span><b>${esc(album.name||'未命名专辑')}</b><small>${esc([album.date,album.type].filter(Boolean).join(' · ')||'专辑')}</small></span></div>`).join('');
+  box.className='albStage music-search-stage';
+  box.innerHTML=`<div class="music-page"><section class="music-page__main"><div class="artist-info">${pic?`<img class="artist-info__cover" src="${esc(pic)}" alt="${esc(artist.name||'')}">`:'<div class="artist-info__cover"></div>'}<div class="artist-info__copy"><span class="artist-info__tag">歌手</span><h2>${esc(artist.name||ARTIST_Q||'搜索结果')}</h2><div class="artist-info__meta">热门单曲 ${songs.length} 首　·　专辑 ${ALBUM_LIST.length||data.albumCount||0} 张　·　来源 ${data.source==='qq'?'QQ音乐':'网易云音乐'}</div><div class="artist-info__actions"><button type="button" class="primary" id="artistMakeHot">按热门生成</button><button type="button" id="artistBrowseAlbums">查看全部专辑</button></div></div></div><div class="artist-summary"><b>音乐资料</b>从这里挑选一首单曲或一张专辑，再交给右侧的商品制作队列。封面、曲名和歌手信息会继续传入现有生成流程。</div><div class="track-head"><h3>热门歌曲</h3><span>${songs.length} 首</span><button type="button" id="artistSongMode">按关键词搜索更多单曲 →</button></div><table class="track-table"><thead><tr><th class="no">#</th><th>歌曲标题</th><th>专辑</th><th class="duration">时长</th><th></th></tr></thead><tbody>${rows||'<tr><td colspan="5">暂无歌曲数据</td></tr>'}</tbody></table></section><aside class="music-page__side"><div class="side-title">相关专辑</div>${albumRows||'<p class="search-popover__empty">暂无专辑数据</p>'}${ALBUM_LIST.length>albums.length?'<button class="side-more" id="artistSideMore" type="button">查看全部专辑 →</button>':''}</aside></div>`;
+  const chooseSong=i=>{const track=songs[i];if(!track)return;uiMode('song');$('#songKw').value=(track.name||'')+' '+(track.artist||artist.name||'');$('#btnQuerySong').click();};
+  box.querySelectorAll('.artist-track').forEach(row=>row.addEventListener('click',()=>chooseSong(Number(row.dataset.track))));
+  box.querySelectorAll('.track-table .make button').forEach(btn=>btn.addEventListener('click',e=>{e.stopPropagation();chooseSong(Number(btn.dataset.track));}));
+  const browse=()=>{uiMode('album');renderAlbumStage();showAlbumStage();};
+  const browseBtn=$('#artistBrowseAlbums'),moreBtn=$('#artistSideMore');if(browseBtn)browseBtn.onclick=browse;if(moreBtn)moreBtn.onclick=browse;
+  const hot=$('#artistMakeHot');if(hot)hot.onclick=()=>{$('#exitHot').click();toast('已切换到热门歌曲生成，勾选商品后点击左侧“开始制作”');};
+  const songMode=$('#artistSongMode');if(songMode)songMode.onclick=()=>{uiMode('song');$('#songKw').focus();};
+  box.querySelectorAll('.side-album').forEach(row=>row.addEventListener('click',()=>{const album=albums[Number(row.dataset.album)];if(album)openStudio(albumParams(album));}));
+}
+
 /* 搜索结果 → 右侧主区铺成专辑网格 */
 function renderAlbumStage(){
   const box = $('#albStage'); if(!box) return;
@@ -1386,6 +1415,7 @@ function renderAlbumStage(){
         <button class="go" data-i="${i}">设计这张</button>
       </div>
     </div>`).join('');
+  box.className='albStage album-grid-page';
   box.innerHTML = `
     <div class="albHead">
       <div class="who">${esc(ARTIST_Q)}<em>网易云</em></div>
@@ -1760,8 +1790,14 @@ $('#btnQueryArtist').onclick = async ()=>{
     $('#albCurName').textContent = a.name;
     $('#albumArtist').value = a.name;
     /* 换了歌手 → 上一位的专辑选择必须清掉，否则会把别人的专辑勾着带出去 */
-    ALBUM_FOUND = null; ALBUM_LIST = []; ALBUM_SEL.clear();
+    ALBUM_FOUND = albs.length ? {artist:a.name, source:d.source, albums:albs} : null; ALBUM_LIST = albs; ALBUM_SEL.clear();
     uiMode('artist');
+    // 搜到歌手立即进入音乐详情页；不再把结果困在左侧表单内。
+    renderArtistResultStage(d);
+    const stage=$('#albStage'), content=$('#content'); if(stage) stage.hidden=false; if(content) content.hidden=true;
+    document.body.classList.add('has-music-result');
+    $('main').classList.add('music-search-active'); setWorkspaceCompact(true);
+    setTitle(a.name+' · 音乐搜索', '热门歌曲 '+n+' 首 · 选择歌曲或专辑后制作商品');
     if(!warn.length) toast(`找到 ${a.name}，热门 ${n} 首 · 专辑 ${acnt} 张 · 数据源 ${srcName}`);
   }catch(e){
     toast(e.message);
@@ -1772,6 +1808,14 @@ $('#btnQueryArtist').onclick = async ()=>{
 $('#artistName').addEventListener('keydown', e=>{
   if(e.key === 'Enter') $('#btnQueryArtist').click();
 });
+
+/* 顶部红色导航只切换搜索入口，不清掉当前结果。 */
+$$('.music-nav [data-nav-mode]').forEach(btn=>btn.addEventListener('click',()=>{
+  const mode=btn.dataset.navMode;
+  uiMode(mode);
+  const field=mode==='artist' ? $('#artistName') : mode==='song' ? $('#songKw') : $('#uploadFile');
+  if(field) field.focus();
+}));
 
 /* ---------------- 出口①：按热门出图（原「歌手热门」链路，一行没改） ---------------- */
 $('#exitHot').onclick = ()=>{
@@ -2718,7 +2762,7 @@ document.addEventListener('keydown', e=>{
   }
   input.addEventListener('focus',open);
   input.addEventListener('input',()=>{const q=input.value.trim(); clear.hidden=!q; clearTimeout(timer); if(!q){renderStart();return;} const mine=++token; timer=setTimeout(async()=>{try{const d=await jget('/api/song?name='+encodeURIComponent(q),7000);if(mine===token && !pop.hidden)renderResults(q,d.songs||[])}catch(e){if(mine===token)renderResults(q,[])}},260);});
-  input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();song(input.value)}else if(e.key==='Escape')close();});
+  input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();artist(input.value)}else if(e.key==='Escape')close();});
   clear.addEventListener('click',()=>{input.value='';clear.hidden=true;input.focus();renderStart();});
   pop.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;if(b.hasAttribute('data-search-clear-history')){try{localStorage.removeItem('fold-search-history')}catch(err){}renderStart();return;}if(b.dataset.searchArtist!==undefined){artist(b.dataset.searchArtist);return;}if(b.dataset.searchSong!==undefined){song(b.dataset.searchSong);return;}if(b.dataset.searchMode==='artist')artist(input.value);if(b.dataset.searchMode==='song')song(input.value);});
   document.addEventListener('pointerdown',e=>{if(!$('#globalSearchBox').contains(e.target))close();});

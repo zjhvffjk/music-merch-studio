@@ -6,3 +6,5 @@ __pycache__/
 *.pyc
 
 _review_frames/
+output/
+.playwright-cli/
