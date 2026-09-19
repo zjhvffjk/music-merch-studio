@@ -1403,7 +1403,7 @@ function renderArtistResultStage(data){
     box.className='albStage song-maker-stage';
     box.innerHTML=`<section class="song-maker-page"><button type="button" class="song-maker-back">← 返回歌曲列表</button><div class="song-maker-hero"><div class="song-maker-cover"><span>♪</span><img src="${esc(asset(track.pic||''))}" alt="" onerror="this.style.display='none'"></div><div><span>SONG / PRODUCT MAKER</span><h2>制作《${esc(track.name||'未命名歌曲')}》</h2><p>${esc(artist.name||track.artist||'')}　·　${esc(track.album||'单曲')}　·　${esc(track.dur||'')}</p></div></div><div class="song-maker-products"><button type="button" class="song-maker-product" data-output="keychain"><i>01 / OUTPUT</i><b>钥匙扣商品图</b><small>实物合成，可直接作为商品主图。</small></button><button type="button" class="song-maker-product" data-output="shop"><i>02 / OUTPUT</i><b>白底商品图</b><small>白底、透明底与商品素材输出。</small></button><button type="button" class="song-maker-product" data-output="vinyl"><i>03 / OUTPUT</i><b>黑胶播放界面</b><small>竖版唱片视觉与完整播放界面。</small></button></div><div class="song-maker-footer"><span class="song-maker-status">正在匹配当前歌曲封面…</span><button type="button" class="song-maker-cancel">取消</button><button type="button" class="song-maker-start primary" disabled>开始制作 →</button></div></section>`;
     const page=box.querySelector('.song-maker-page'), status=page.querySelector('.song-maker-status'), start=page.querySelector('.song-maker-start');
-    const selected={keychain:false,shop:false,vinyl:false};
+    const selected={keychain:true,shop:true,vinyl:true};
     const sync=()=>page.querySelectorAll('.song-maker-product').forEach(b=>b.classList.toggle('is-on',!!selected[b.dataset.output]));
     page.querySelectorAll('.song-maker-product').forEach(b=>b.onclick=()=>{selected[b.dataset.output]=!selected[b.dataset.output];sync();});
     page.querySelector('.song-maker-back').onclick=()=>renderArtistResultStage(data);
@@ -1413,7 +1413,7 @@ function renderArtistResultStage(data){
       const found=(d.songs||[]).find(x=>x.name===track.name && String(x.artist||'').includes(artist.name||'')) || (d.songs||[])[0];
       if(!found)throw new Error('没有找到可用封面');
       const cover=page.querySelector('.song-maker-hero img'); if(found.pic)cover.src=asset(found.pic);
-      status.textContent='已匹配封面 · 选择需要同时输出的商品'; start.disabled=false;
+      status.textContent='已匹配封面 · 默认完整商品包已选，可按需取消'; start.disabled=false;
       start.onclick=()=>{
         MODE='song'; PICK=0; SEL=found; $('#songKw').value=(track.name||'')+' '+(found.artist||artist.name||'');
         $('#p_keychain').checked=selected.keychain; $('#p_keychain').dispatchEvent(new Event('change'));
