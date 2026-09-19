@@ -764,6 +764,10 @@ main{background:#f7f8fc;min-width:0}.bar{background:rgba(255,255,255,.88);border
 main.workspace-compact .studio-intro{margin:11px 20px 0;background:linear-gradient(115deg,#5b69ec,#7785f6);box-shadow:0 8px 18px rgba(78,95,213,.15)}main.workspace-compact .product-deck{margin:10px 20px 0}main.workspace-compact .prog{margin:10px 20px 0}main.workspace-compact .content{padding-left:20px;padding-right:20px}
 @media(max-width:1280px){.app{grid-template-columns:224px minmax(0,1fr)}.production-rail{display:none}.studio-intro,.product-deck{margin-left:18px;margin-right:18px}.content{padding-left:18px;padding-right:18px}.product-deck__grid{grid-template-columns:repeat(3,1fr)}.product-tile--feature{grid-column:span 2}}@media(max-width:820px){.app{display:block;height:auto}.app>aside:not(.production-rail){width:auto}.studio-intro{margin:12px}.product-deck{margin:18px 12px}.content{padding:14px 12px}.product-deck__grid{grid-template-columns:repeat(2,1fr)}.product-tile--feature{grid-column:span 2}main.workspace-compact .studio-intro,main.workspace-compact .product-deck,main.workspace-compact .prog{margin-left:12px;margin-right:12px}main.workspace-compact .content{padding-left:12px;padding-right:12px}}
 
+
+/* ===== 全局音乐搜索：对齐音乐平台的“输入即浏览”体验 ===== */
+.global-search{width:min(410px,36vw);position:relative;margin:0 auto}.global-search input{width:100%;height:36px;padding:0 33px 0 32px;border:1px solid #e1e4ef;border-radius:8px;background:#f7f8fc;color:#30344e;font:12px Inter,"Microsoft YaHei",sans-serif;outline:0;transition:.18s}.global-search input:focus{background:#fff;border-color:#8f9af0;box-shadow:0 0 0 3px rgba(88,104,238,.12)}.global-search__icon{position:absolute;left:11px;top:6px;color:#7d86ac;font-size:20px;line-height:22px;z-index:1}.global-search button{position:absolute;right:8px;top:5px;border:0;background:transparent;color:#8990ac;font-size:18px;cursor:pointer;z-index:1}.search-popover{position:absolute;left:0;top:43px;width:100%;max-height:480px;overflow:auto;padding:8px;background:#fff;border:1px solid #e2e5f0;border-radius:10px;box-shadow:0 16px 35px rgba(44,54,111,.2);z-index:20}.search-popover__label{padding:7px 9px 5px;color:#9298ab;font-size:10px;font-weight:700;letter-spacing:.04em}.search-popover__chips{display:flex;flex-wrap:wrap;gap:6px;padding:2px 8px 10px}.search-popover__chips button,.search-popover__action{position:static;height:auto;padding:5px 8px;border:0;border-radius:6px;background:#f3f4fa;color:#5d6580;font:11px Inter,"Microsoft YaHei",sans-serif;cursor:pointer}.search-popover__chips button:hover,.search-popover__action:hover{background:#e7eaff;color:#4f61db}.search-popover__actions{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:2px 8px 10px}.search-popover__action{text-align:left}.search-popover__action b{display:block;font-size:11px}.search-popover__action small{display:block;margin-top:2px;color:#8b91a5;font-size:9px}.search-popover__row{width:100%;display:flex;align-items:center;gap:8px;padding:7px 8px;border:0;border-radius:7px;background:transparent;color:#394057;text-align:left;font:11px Inter,"Microsoft YaHei",sans-serif;cursor:pointer}.search-popover__row:hover{background:#f3f5ff}.search-popover__cover{width:28px;height:28px;flex:none;border-radius:5px;object-fit:cover;background:#e8eaf3}.search-popover__row b{display:block;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px}.search-popover__row small{display:block;margin-top:1px;color:#8b91a4;font-size:9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.search-popover__row i{margin-left:auto;font-style:normal;color:#9ba1b4;font-size:9px}.search-popover__history{display:flex;justify-content:space-between;align-items:center;padding:7px 9px 5px;color:#9298ab;font-size:10px;font-weight:700}.search-popover__history button{position:static;padding:0;background:transparent;color:#9097b1;font-size:10px}.search-popover__empty{padding:17px 9px;color:#858ba0;font-size:11px}.bar{gap:16px}.bar .ttl{min-width:138px}.bar .acts{margin-left:0}@media(max-width:1050px){.global-search{width:min(340px,32vw)}.bar .ttl{min-width:110px}.bar .ttl small{display:none}}@media(max-width:760px){.global-search{order:3;width:100%;margin:0}.bar{flex-wrap:wrap}.bar .acts{margin-left:auto}.search-popover{position:fixed;left:14px;right:14px;width:auto;top:94px}}
+
 </style>
 </head>
 <body data-page-node-id="Na2JkVOieEwQ90ny6oba1N">
@@ -1029,7 +1033,11 @@ main.workspace-compact .studio-intro{margin:11px 20px 0;background:linear-gradie
 
   <main data-page-node-id="opPSyCCJuApeWoRlIf7w9y">
     <div class="bar" data-page-node-id="ABF4cgZMJkcxmagyVDvfGZ">
-      <div class="ttl" id="ttl" data-page-node-id="ugxroEdkkZsrda9ZUOfXoc">未开始<small id="sub" data-page-node-id="xfMKTCwCqTg1jU68vIYZ7B">选一个模式，配好参数，点开始生成</small></div>
+      <div class="ttl" id="ttl" data-page-node-id="ugxroEdkkZsrda9ZUOfXoc">音乐搜索<small id="sub" data-page-node-id="xfMKTCwCqTg1jU68vIYZ7B">搜索歌手、单曲或专辑封面，开始制作</small></div>
+      <div class="global-search" id="globalSearchBox">
+        <span class="global-search__icon">⌕</span><input id="globalSearch" type="search" autocomplete="off" placeholder="搜索歌手、单曲或专辑" aria-label="搜索歌手、单曲或专辑"><button id="globalSearchClear" type="button" aria-label="清空搜索" hidden>×</button>
+        <div class="search-popover" id="searchPopover" hidden></div>
+      </div>
       <div class="acts" data-page-node-id="nA8nfcPZ8EFbpGO8AKelGL">
         <button class="btn" id="btnLib" data-page-node-id="LibBtn0Xq7Lm2NvB4tRw">作品库</button>
         <button class="btn" id="btnZip" disabled data-page-node-id="8dnzDgZKgdLJkvAyCGhr6J">下载 ZIP</button>
@@ -2685,6 +2693,35 @@ $('#lib').onclick = e=>{ if(e.target === $('#lib')) libClose(); };
 document.addEventListener('keydown', e=>{
   if(e.key === 'Escape' && $('#lib').classList.contains('on')) libClose();
 });
+
+/* ===== 全局搜索：历史、热搜、输入联想与两种结果入口 ===== */
+(function bindGlobalSearch(){
+  const input=$('#globalSearch'), pop=$('#searchPopover'), clear=$('#globalSearchClear');
+  if(!input || !pop) return;
+  const hot=['周杰伦','陈奕迅','林俊杰','薛之谦','邓紫棋','告五人','毛不易','张杰','孙燕姿','王菲'];
+  let timer=0, token=0;
+  const escape=esc;
+  function history(){try{return JSON.parse(localStorage.getItem('fold-search-history')||'[]').slice(0,8)}catch(e){return []}}
+  function save(q){const list=history().filter(x=>x!==q); list.unshift(q); try{localStorage.setItem('fold-search-history',JSON.stringify(list.slice(0,8)))}catch(e){}}
+  function open(){pop.hidden=false; clear.hidden=!input.value; if(!input.value.trim()) renderStart();}
+  function close(){pop.hidden=true;}
+  function artist(q){q=(q||'').trim(); if(!q)return; save(q); input.value=q; clear.hidden=false; uiMode('artist'); $('#artistName').value=q; $('#btnQueryArtist').click(); close();}
+  function song(q){q=(q||'').trim(); if(!q)return; save(q); input.value=q; clear.hidden=false; uiMode('song'); $('#songKw').value=q; $('#btnQuerySong').click(); close();}
+  function renderStart(){
+    const h=history();
+    pop.innerHTML=`${h.length?`<div class="search-popover__history"><span>搜索历史</span><button type="button" data-search-clear-history>清空</button></div><div class="search-popover__chips">${h.map(x=>`<button type="button" data-search-artist="${escape(x)}">${escape(x)}</button>`).join('')}</div>`:''}<div class="search-popover__label">猜你想搜</div><div class="search-popover__chips">${hot.map(x=>`<button type="button" data-search-artist="${escape(x)}">${escape(x)}</button>`).join('')}</div><div class="search-popover__label">快速进入</div><div class="search-popover__actions"><button class="search-popover__action" type="button" data-search-mode="artist"><b>按歌手搜索</b><small>热门歌曲和全部专辑</small></button><button class="search-popover__action" type="button" data-search-mode="song"><b>按单曲搜索</b><small>从候选里选一首制作</small></button></div>`;
+  }
+  function renderResults(q,songs){
+    const rows=songs.slice(0,6).map(x=>`<button class="search-popover__row" type="button" data-search-song="${escape((x.name||'')+' '+(x.artist||''))}">${x.pic?`<img class="search-popover__cover" src="${escape(x.pic)}?param=80y80" alt="">`:'<i class="search-popover__cover"></i>'}<span><b>${escape(x.name)}</b><small>${escape(x.artist||'')} · ${escape(x.album||'')}</small></span><i>${escape(x.dur||'')}</i></button>`).join('');
+    pop.innerHTML=`<div class="search-popover__actions"><button class="search-popover__action" type="button" data-search-artist="${escape(q)}"><b>搜索歌手「${escape(q)}」</b><small>热门歌曲和专辑</small></button><button class="search-popover__action" type="button" data-search-song="${escape(q)}"><b>搜索单曲「${escape(q)}」</b><small>显示可选版本</small></button></div>${rows?`<div class="search-popover__label">单曲联想</div>${rows}`:'<div class="search-popover__empty">没有匹配的单曲，可直接按歌手或关键词搜索。</div>`;
+  }
+  input.addEventListener('focus',open);
+  input.addEventListener('input',()=>{const q=input.value.trim(); clear.hidden=!q; clearTimeout(timer); if(!q){renderStart();return;} const mine=++token; timer=setTimeout(async()=>{try{const d=await jget('/api/song?name='+encodeURIComponent(q),7000);if(mine===token && !pop.hidden)renderResults(q,d.songs||[])}catch(e){if(mine===token)renderResults(q,[])}},260);});
+  input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();song(input.value)}else if(e.key==='Escape')close();});
+  clear.addEventListener('click',()=>{input.value='';clear.hidden=true;input.focus();renderStart();});
+  pop.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;if(b.hasAttribute('data-search-clear-history')){try{localStorage.removeItem('fold-search-history')}catch(err){}renderStart();return;}if(b.dataset.searchArtist!==undefined){artist(b.dataset.searchArtist);return;}if(b.dataset.searchSong!==undefined){song(b.dataset.searchSong);return;}if(b.dataset.searchMode==='artist')artist(input.value);if(b.dataset.searchMode==='song')song(input.value);});
+  document.addEventListener('pointerdown',e=>{if(!$('#globalSearchBox').contains(e.target))close();});
+})();
 
 /* ===== 商品卡片与现有制作参数同步，不复制后端逻辑 ===== */
 (function bindProductDeck(){
