@@ -754,6 +754,16 @@ main.workspace-compact .product-tile strong{font-size:9px}
 main.workspace-compact .prog{margin-top:12px}
 @media(max-width:820px){main.workspace-compact .studio-intro{margin:10px 14px 0;padding:11px 14px}main.workspace-compact .product-deck{margin:10px 14px 0}main.workspace-compact .product-deck__grid{grid-template-columns:repeat(2,1fr)}main.workspace-compact .product-tile--feature{grid-column:span 2}}
 
+
+/* ===== V2：封面库 + 制作队列（取代传统后台两栏骨架） ===== */
+:root{--blue:#5868ee;--blue-deep:#3042c6;--ice:#f5f6fb;--ink-v2:#24263a;--muted-v2:#777b94;--rail-line:#e7e9f3;--surface:#fff}
+body{background:var(--ice);color:var(--ink-v2)}.app{display:grid;grid-template-columns:240px minmax(0,1fr) 258px;height:100%;background:var(--ice)}
+.app>aside:not(.production-rail){width:auto;background:#fff;border-right:1px solid var(--rail-line);box-shadow:none}.brand{padding:25px 22px 18px;background:#fff;border-bottom:0}.brand-overline{color:#6572db}.brand h1{color:#272941;font-family:Inter,"Microsoft YaHei",sans-serif;font-size:20px;font-weight:800;letter-spacing:-.03em}.brand p{color:#7b7f95;font-size:11px;line-height:1.6}.dot{background:#5e6efa;border-radius:4px;width:14px;height:14px}.side-body{padding:12px 16px 24px;background:#fff}.tabs{background:#f3f4f9;border-color:transparent;border-radius:9px}.tabs button{padding:9px 3px;font-size:11.5px;color:#777c93}.tabs button.on{background:#5a6bed;color:#fff;box-shadow:0 5px 10px rgba(73,92,218,.2)}.source-helper,.output-title{margin-top:18px}.source-helper span,.output-title span{color:#5a6bed}.source-helper b,.output-title b,.lbl,.kctog .sw b{color:#30334b}.source-helper em,.output-title em,.lbl em{display:none}.pane{margin-top:12px}.row input,input[type=text],input[type=number],select{border-color:#e2e4ef;background:#fafbfe;color:#2a2e47;border-radius:8px;font-size:12px}.row input:focus,input:focus,select:focus{border-color:#7786f4;box-shadow:0 0 0 3px rgba(88,104,238,.12)}button.btn{background:#f3f4f9;border-color:transparent;color:#4c5473;border-radius:8px;font-size:11.5px}.exitbox{border-color:#e4e6ef;background:#f9faff}.kctog{border-color:#e4e6ef;background:#fff;border-radius:9px}.kctog:has(input:checked){border-color:#c7cef8;background:#f7f8ff}.create-footer{border-top-color:#e5e7f0}.create-footer b{color:#30334b}.create-footer .go{background:#5a6bed;box-shadow:0 7px 15px rgba(73,92,218,.25)}.create-footer .go:hover:not(:disabled){background:#4354d2}
+main{background:#f7f8fc;min-width:0}.bar{background:rgba(255,255,255,.88);border-bottom:1px solid #e7e9f1;box-shadow:none}.bar .ttl{color:#2c2f47}.bar .acts .btn{background:#fff;border-color:#e2e5f0;color:#59607a}.bar .acts .btn:hover{background:#f0f2ff;border-color:#bdc6f9}.studio-intro{min-height:214px;margin:20px 24px 0;padding:30px 34px;border-radius:16px;background:linear-gradient(115deg,#5b69ec,#7785f6);box-shadow:0 18px 34px rgba(78,95,213,.2)}.studio-intro::after{content:"";position:absolute;right:27%;top:-45%;width:300px;height:300px;border-radius:50%;background:rgba(255,255,255,.08)}.intro-index{color:#dfe4ff}.intro-copy h2{font-family:Inter,"Microsoft YaHei",sans-serif;font-size:34px;font-weight:800;line-height:1.1;letter-spacing:-.045em}.intro-copy p{color:#edf0ff;font-size:12px;max-width:450px}.disc-shape{background:radial-gradient(circle at center,#fff 0 9%,#3748bd 10% 14%,transparent 14.5%),repeating-radial-gradient(circle at center,#3141b3 0 2px,#5262d4 3px 5px);border-color:rgba(255,255,255,.7);box-shadow:0 18px 32px rgba(32,43,125,.25)}.cover-shape{background:#f4edc6;color:#3749bd;box-shadow:10px 12px 0 rgba(45,55,147,.25)}.product-deck{margin:21px 24px 0}.section-head span{color:#6574e7}.section-head h2{font-size:18px;color:#2b2e46;letter-spacing:-.025em}.section-head p{font-size:11px;color:#7c8097}.product-deck__grid{grid-template-columns:1.25fr repeat(4,1fr);gap:9px}.product-tile{min-height:128px;border-color:#e2e5ee;border-radius:12px;background:#fff;color:#30344c}.product-tile:hover:not(:disabled){border-color:#aeb9f2;box-shadow:0 12px 26px -18px rgba(66,84,194,.38)}.product-tile i{color:#6373e9}.product-tile b{margin-top:20px}.product-tile small{color:#8b90a4}.product-tile strong{color:#596bdd}.product-tile--feature{background:linear-gradient(140deg,#eef0ff,#e8ecff);border-color:#cbd2fb}.product-tile--feature b{font-family:Inter,"Microsoft YaHei",sans-serif;font-size:18px;font-weight:800}.product-tile--soon{background:#f2f3f7}.product-tile.is-active{outline-color:#5868ee}.prog{margin:16px 24px 0;background:#e0e4fa}.prog i{background:linear-gradient(90deg,#5668ec,#92a0ff)}.content{padding:14px 24px 36px}.studio-empty{min-height:230px;border-color:#d9ddeb;background:#fff;text-align:left}.empty-number{color:#6575e8}.studio-empty h3{font-family:Inter,"Microsoft YaHei",sans-serif;color:#2b2e46;font-size:23px;font-weight:700;letter-spacing:-.03em}.studio-empty p{color:#7c8195}.empty-notes{color:#596bdd}.empty-notes i{background:#d4d9ee}.item,.albC{border-color:#e2e5ee;border-radius:12px;box-shadow:0 4px 14px rgba(45,54,106,.05)}.item::before{background:linear-gradient(90deg,#5b6ced,#a7b2ff)}.item:hover,.albC:hover{border-color:#b5bef3;box-shadow:0 14px 28px -18px rgba(58,75,181,.27)}.albC.sel{border-color:#5969ec;box-shadow:0 0 0 1px #5969ec,0 12px 28px -14px rgba(58,75,181,.3)}
+.production-rail{background:#fff;border-left:1px solid #e7e9f1;padding:20px 16px;overflow-y:auto;display:flex;flex-direction:column;color:#35384e}.rail-brand{display:flex;align-items:center;font-size:12px;font-weight:800}.rail-brand i{width:8px;height:8px;background:#65d08c;border-radius:50%;margin-left:auto;box-shadow:0 0 0 4px #edfbf2}.rail-project{display:flex;gap:10px;align-items:center;margin:20px 0;padding:11px;border-radius:10px;background:#f4f5fb}.rail-cover{width:36px;height:36px;border-radius:8px;display:grid;place-items:center;color:white;background:linear-gradient(145deg,#4e60de,#91a0ff);font-size:17px}.rail-project b{display:block;font-size:11px}.rail-project small{display:block;margin-top:2px;color:#858a9e;font-size:9.5px;line-height:1.35}.rail-section{padding:16px 0;border-top:1px solid #edf0f5}.rail-section__head{display:flex;align-items:center}.rail-section__head b{font-size:11px}.rail-section__head span{margin-left:auto;color:#888da2;font-size:9px}.rail-selected{margin-top:11px;min-height:78px;border:1px dashed #d5d9e7;border-radius:9px;padding:10px;background:#fafbfe}.rail-selected p{font-size:10.5px;color:#6d738a;margin:0}.rail-selected small{display:block;color:#9a9fb0;font-size:9px;line-height:1.5;margin-top:3px}.rail-output{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid #eef0f5}.rail-output:last-child{border-bottom:0}.rail-output i{width:6px;height:6px;border-radius:50%;background:#6475ec;flex:none}.rail-output b{font-size:10px}.rail-output small{display:block;color:#9297aa;font-size:8.5px;margin-top:1px}.rail-steps ol{list-style:none;padding:10px 0 0;margin:0;display:grid;gap:12px}.rail-steps li{display:flex;gap:9px;align-items:center;color:#9da2b1}.rail-steps li i{font-style:normal;width:20px;height:20px;display:grid;place-items:center;border-radius:50%;background:#f0f1f6;font-size:9px}.rail-steps li.active{color:#4657d6}.rail-steps li.active i{background:#5b6bed;color:#fff}.rail-steps li b{font-size:10.5px;display:block}.rail-steps li small{font-size:9px;display:block;margin-top:1px}.rail-library{margin-top:auto;padding:10px;border-radius:9px;border:1px solid #dfe3ef;background:#fff;color:#535b7b;font:600 11px Inter,"Microsoft YaHei",sans-serif;cursor:pointer;text-align:left}.rail-library span{float:right;font-size:15px;line-height:10px}.rail-library:hover{border-color:#98a5ee;color:#4355d7;background:#f6f7ff}
+main.workspace-compact .studio-intro{margin:11px 20px 0;background:linear-gradient(115deg,#5b69ec,#7785f6);box-shadow:0 8px 18px rgba(78,95,213,.15)}main.workspace-compact .product-deck{margin:10px 20px 0}main.workspace-compact .prog{margin:10px 20px 0}main.workspace-compact .content{padding-left:20px;padding-right:20px}
+@media(max-width:1280px){.app{grid-template-columns:224px minmax(0,1fr)}.production-rail{display:none}.studio-intro,.product-deck{margin-left:18px;margin-right:18px}.content{padding-left:18px;padding-right:18px}.product-deck__grid{grid-template-columns:repeat(3,1fr)}.product-tile--feature{grid-column:span 2}}@media(max-width:820px){.app{display:block;height:auto}.app>aside:not(.production-rail){width:auto}.studio-intro{margin:12px}.product-deck{margin:18px 12px}.content{padding:14px 12px}.product-deck__grid{grid-template-columns:repeat(2,1fr)}.product-tile--feature{grid-column:span 2}main.workspace-compact .studio-intro,main.workspace-compact .product-deck,main.workspace-compact .prog{margin-left:12px;margin-right:12px}main.workspace-compact .content{padding-left:12px;padding-right:12px}}
+
 </style>
 </head>
 <body data-page-node-id="Na2JkVOieEwQ90ny6oba1N">
@@ -1059,6 +1069,13 @@ main.workspace-compact .prog{margin-top:12px}
       <iframe id="dwFrame" src="about:blank" title="迷你CD 设计工作台"></iframe>
     </div>
   </main>
+  <aside class="production-rail" aria-label="制作清单">
+    <div class="rail-brand"><span>制作清单</span><i></i></div>
+    <div class="rail-project"><div class="rail-cover"><span>♪</span></div><div><b>当前项目</b><small>先从中间选择一张封面</small></div></div>
+    <div class="rail-section"><div class="rail-section__head"><b>已选商品</b><span id="railCount">0 项</span></div><div id="railSelected" class="rail-selected"><p>还没有加入商品</p><small>选择中间的商品卡片后会显示在这里。</small></div></div>
+    <div class="rail-section rail-steps"><div class="rail-section__head"><b>制作流程</b><span>01 / 03</span></div><ol><li class="active"><i>1</i><span><b>找到音乐</b><small>搜索歌手或单曲</small></span></li><li><i>2</i><span><b>选择商品</b><small>按封面制作不同周边</small></span></li><li><i>3</i><span><b>生成与下载</b><small>作品库保留全部历史</small></span></li></ol></div>
+    <button class="rail-library" type="button" id="railLib">打开作品库 <span>→</span></button>
+  </aside>
 </div>
 
 <!-- 作品库：历史任务清单（数据来自后端 /api/jobs，读磁盘 meta.json） -->
@@ -2673,11 +2690,18 @@ document.addEventListener('keydown', e=>{
 (function bindProductDeck(){
   function clickTarget(id){ const el=$(id); if(!el || el.disabled) return false; if(!el.checked){ el.checked=true; el.dispatchEvent(new Event('change',{bubbles:true})); } return true; }
   function updateProductTiles(){
+    const map={keychain:'#p_keychain',shop:'#p_shop',vinyl:'#p_vinyl'};
+    const labels={keychain:['钥匙扣商品图','实物合成'],shop:['电商白底图','白底 / 透明底'],vinyl:['黑胶播放界面','竖版播放图']};
+    const active=[];
     $$('.product-tile[data-product]').forEach(tile=>{
-      const map={keychain:'#p_keychain',shop:'#p_shop',vinyl:'#p_vinyl'};
       const target=map[tile.dataset.product];
-      tile.classList.toggle('is-active', !!(target && $(target) && $(target).checked));
+      const chosen=!!(target && $(target) && $(target).checked);
+      tile.classList.toggle('is-active',chosen);
+      if(chosen) active.push(labels[tile.dataset.product]);
     });
+    const list=$('#railSelected'), count=$('#railCount');
+    if(count) count.textContent=active.length+' 项';
+    if(list) list.innerHTML=active.length ? active.map(([name,desc])=>`<div class="rail-output"><i></i><span><b>${name}</b><small>${desc}</small></span></div>`).join('') : '<p>还没有加入商品</p><small>选择中间的商品卡片后会显示在这里。</small>';
   }
   $$('.product-tile[data-product]').forEach(tile=>tile.addEventListener('click',()=>{
     const type=tile.dataset.product;
@@ -2688,6 +2712,7 @@ document.addEventListener('keydown', e=>{
     updateProductTiles();
   }));
   ['#p_keychain','#p_shop','#p_vinyl'].forEach(id=>{const el=$(id); if(el) el.addEventListener('change',updateProductTiles);});
+  const railLib=$('#railLib'); if(railLib) railLib.onclick=()=>$('#btnLib').click();
   updateProductTiles();
 })();
 
