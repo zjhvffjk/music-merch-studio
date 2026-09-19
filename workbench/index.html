@@ -782,6 +782,14 @@ body.has-active-production main.workspace-compact .content{padding-top:18px}
 /* 搜索下拉内的按钮必须脱离顶部清空按钮的绝对定位规则 */
 .global-search .search-popover button,.global-search .search-popover .search-popover__action{position:static;right:auto;top:auto}.global-search .search-popover__actions .search-popover__action{display:block;width:100%}.global-search .search-popover__row{display:flex;width:100%}
 
+
+/* 发现页只做一件事：找到音乐。商品选择留到选定封面之后。 */
+.studio-intro,.product-deck{display:none}
+.production-rail{display:none}
+.app{grid-template-columns:minmax(0,1fr)}
+.discover-home{width:min(880px,calc(100% - 48px));margin:44px auto 60px;padding:54px 58px;border:1px solid #e2e5ef;border-radius:18px;background:linear-gradient(145deg,#fff 0%,#f1f3ff 100%);box-shadow:0 20px 45px -34px rgba(57,71,162,.44);position:relative;overflow:hidden}
+.discover-home::after{content:'◌';position:absolute;right:42px;top:10px;color:#e2e6ff;font:250px/1 Georgia,serif;z-index:0}.discover-home>*{position:relative;z-index:1}.discover-home__eyebrow{font-size:10px;font-weight:800;letter-spacing:.18em;color:#6173e9}.discover-home h2{margin:15px 0 13px;color:#282d4a;font:700 38px/1.13 Inter,"Microsoft YaHei",sans-serif;letter-spacing:-.05em}.discover-home p{max-width:520px;margin:0;color:#727994;font-size:14px;line-height:1.8}.discover-home__quick{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-top:34px}.discover-home__quick span{margin-right:4px;font-size:11px;color:#707791}.discover-home__quick button{padding:8px 13px;border:1px solid #dce0f2;border-radius:999px;background:#fff;color:#424a70;font:12px Inter,"Microsoft YaHei",sans-serif;cursor:pointer}.discover-home__quick button:hover{border-color:#7d8af0;background:#eff1ff;color:#4054c4}.discover-home__footer{display:flex;align-items:center;gap:15px;margin-top:38px;padding-top:18px;border-top:1px solid #e2e5ef}.discover-home__footer button{border:0;background:transparent;padding:0;color:#4f60d5;font:700 13px Inter,"Microsoft YaHei",sans-serif;cursor:pointer}.discover-home__footer button b{margin-left:5px;font-size:17px}.discover-home__footer small{color:#9096ac;font-size:11px}
+@media(max-width:720px){.discover-home{width:calc(100% - 28px);margin:24px auto;padding:34px 27px}.discover-home h2{font-size:30px}.discover-home::after{right:-20px;top:45px;font-size:180px}.discover-home__footer{align-items:flex-start;flex-direction:column;gap:7px}}
 </style>
 </head>
 <body data-page-node-id="Na2JkVOieEwQ90ny6oba1N">
@@ -1078,12 +1086,13 @@ body.has-active-production main.workspace-compact .content{padding-top:18px}
     <div class="progwrap" data-page-node-id="Lghzpgv6uXa9UszZc9JHUt"></div>
 
     <div class="content" id="content" data-page-node-id="SwJHkFeLf7BKlOBYCjskNI">
-      <div class="empty studio-empty" data-page-node-id="wCnHj1Y1BVHxpJOAeUZP2e">
-        <div class="empty-number">NOW</div>
-        <h3 data-page-node-id="D8XPSmM6OnIX7zijCUNJhS">还没有待制作的音乐</h3>
-        <p data-page-node-id="HCF0oppvfkdAmnONxhmwH5">从左侧搜索歌手、指定单曲或上传一张封面。选中歌曲后，这里会展示你的制作过程和最终作品。</p>
-        <div class="empty-notes"><span>原始封面</span><i></i><span>商品选择</span><i></i><span>生成与下载</span></div>
-      </div>
+      <section class="discover-home" aria-label="开始制作音乐周边">
+        <span class="discover-home__eyebrow">MUSIC OBJECTS / DISCOVER</span>
+        <h2>先找到一段音乐，<br>再把它做成商品。</h2>
+        <p>搜索歌手、单曲或专辑；选定封面后再选择迷你 CD、商品图或后续新增的周边类型。</p>
+        <div class="discover-home__quick"><span>热门搜索</span><button type="button" data-discover-artist="周杰伦">周杰伦</button><button type="button" data-discover-artist="陈奕迅">陈奕迅</button><button type="button" data-discover-artist="林俊杰">林俊杰</button><button type="button" data-discover-artist="孙燕姿">孙燕姿</button></div>
+        <div class="discover-home__footer"><button type="button" data-discover-upload>上传自己的封面 <b>→</b></button><small>支持网易云、QQ 音乐与本地封面</small></div>
+      </section>
     </div>
 
     <!-- 专辑工作台：搜索结果铺在主区；点一张就地换成设计工作台（iframe，不再跳页） -->
@@ -2750,6 +2759,13 @@ $('#libRefresh').onclick = ()=> libLoad(false);
 $('#lib').onclick = e=>{ if(e.target === $('#lib')) libClose(); };
 document.addEventListener('keydown', e=>{
   if(e.key === 'Escape' && $('#lib').classList.contains('on')) libClose();
+});
+
+/* 首页快捷入口沿用顶部搜索与上传流程，不另起一套功能。 */
+document.addEventListener('click', e=>{
+  const artist=e.target.closest('[data-discover-artist]');
+  if(artist){ const input=$('#globalSearch'); input.value=artist.dataset.discoverArtist; input.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true})); return; }
+  if(e.target.closest('[data-discover-upload]')){ const tab=$('.music-nav [data-nav-mode="upload"]'); if(tab) tab.click(); }
 });
 
 /* ===== 全局搜索：历史、热搜、输入联想与两种结果入口 ===== */
