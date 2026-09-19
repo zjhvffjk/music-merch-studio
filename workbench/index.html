@@ -790,6 +790,9 @@ body.has-active-production main.workspace-compact .content{padding-top:18px}
 .discover-home{width:min(880px,calc(100% - 48px));margin:44px auto 60px;padding:54px 58px;border:1px solid #e2e5ef;border-radius:18px;background:linear-gradient(145deg,#fff 0%,#f1f3ff 100%);box-shadow:0 20px 45px -34px rgba(57,71,162,.44);position:relative;overflow:hidden}
 .discover-home::after{content:'◌';position:absolute;right:42px;top:10px;color:#e2e6ff;font:250px/1 Georgia,serif;z-index:0}.discover-home>*{position:relative;z-index:1}.discover-home__eyebrow{font-size:10px;font-weight:800;letter-spacing:.18em;color:#6173e9}.discover-home h2{margin:15px 0 13px;color:#282d4a;font:700 38px/1.13 Inter,"Microsoft YaHei",sans-serif;letter-spacing:-.05em}.discover-home p{max-width:520px;margin:0;color:#727994;font-size:14px;line-height:1.8}.discover-home__quick{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-top:34px}.discover-home__quick span{margin-right:4px;font-size:11px;color:#707791}.discover-home__quick button{padding:8px 13px;border:1px solid #dce0f2;border-radius:999px;background:#fff;color:#424a70;font:12px Inter,"Microsoft YaHei",sans-serif;cursor:pointer}.discover-home__quick button:hover{border-color:#7d8af0;background:#eff1ff;color:#4054c4}.discover-home__footer{display:flex;align-items:center;gap:15px;margin-top:38px;padding-top:18px;border-top:1px solid #e2e5ef}.discover-home__footer button{border:0;background:transparent;padding:0;color:#4f60d5;font:700 13px Inter,"Microsoft YaHei",sans-serif;cursor:pointer}.discover-home__footer button b{margin-left:5px;font-size:17px}.discover-home__footer small{color:#9096ac;font-size:11px}
 @media(max-width:720px){.discover-home{width:calc(100% - 28px);margin:24px auto;padding:34px 27px}.discover-home h2{font-size:30px}.discover-home::after{right:-20px;top:45px;font-size:180px}.discover-home__footer{align-items:flex-start;flex-direction:column;gap:7px}}
+
+/* 歌曲表内的制作器：商品选择只属于当前正在制作的那一首歌。 */
+.inline-maker-row td{padding:0!important;background:#f4f6ff!important;border-bottom:1px solid #d9dff8!important}.inline-maker{padding:17px 18px 18px;border-left:3px solid #6072ed}.inline-maker__head{display:flex;align-items:baseline;gap:10px;margin-bottom:13px}.inline-maker__head b{font-size:14px;color:#303755}.inline-maker__head small{font-size:11px;color:#7a829e}.inline-products{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}.inline-product{min-height:82px;padding:11px 12px;border:1px solid #dce1f3;border-radius:9px;background:#fff;text-align:left;cursor:pointer;color:#4b5270;font-family:inherit}.inline-product:hover{border-color:#9eabf4}.inline-product.is-on{border-color:#6576ed;background:#eef0ff;box-shadow:inset 0 0 0 1px #6576ed}.inline-product i{display:block;margin-bottom:6px;color:#6475e9;font-style:normal;font-size:10px;font-weight:800}.inline-product b{display:block;font-size:12px;color:#323850}.inline-product small{display:block;margin-top:4px;color:#8b91a8;font-size:10px;line-height:1.4}.inline-maker__foot{display:flex;align-items:center;gap:12px;margin-top:13px}.inline-maker__foot span{margin-right:auto;color:#7b829b;font-size:10px}.inline-maker__foot button{padding:8px 13px;border:1px solid #c8cedf;border-radius:5px;background:#fff;color:#4b5270;font:12px Inter,"Microsoft YaHei",sans-serif;cursor:pointer}.inline-maker__foot button.primary{border-color:#286eb3;background:linear-gradient(#4aa3e9,#1f79c4);color:#fff}.inline-maker__foot button:disabled{opacity:.55;cursor:wait}@media(max-width:720px){.inline-products{grid-template-columns:1fr}.inline-maker{padding:14px}.inline-maker__foot{flex-wrap:wrap}.inline-maker__foot span{width:100%}}
 </style>
 </head>
 <body data-page-node-id="Na2JkVOieEwQ90ny6oba1N">
@@ -1061,7 +1064,7 @@ body.has-active-production main.workspace-compact .content{padding-top:18px}
         <div class="search-popover" id="searchPopover" hidden></div>
       </div>
       <div class="acts" data-page-node-id="nA8nfcPZ8EFbpGO8AKelGL">
-        <button class="btn" id="btnControls" type="button">制作参数</button><button class="btn" id="btnLib" data-page-node-id="LibBtn0Xq7Lm2NvB4tRw">作品库</button>
+        <button class="btn" id="btnLib" data-page-node-id="LibBtn0Xq7Lm2NvB4tRw">作品库</button>
         <button class="btn" id="btnZip" disabled data-page-node-id="8dnzDgZKgdLJkvAyCGhr6J">下载 ZIP</button>
         <button class="btn" id="btnOpen" disabled data-page-node-id="xvXDAU5GrOG07sHWJ3USxk">打开文件夹</button>
         <button class="btn" id="btnTheme" title="切换深色 / 浅色" data-page-node-id="ThemeBtn0Xq7Lm2NvB4tRw">🌙 暗</button>
@@ -1392,7 +1395,32 @@ function renderArtistResultStage(data){
   const albumRows=albums.map((album,i)=>`<div class="side-album" data-album="${i}"><img src="${esc(asset(album.pic||''))}" alt=""><span><b>${esc(album.name||'未命名专辑')}</b><small>${esc([album.date,album.type].filter(Boolean).join(' · ')||'专辑')}</small></span></div>`).join('');
   box.className='albStage music-search-stage';
   box.innerHTML=`<div class="music-page"><section class="music-page__main"><div class="artist-info">${pic?`<img class="artist-info__cover" src="${esc(pic)}" alt="${esc(artist.name||'')}">`:'<div class="artist-info__cover"></div>'}<div class="artist-info__copy"><span class="artist-info__tag">歌手</span><h2>${esc(artist.name||ARTIST_Q||'搜索结果')}</h2><div class="artist-info__meta">热门单曲 ${songs.length} 首　·　专辑 ${ALBUM_LIST.length||data.albumCount||0} 张　·　来源 ${data.source==='qq'?'QQ音乐':'网易云音乐'}</div><div class="artist-info__actions"><button type="button" class="primary" id="artistMakeHot">按热门生成</button><button type="button" id="artistBrowseAlbums">查看全部专辑</button></div></div></div><div class="artist-summary"><b>音乐资料</b>从这里挑选一首单曲或一张专辑，再交给右侧的商品制作队列。封面、曲名和歌手信息会继续传入现有生成流程。</div><div class="track-head"><h3>热门歌曲</h3><span>${songs.length} 首</span><button type="button" id="artistSongMode">按关键词搜索更多单曲 →</button></div><table class="track-table"><thead><tr><th class="no">#</th><th>歌曲标题</th><th>专辑</th><th class="duration">时长</th><th></th></tr></thead><tbody>${rows||'<tr><td colspan="5">暂无歌曲数据</td></tr>'}</tbody></table></section><aside class="music-page__side"><div class="side-title">相关专辑</div>${albumRows||'<p class="search-popover__empty">暂无专辑数据</p>'}${ALBUM_LIST.length>albums.length?'<button class="side-more" id="artistSideMore" type="button">查看全部专辑 →</button>':''}</aside></div>`;
-  const chooseSong=i=>{const track=songs[i];if(!track)return;uiMode('song');$('#songKw').value=(track.name||'')+' '+(track.artist||artist.name||'');$('#btnQuerySong').click();};
+  const chooseSong=async i=>{
+    const track=songs[i]; if(!track)return;
+    const prior=box.querySelector('.inline-maker-row');
+    if(prior && Number(prior.dataset.track)===i){prior.remove();return;}
+    if(prior)prior.remove();
+    const row=box.querySelector(`.artist-track[data-track="${i}"]`); if(!row)return;
+    row.insertAdjacentHTML('afterend',`<tr class="inline-maker-row" data-track="${i}"><td colspan="5"><div class="inline-maker"><div class="inline-maker__head"><b>制作《${esc(track.name||'未命名歌曲')}》</b><small>封面会自动从当前歌曲获取</small></div><div class="inline-products"><button type="button" class="inline-product" data-output="keychain"><i>01</i><b>钥匙扣商品图</b><small>实物合成 · 可直接上架</small></button><button type="button" class="inline-product" data-output="shop"><i>02</i><b>白底商品图</b><small>白底 / 透明底商品素材</small></button><button type="button" class="inline-product" data-output="vinyl"><i>03</i><b>黑胶播放界面</b><small>竖版唱片视觉</small></button></div><div class="inline-maker__foot"><span class="inline-maker__status">正在匹配歌曲封面…</span><button type="button" class="inline-maker__cancel">取消</button><button type="button" class="inline-maker__start primary" disabled>开始制作 →</button></div></div></td></tr>`);
+    const panel=row.nextElementSibling; const status=panel.querySelector('.inline-maker__status'); const start=panel.querySelector('.inline-maker__start');
+    const selected={keychain:!!$('#p_keychain').checked,shop:!!$('#p_shop').checked,vinyl:!!$('#p_vinyl').checked};
+    const sync=()=>panel.querySelectorAll('.inline-product').forEach(b=>b.classList.toggle('is-on',!!selected[b.dataset.output]));
+    panel.querySelectorAll('.inline-product').forEach(b=>b.onclick=()=>{selected[b.dataset.output]=!selected[b.dataset.output];sync();});
+    panel.querySelector('.inline-maker__cancel').onclick=()=>panel.remove(); sync();
+    try{
+      const d=await jget('/api/song?name='+encodeURIComponent((track.name||'')+' '+(artist.name||'')));
+      const found=(d.songs||[]).find(x=>x.name===track.name && String(x.artist||'').includes(artist.name||'')) || (d.songs||[])[0];
+      if(!found)throw new Error('没有找到可用封面');
+      status.textContent='已匹配封面 · 可选择需要同时输出的商品'; start.disabled=false;
+      start.onclick=()=>{
+        MODE='song'; PICK=0; SEL=found; $('#songKw').value=(track.name||'')+' '+(found.artist||artist.name||'');
+        $('#p_keychain').checked=selected.keychain; $('#p_keychain').dispatchEvent(new Event('change'));
+        $('#p_shop').checked=selected.shop; $('#p_shop').dispatchEvent(new Event('change'));
+        $('#p_vinyl').checked=selected.vinyl; $('#p_vinyl').dispatchEvent(new Event('change'));
+        $('#btnGo').click();
+      };
+    }catch(e){status.textContent='封面匹配失败：'+(e.message||'请重试');}
+  };
   box.querySelectorAll('.artist-track').forEach(row=>row.addEventListener('click',()=>chooseSong(Number(row.dataset.track))));
   box.querySelectorAll('.track-table .make button').forEach(btn=>btn.addEventListener('click',e=>{e.stopPropagation();chooseSong(Number(btn.dataset.track));}));
   const browse=()=>{uiMode('album');renderAlbumStage();showAlbumStage();};
@@ -1826,7 +1854,6 @@ $('#artistName').addEventListener('keydown', e=>{
 /* 顶部红色导航只切换搜索入口，不清掉当前结果。 */
 $$('.music-nav [data-nav-mode]').forEach(btn=>btn.addEventListener('click',()=>{
   const mode=btn.dataset.navMode;
-  document.body.classList.add('production-controls-open'); $('#btnControls').textContent='收起参数';
   uiMode(mode);
   const field=mode==='artist' ? $('#artistName') : mode==='song' ? $('#songKw') : $('#uploadFile');
   if(field) field.focus();
@@ -2739,10 +2766,7 @@ async function libDel(id){
 $$('#libcat button').forEach(b=>{
   b.onclick = ()=>{ libSetCat(b.dataset.c); libPaint(); };
 });
-$('#btnControls').onclick = ()=>{
-  const open=document.body.classList.toggle('production-controls-open');
-  $('#btnControls').textContent=open ? '收起参数' : '制作参数';
-};
+
 $('#btnLib').onclick = ()=> libOpen();
 $('#libClose').onclick = libClose;
 /* ---- 批量选择接线（2026-09-19）---- */
