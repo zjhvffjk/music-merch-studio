@@ -2656,7 +2656,7 @@ document.addEventListener('keydown', e=>{
   $$('.product-tile[data-product]').forEach(tile=>tile.addEventListener('click',()=>{
     const type=tile.dataset.product;
     if(type==='nfc'){ toast('NFC 音乐小卡已预留入口，制作模块下一步接入。'); return; }
-    if(type==='minicd'){ setMode('artist'); $('#artistName').focus(); toast('先搜索歌手并选择专辑封面，即可进入迷你 CD 设计。'); return; }
+    if(type==='minicd'){ uiMode('artist'); $('#artistName').focus(); toast('先搜索歌手并选择专辑封面，即可进入迷你 CD 设计。'); return; }
     const map={keychain:'#p_keychain',shop:'#p_shop',vinyl:'#p_vinyl'};
     if(clickTarget(map[type])) toast('已加入「'+tile.querySelector('b').textContent+'」输出');
     updateProductTiles();
@@ -2738,3 +2738,4 @@ $('.brand h1').ondblclick = ()=> showConn(true);
 </script>
 </body>
 </html>
+
