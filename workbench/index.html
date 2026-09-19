@@ -734,6 +734,26 @@ main{background:linear-gradient(125deg,#f7f3ea,#ede8de);overflow-y:auto}.bar{pos
 @media(max-width:1100px){aside{width:310px}.studio-intro,.product-deck{margin-left:22px;margin-right:22px}.content{padding-left:22px;padding-right:22px}.product-deck__grid{grid-template-columns:repeat(3,1fr)}.product-tile--feature{grid-column:span 2}.intro-art{width:245px}.disc-shape{right:-70px}.section-head{align-items:start;flex-direction:column}.section-head p{max-width:480px}}
 @media(max-width:820px){body{overflow:auto}.app{display:block}aside{width:auto;min-height:0;box-shadow:none}.side-body{max-height:none}.studio-intro{margin:14px;min-height:230px;padding:28px}.intro-copy h2{font-size:34px}.intro-art{display:none}.product-deck{margin:24px 14px}.product-deck__grid{grid-template-columns:repeat(2,1fr)}.product-tile--feature{grid-column:span 2}.content{padding:16px 14px 30px}.prog{margin:14px}.studio-empty{padding:30px 24px}.create-footer{position:sticky;bottom:0;z-index:3;background:#eee8dd;padding:12px 0}.empty-notes{flex-wrap:wrap}}
 
+
+/* 搜索/生成后：首次引导自动折叠，优先把高度交还给结果和商品图 */
+main.workspace-compact .studio-intro{min-height:0;margin-top:12px;padding:13px 20px;border-radius:13px;box-shadow:0 8px 22px rgba(24,62,44,.11)}
+main.workspace-compact .intro-copy{max-width:none;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+main.workspace-compact .intro-index{font-size:9px;white-space:nowrap}
+main.workspace-compact .intro-copy h2{font-family:Inter,"Microsoft YaHei",sans-serif;font-size:15px;font-weight:700;line-height:1.25;letter-spacing:0;margin:0}
+main.workspace-compact .intro-copy h2 br{display:none}
+main.workspace-compact .intro-copy p,main.workspace-compact .intro-art{display:none}
+main.workspace-compact .product-deck{margin-top:12px;margin-bottom:2px}
+main.workspace-compact .section-head{display:none}
+main.workspace-compact .product-deck__grid{gap:7px}
+main.workspace-compact .product-tile{min-height:74px;padding:9px 11px;border-radius:10px}
+main.workspace-compact .product-tile i{font-size:9px}
+main.workspace-compact .product-tile b{margin-top:5px;font-size:12px}
+main.workspace-compact .product-tile--feature b{font-family:Inter,"Microsoft YaHei",sans-serif;font-size:13px;font-weight:700}
+main.workspace-compact .product-tile small{margin-top:1px;font-size:9px}
+main.workspace-compact .product-tile strong{font-size:9px}
+main.workspace-compact .prog{margin-top:12px}
+@media(max-width:820px){main.workspace-compact .studio-intro{margin:10px 14px 0;padding:11px 14px}main.workspace-compact .product-deck{margin:10px 14px 0}main.workspace-compact .product-deck__grid{grid-template-columns:repeat(2,1fr)}main.workspace-compact .product-tile--feature{grid-column:span 2}}
+
 </style>
 </head>
 <body data-page-node-id="Na2JkVOieEwQ90ny6oba1N">
@@ -1255,7 +1275,11 @@ let DW_URL   = '';    // 当前 iframe 载入的地址（重复点同一张不�
 let ARTIST_FOUND = null;
 
 /* 弹层切换：专辑网格 与 生成结果 共用主区，同一时刻只显示一个 */
+function setWorkspaceCompact(on = true){
+  const main = document.querySelector('main'); if(main) main.classList.toggle('workspace-compact', on);
+}
 function showAlbumStage(){
+  setWorkspaceCompact(true);
   const s = $('#albStage'); if(s) s.hidden = false;
   const c = $('#content');  if(c) c.hidden = true;
   /* 顶栏标题跟着一起走 —— 不然主区已经是专辑墙了，标题还写着「未开始」 */
@@ -1993,6 +2017,8 @@ function setTitle(t, s){ $('#ttl').childNodes[0].nodeValue = t; $('#sub').textCo
 function setProgress(p){ $('#pbar').style.width = Math.max(0, Math.min(100,p)) + '%'; }
 
 function render(d){
+  // 一旦真正开始生成，首页引导不再占用展示面积。
+  setWorkspaceCompact(true);
   if(d.status === 'running'){
     const pct = d.total ? (d.done / d.total * 100) : 6;
     setProgress(pct);
