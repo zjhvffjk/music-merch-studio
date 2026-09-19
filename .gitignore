@@ -4,3 +4,5 @@ workbench/*.log
 workbench/_selftest_*.txt
 __pycache__/
 *.pyc
+
+_review_frames/

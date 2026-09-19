@@ -2713,7 +2713,8 @@ document.addEventListener('keydown', e=>{
   }
   function renderResults(q,songs){
     const rows=songs.slice(0,6).map(x=>`<button class="search-popover__row" type="button" data-search-song="${escape((x.name||'')+' '+(x.artist||''))}">${x.pic?`<img class="search-popover__cover" src="${escape(x.pic)}?param=80y80" alt="">`:'<i class="search-popover__cover"></i>'}<span><b>${escape(x.name)}</b><small>${escape(x.artist||'')} · ${escape(x.album||'')}</small></span><i>${escape(x.dur||'')}</i></button>`).join('');
-    pop.innerHTML=`<div class="search-popover__actions"><button class="search-popover__action" type="button" data-search-artist="${escape(q)}"><b>搜索歌手「${escape(q)}」</b><small>热门歌曲和专辑</small></button><button class="search-popover__action" type="button" data-search-song="${escape(q)}"><b>搜索单曲「${escape(q)}」</b><small>显示可选版本</small></button></div>${rows?`<div class="search-popover__label">单曲联想</div>${rows}`:'<div class="search-popover__empty">没有匹配的单曲，可直接按歌手或关键词搜索。</div>`;
+    const listMarkup = rows ? '<div class="search-popover__label">单曲联想</div>' + rows : '<div class="search-popover__empty">没有匹配的单曲，可直接按歌手或关键词搜索。</div>';
+    pop.innerHTML=`<div class="search-popover__actions"><button class="search-popover__action" type="button" data-search-artist="${escape(q)}"><b>搜索歌手「${escape(q)}」</b><small>热门歌曲和专辑</small></button><button class="search-popover__action" type="button" data-search-song="${escape(q)}"><b>搜索单曲「${escape(q)}」</b><small>显示可选版本</small></button></div>${listMarkup}`;
   }
   input.addEventListener('focus',open);
   input.addEventListener('input',()=>{const q=input.value.trim(); clear.hidden=!q; clearTimeout(timer); if(!q){renderStart();return;} const mine=++token; timer=setTimeout(async()=>{try{const d=await jget('/api/song?name='+encodeURIComponent(q),7000);if(mine===token && !pop.hidden)renderResults(q,d.songs||[])}catch(e){if(mine===token)renderResults(q,[])}},260);});
