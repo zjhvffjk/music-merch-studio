@@ -245,6 +245,7 @@ def new_job(title, mode, opt=None):
         "items": [], "skipped": [], "error": None,
         "overview": None, "keychainOverview": None, "shopGrids": [], "zip": None,
         "playerPrints": [],
+        "playerFoldPrints": [],
         "albumWall": None,
         "dir": d,
         "elapsed": 0.0, "t0": t0,
@@ -292,6 +293,7 @@ def snap(job):
             "keychainOverview": job.get("keychainOverview"),
             "vinylOverview": job.get("vinylOverview"),
             "playerPrints": list(job.get("playerPrints") or []),
+            "playerFoldPrints": list(job.get("playerFoldPrints") or []),
             "albumWall": job.get("albumWall"),
             "shopGrids": job.get("shopGrids") or [],
             "elapsed": round(job["elapsed"], 1),
@@ -383,6 +385,7 @@ def _meta_of(job):
         "keychainOverview": job.get("keychainOverviewFile"),
         "vinylOverview": job.get("vinylOverviewFile"),
         "playerPrints": list(job.get("playerPrints") or []),
+        "playerFoldPrints": list(job.get("playerFoldPrints") or []),
         "albumWall": job.get("albumWallFile"),
         "shopGrids": list(job.get("shopGrids") or []),
         "counts": {
@@ -391,7 +394,7 @@ def _meta_of(job):
             "vinyl": sum(1 for i in items if i.get("vinyl")),
             "shop": sum(len(i.get("shop") or {}) for i in items),
             "grids": len(job.get("shopGrids") or []),
-            "prints": len(job.get("playerPrints") or []),
+            "prints": len(job.get("playerPrints") or []) + len(job.get("playerFoldPrints") or []),
             "albums": sum(1 for i in items if i.get("albumCover")),
             "albumCards": sum(1 for i in items if i.get("albumCard")),
         },
@@ -596,6 +599,10 @@ def job_card(m):
                            "url": _asset_url(jid, x.get("file")),
                            "pdfUrl": _asset_url(jid, x.get("pdf"))}
                          for x in _as_list(m.get("playerPrints")) if isinstance(x, dict)],
+        "playerFoldPrints": [{"label": x.get("label"), "kind": x.get("kind"),
+                                "url": _asset_url(jid, x.get("file")),
+                                "pdfUrl": _asset_url(jid, x.get("pdf"))}
+                               for x in _as_list(m.get("playerFoldPrints")) if isinstance(x, dict)],
         "albumWallUrl": _asset_url(jid, m.get("albumWall")),
         "shopGrids": [{"label": g.get("label"),
                        "url": _asset_url(jid, g.get("file"))}
@@ -1264,6 +1271,130 @@ def render_player_print_sheets(job, made, layout="landscape32", dpi=PRINT_DPI):
 
 
 
+def _dashed_line(draw, xy, length, dash, fill, width=1, vertical=False):
+    """在对折卡中画可识别的虚线折线，保持居中且不改变卡片成品尺寸。"""
+    x, y = xy
+    for at in range(0, length, dash * 2):
+        if vertical:
+            draw.line((x, y + at, x, min(y + at + dash, y + length)), fill=fill, width=width)
+        else:
+            draw.line((x + at, y, min(x + at + dash, x + length), y), fill=fill, width=width)
+
+
+def _fold_card_image(player_path, dpi=PRINT_DPI):
+    """生成一张展开的对折卡：左、右页各 30×50mm，折好后为 30×50mm。"""
+    half_w, card_h = _mm_px(30, dpi), _mm_px(50, dpi)
+    card = Image.new("RGB", (half_w * 2, card_h), "white")
+    with Image.open(player_path) as source:
+        face = ImageOps.fit(source.convert("RGB"), (half_w, card_h), method=Image.Resampling.LANCZOS)
+    card.paste(face, (0, 0))
+    card.paste(face, (half_w, 0))
+    draw = ImageDraw.Draw(card)
+    cut = (42, 42, 42)
+    fold = (92, 92, 92)
+    draw.rectangle((0, 0, card.width - 1, card.height - 1), outline=cut, width=max(1, _mm_px(.18, dpi)))
+    _dashed_line(draw, (half_w, 0), card_h, max(4, _mm_px(1.2, dpi)), fold, width=max(1, _mm_px(.18, dpi)), vertical=True)
+    face.close()
+    return card
+
+
+def _crop_marks(draw, x, y, w, h, dpi=PRINT_DPI):
+    """外置裁切角标；线在成品外，不压到播放器画面。"""
+    off, ln = _mm_px(1.6, dpi), _mm_px(2.3, dpi)
+    color, width = (55, 55, 55), max(1, _mm_px(.16, dpi))
+    for px, py, sx, sy in ((x, y, -1, -1), (x + w, y, 1, -1), (x, y + h, -1, 1), (x + w, y + h, 1, 1)):
+        draw.line((px + sx * off, py, px + sx * (off + ln), py), fill=color, width=width)
+        draw.line((px, py + sy * off, px, py + sy * (off + ln)), fill=color, width=width)
+
+
+def render_player_fold_prints(job, made, dpi=PRINT_DPI):
+    """输出两种对折卡印刷文件：1:1 技术总览与可裁切 A4 拼版。
+
+    每张物料展开为 60×50mm，中心虚线为折线，裁切后对折即得到 30×50mm 成品。
+    """
+    if not made:
+        return []
+    out_dir = os.path.join(job["dir"], "print")
+    os.makedirs(out_dir, exist_ok=True)
+    page_w, page_h = _mm_px(210, dpi), _mm_px(297, dpi)
+    card_w, card_h = _mm_px(60, dpi), _mm_px(50, dpi)
+    font_title = ImageFont.truetype(FONT_BD, _mm_px(4.2, dpi), index=0)
+    font_label = ImageFont.truetype(FONT_BD, _mm_px(2.0, dpi), index=0)
+    font_note = ImageFont.truetype(FONT_BD, _mm_px(1.55, dpi), index=0)
+    line = (50, 50, 50)
+    out = []
+
+    for item in made:
+        ppath = item.get("playerPath")
+        if not ppath or not os.path.isfile(ppath):
+            continue
+        card = _fold_card_image(ppath, dpi)
+        base = safe_name(f"{item.get('rank', 0):02d} {item.get('name') or '播放界面'}")
+
+        # ① 1:1 技术总览：一张展开卡 + 裁切线、折线、尺寸标注、50mm 校验尺。
+        proof = Image.new("RGB", (page_w, page_h), "white")
+        draw = ImageDraw.Draw(proof)
+        margin = _mm_px(14, dpi)
+        draw.text((margin, _mm_px(13, dpi)), "30×50mm 对折播放卡 · 1:1 印刷版面总览", font=font_title, fill=line)
+        draw.line((margin, _mm_px(22, dpi), page_w - margin, _mm_px(22, dpi)), fill=line, width=2)
+        x, y = (page_w - card_w) // 2, _mm_px(62, dpi)
+        proof.paste(card, (x, y))
+        _crop_marks(draw, x, y, card_w, card_h, dpi)
+        # 顶部展开尺寸 60mm；左右分别 30mm。
+        dim_y = y - _mm_px(7, dpi)
+        draw.line((x, dim_y, x + card_w, dim_y), fill=line, width=1)
+        for px in (x, x + card_w // 2, x + card_w):
+            draw.line((px, dim_y - _mm_px(1.5, dpi), px, dim_y + _mm_px(1.5, dpi)), fill=line, width=1)
+        draw.text((x + _mm_px(9, dpi), dim_y - _mm_px(6, dpi)), "左页 30mm", font=font_label, fill=line)
+        draw.text((x + card_w // 2 + _mm_px(7, dpi), dim_y - _mm_px(6, dpi)), "右页 30mm", font=font_label, fill=line)
+        draw.text((x + card_w // 2 - _mm_px(7, dpi), dim_y + _mm_px(2, dpi)), "展开 60mm", font=font_label, fill=line)
+        # 右侧成品高度标注。
+        dim_x = x + card_w + _mm_px(9, dpi)
+        draw.line((dim_x, y, dim_x, y + card_h), fill=line, width=1)
+        draw.line((dim_x - _mm_px(1.5, dpi), y, dim_x + _mm_px(1.5, dpi), y), fill=line, width=1)
+        draw.line((dim_x - _mm_px(1.5, dpi), y + card_h, dim_x + _mm_px(1.5, dpi), y + card_h), fill=line, width=1)
+        draw.text((dim_x + _mm_px(2, dpi), y + card_h // 2 - _mm_px(3, dpi)), "高 50mm", font=font_label, fill=line)
+        draw.text((x + card_w // 2 + _mm_px(3, dpi), y + _mm_px(4, dpi)), "折线", font=font_label, fill=(235, 235, 235))
+        draw.text((x, y + card_h + _mm_px(8, dpi)), "外框实线＝裁切线　中间虚线＝对折线　折好后成品＝30×50mm", font=font_note, fill=(78, 78, 78))
+        # 50mm 校验尺，打印后以物理尺复核，不依赖查看器缩放。
+        ruler_y, ruler_x, ruler_len = page_h - _mm_px(31, dpi), margin, _mm_px(50, dpi)
+        draw.text((ruler_x, ruler_y - _mm_px(7, dpi)), "50mm 校验尺（打印后实测）", font=font_label, fill=line)
+        draw.line((ruler_x, ruler_y, ruler_x + ruler_len, ruler_y), fill=line, width=2)
+        for n in range(0, 51, 5):
+            px = ruler_x + _mm_px(n, dpi)
+            tick = _mm_px(4 if n % 10 == 0 else 2.5, dpi)
+            draw.line((px, ruler_y - tick, px, ruler_y + tick), fill=line, width=2 if n % 10 == 0 else 1)
+        draw.text((ruler_x, page_h - _mm_px(18, dpi)), "打印请选择 100% 原尺寸；不要“适应页面”或缩放。", font=font_label, fill=line)
+        proof_png = os.path.join(out_dir, base + "-对折卡-1比1印刷总览.png")
+        proof_pdf = os.path.join(out_dir, base + "-对折卡-1比1印刷总览.pdf")
+        proof.save(proof_png, dpi=(dpi, dpi)); proof.save(proof_pdf, "PDF", resolution=dpi)
+        rel_png, rel_pdf = _rel(job, proof_png), _rel(job, proof_pdf)
+        out.append({"kind": "proof", "label": f"{item.get('name') or '播放界面'} · 对折卡 1:1 印刷版面总览", "file": rel_png, "url": url_of(job, rel_png), "pdf": rel_pdf, "pdfUrl": url_of(job, rel_pdf)})
+        proof.close()
+
+        # ② 实际 A4 拼版：3×5 个展开卡，每张 60×50mm，保留裁切与折线。
+        cols, rows = 3, 5
+        sheet = Image.new("RGB", (page_w, page_h), "white")
+        draw = ImageDraw.Draw(sheet)
+        grid_w, grid_h = cols * card_w, rows * card_h
+        ox, oy = (page_w - grid_w) // 2, _mm_px(19, dpi)
+        draw.text((ox, _mm_px(8, dpi)), f"{item.get('name') or '播放界面'} · 30×50mm 对折卡 A4 拼版", font=font_label, fill=line)
+        for row in range(rows):
+            for col in range(cols):
+                sx, sy = ox + col * card_w, oy + row * card_h
+                sheet.paste(card, (sx, sy))
+                _crop_marks(draw, sx, sy, card_w, card_h, dpi)
+        foot_y = oy + grid_h + _mm_px(8, dpi)
+        draw.text((ox, foot_y), "3×5＝15 张对折卡｜实线裁切、虚线对折｜折好后每张 30×50mm｜100% 原尺寸打印", font=font_note, fill=(82, 82, 82))
+        sheet_png = os.path.join(out_dir, base + "-对折卡-A4-3x5-15张.png")
+        sheet_pdf = os.path.join(out_dir, base + "-对折卡-A4-3x5-15张.pdf")
+        sheet.save(sheet_png, dpi=(dpi, dpi)); sheet.save(sheet_pdf, "PDF", resolution=dpi)
+        rel_png, rel_pdf = _rel(job, sheet_png), _rel(job, sheet_pdf)
+        out.append({"kind": "sheet", "label": f"{item.get('name') or '播放界面'} · 对折卡 A4 裁切拼版（3×5＝15 张）", "file": rel_png, "url": url_of(job, rel_png), "pdf": rel_pdf, "pdfUrl": url_of(job, rel_pdf)})
+        sheet.close(); card.close()
+    return out
+
+
 def finish(job, made, ar_name, total_label, src=None):
     """收尾: 生成总览 + ZIP"""
     tag = {"qq": " · QQ音乐", "163": " · 网易云"}.get(src, "")
@@ -1294,6 +1425,10 @@ def finish(job, made, ar_name, total_label, src=None):
         if job["playerPrints"]:
             label = PLAYER_PRINT_LAYOUTS[player_print_layout(job.get("playerPrintLayout"))]["label"]
             log(job, f"播放界面 A4 印刷拼版已生成（{len(job['playerPrints'])} 页，{label}）", "ok")
+        job["phase"] = "生成对折卡印刷版面"
+        job["playerFoldPrints"] = render_player_fold_prints(job, play_made)
+        if job["playerFoldPrints"]:
+            log(job, f"对折播放卡印刷文件已生成（{len(job['playerFoldPrints'])} 份：1:1 总览 + A4 拼版）", "ok")
 
     # 钥匙扣总览（1:1，用方形缩略图，别按 3:5 压扁）
     kc_made = [it for it in made if it.get("keychainPath")]

@@ -2421,6 +2421,11 @@ function singleDeliveryView(d){
   const shop=(d.shopGrids||[])[0]; if(shop) tabs.push({key:'shop',no:'03',label:'电商白底图',sub:shop.label||'商品图拼版',url:shop.url,title:shop.label||'电商白底图'});
   if(item.vinylUrl || d.vinylOverview) tabs.push({key:'vinyl',no:'04',label:'黑胶播放界面',sub:'竖图 · 播放卡',url:item.vinylUrl||d.vinylOverview,title:(item.name||'')+' 黑胶播放界面'});
   const print=(d.playerPrints||[])[0]; if(print) tabs.push({key:'print',no:'05',label:'打印制作',sub:print.label||'A4 印刷拼版',url:print.url,pdf:print.pdfUrl,title:print.label||'播放界面 A4 印刷拼版',print:true});
+  const foldPrints=d.playerFoldPrints||[];
+  const foldProof=foldPrints.find(x=>x.kind==='proof')||foldPrints[0];
+  const foldSheet=foldPrints.find(x=>x.kind==='sheet');
+  if(foldProof) tabs.push({key:'fold-proof',no:'06',label:'对折卡版面总览',sub:'1:1 · 裁切 / 折线 / 校验尺',url:foldProof.url,pdf:foldProof.pdfUrl,title:foldProof.label||'对折卡 1:1 印刷版面总览',print:true});
+  if(foldSheet) tabs.push({key:'fold-sheet',no:'07',label:'对折卡 A4 拼版',sub:'3 × 5 · 15 张',url:foldSheet.url,pdf:foldSheet.pdfUrl,title:foldSheet.label||'对折卡 A4 裁切拼版',print:true});
   if(!tabs.length) return '';
   if(!tabs.some(t=>t.key===SINGLE_DELIVERY_TAB)) SINGLE_DELIVERY_TAB=tabs[0].key;
   const active=tabs.find(t=>t.key===SINGLE_DELIVERY_TAB)||tabs[0];
