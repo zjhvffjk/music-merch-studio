@@ -1321,6 +1321,8 @@ function returnSongMaker(){
   document.body.classList.remove('has-active-production');
   $('main').classList.add('music-search-active');
   renderArtistResultStage(LAST_ARTIST_DATA);
+  // 生成结果阶段会把资料舞台收起；回制作设置时必须先重新显示它。
+  const stage=$('#albStage'),content=$('#content'); if(stage)stage.hidden=false; if(content)content.hidden=true;
   history.replaceState({route:'song',payload:{data:LAST_ARTIST_DATA,index:LAST_SONG_INDEX}},'',location.pathname);
   const wasRestoring=ROUTE_RESTORING; ROUTE_RESTORING=true;
   const row=$('#albStage .artist-track[data-track="'+LAST_SONG_INDEX+'"]'); if(row) row.click();
