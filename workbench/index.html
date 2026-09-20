@@ -905,7 +905,6 @@ html:not([data-theme="dark"]) .song-maker-replace:hover{color:#fffdf6;border-bot
              「专辑全集」不再是独立 tab —— 它变成「歌手」的出口②。 -->
         <button data-m="artist" class="on" data-page-node-id="K57GPO7tK79MOdA0Lzt03R">歌手</button>
         <button data-m="song" data-page-node-id="yclsMGyAev4zrb37YyrOfP">单曲指定</button>
-        <button data-m="upload" data-page-node-id="xYXpixd5MXWJZKTDhWFlF6">上传封面</button>
       </div>
       <div class="source-helper"><span>01</span><b>选择封面来源</b><em>搜索歌手、指定单曲或上传图片</em></div>
 
@@ -1011,32 +1010,7 @@ html:not([data-theme="dark"]) .song-maker-replace:hover{color:#fffdf6;border-bot
         <div id="songBox" data-page-node-id="khAIfMkbODXf3Av0OFFOLn"></div>
       </div>
 
-      <!-- 上传 -->
-      <div class="pane" id="p-upload" data-page-node-id="EwBrrSKA5Y4Eqcp2oenpDj">
-        <div class="fld" data-page-node-id="SrmSfUvM5AWLQs726T95ub">
-          <div class="lbl" data-page-node-id="ceYXL4B3wSWF3M0BqyBCKT">封面图 <em data-page-node-id="RC4rHjrWqZ0UxxLUAmLVt3">任意尺寸，自动居中裁方</em></div>
-          <div id="upBox" data-page-node-id="5JyCf6E5pinZSZopERLc2E">
-            <div class="drop" id="drop" data-page-node-id="XSro8gE6bgtETz2vcOtIXU">
-              <div class="ic" data-page-node-id="pHauCdDjopSaII1KXmjaCj">⬆</div>
-              <div class="t1" data-page-node-id="ElrMz6W6Cs8enMaLPkZzGy">点击选择，或把图片拖进来</div>
-              <div class="t2" data-page-node-id="4pXXDa4pekjsnm4ZtZqumt">JPG / PNG / WebP</div>
-            </div>
-          </div>
-          <input type="file" id="file" accept="image/*" hidden data-page-node-id="OkuKyKLh00g4G1HcnRfPc9">
-        </div>
-        <div class="fld" data-page-node-id="QqfspJtCAR1mzv30Crlldy">
-          <div class="lbl" data-page-node-id="0xVqYTu10vAJRhJJMFrFum">歌名</div>
-          <input type="text" id="upTitle" placeholder="显示在播放界面的歌名" data-page-node-id="H3mNPCRjHtb35LvBtEjsNT">
-        </div>
-        <div class="fld" data-page-node-id="u0NdR538hipYleT3OEqYNr">
-          <div class="lbl" data-page-node-id="KRUVLj3vjo4yCXTzfovN07">歌手</div>
-          <input type="text" id="upArtist" placeholder="显示在歌名下方" data-page-node-id="AVqqb8X41T5ZWLg8XO5Vk1">
-        </div>
-        <div class="fld" data-page-node-id="wrPeU8hJMq91CKrYFf5Vmf">
-          <div class="lbl" data-page-node-id="0sevFzPNXcvE8QurNJkjqE">时长 <em data-page-node-id="FGKKj8ljFHfwg1FjTRFPId">秒，可留空</em></div>
-          <input type="number" id="upDur" placeholder="例：257 表示 04:17" min="0" max="36000" data-page-node-id="vg5LjbaDjq2xg84OxWZ3z6">
-        </div>
-      </div>
+      <input type="file" id="file" accept="image/*" hidden>
 
       <!-- 高级 -->
       <details class="adv" data-page-node-id="x5d47My2cYgZ35Ga4huSUJ">
@@ -1596,16 +1570,9 @@ function renderArtistResultStage(data){
       const cover=page.querySelector('.song-maker-hero img'); if(found.pic)cover.src=asset(found.pic);
       status.textContent='已匹配封面 · 默认完整商品包已选，可按需取消'; start.disabled=false;
       start.onclick=()=>{
-        if(customCover){
-          MODE='upload'; PICK=0; SEL=found;
-          $('#upTitle').value=track.name||'未命名歌曲';
-          $('#upArtist').value=artist.name||found.artist||'';
-          const parts=String(track.dur||'').split(':').map(Number);
-          $('#upDur').value=parts.length===2 ? parts[0]*60+parts[1] : 0;
-          UPLOAD=customCover.upload;
-        }else{
-          MODE='song'; PICK=0; SEL=found; $('#songKw').value=(track.name||'')+' '+(found.artist||artist.name||'');
-        }
+        MODE='song'; PICK=0;
+        SEL=customCover ? {...found,coverUpload:customCover.upload} : found;
+        $('#songKw').value=(track.name||'')+' '+(found.artist||artist.name||'');
         $('#p_keychain').checked=selected.keychain; $('#p_keychain').dispatchEvent(new Event('change'));
         $('#p_shop').checked=selected.shop; $('#p_shop').dispatchEvent(new Event('change'));
         $('#p_vinyl').checked=selected.vinyl; $('#p_vinyl').dispatchEvent(new Event('change'));
@@ -2078,7 +2045,7 @@ $('#artistName').addEventListener('keydown', e=>{
 $$('.music-nav [data-nav-mode]').forEach(btn=>btn.addEventListener('click',()=>{
   const mode=btn.dataset.navMode;
   uiMode(mode);
-  const field=mode==='artist' ? $('#artistName') : mode==='song' ? $('#songKw') : $('#uploadFile');
+  const field=mode==='artist' ? $('#artistName') : $('#songKw');
   if(field) field.focus();
 }));
 
@@ -2188,67 +2155,30 @@ $('#songKw').addEventListener('keydown', e=>{
   if(e.key === 'Enter') $('#btnQuerySong').click();
 });
 
-/* ---------------- 上传 ---------------- */
+/* ---------------- 自定义封面上传（仅供当前制作页覆盖封面） ---------------- */
+const file = $('#file');
 function replaceCurrentCover(handler){
   COVER_REPLACE_HANDLER = handler;
   file.value = '';
   file.click();
 }
-const drop = $('#drop'), file = $('#file');
-drop.onclick = ()=> file.click();
-drop.addEventListener('dragover', e=>{ e.preventDefault(); drop.classList.add('hot'); });
-drop.addEventListener('dragleave', ()=> drop.classList.remove('hot'));
-drop.addEventListener('drop', e=>{
-  e.preventDefault(); drop.classList.remove('hot');
-  if(e.dataTransfer.files[0]) doUpload(e.dataTransfer.files[0]);
-});
 file.onchange = ()=>{ if(file.files[0]) doUpload(file.files[0]); };
-
 async function doUpload(f){
   if(!f.type.startsWith('image/')) return toast('请选图片文件');
   if(f.size > 20*1024*1024) return toast('图片超过 20MB');
   try{
     const r = await req('/api/upload?name='+encodeURIComponent(f.name), {
-      method:'POST',
-      headers:{'Content-Type':'application/octet-stream'},
-      body: f
+      method:'POST', headers:{'Content-Type':'application/octet-stream'}, body:f
     }, 60000);
     const d = await readJson(r);
     UPLOAD = d.upload;
     const url = URL.createObjectURL(f);
     const replaceHandler = COVER_REPLACE_HANDLER;
     COVER_REPLACE_HANDLER = null;
-    if(replaceHandler) replaceHandler({upload:d.upload, url, name:f.name});
-    $('#upBox').innerHTML = `
-      <div class="upv">
-        <img src="${url}" alt="">
-        <button class="x" id="upx">×</button>
-        <span class="tag">${esc(d.size)} px · ${(d.bytes/1024).toFixed(0)} KB</span>
-      </div>`;
-    $('#upx').onclick = ()=>{
-      UPLOAD = null;
-      $('#upBox').innerHTML = `
-        <div class="drop" id="drop">
-          <div class="ic">⬆</div>
-          <div class="t1">点击选择，或把图片拖进来</div>
-          <div class="t2">JPG / PNG / WebP</div>
-        </div>`;
-      bindDrop();
-    };
-    if(!$('#upTitle').value)
-      $('#upTitle').value = f.name.replace(/\.[^.]+$/,'').slice(0,30);
-    toast(replaceHandler ? '已替换当前制作封面' : '封面已就绪');
+    if(!replaceHandler) return toast('请先在歌曲制作页点击“更换封面”');
+    replaceHandler({upload:d.upload, url, name:f.name});
+    toast('已替换当前制作封面');
   }catch(e){ toast(e.message); }
-}
-function bindDrop(){
-  const d = $('#drop'); if(!d) return;
-  d.onclick = ()=> file.click();
-  d.addEventListener('dragover', e=>{ e.preventDefault(); d.classList.add('hot'); });
-  d.addEventListener('dragleave', ()=> d.classList.remove('hot'));
-  d.addEventListener('drop', e=>{
-    e.preventDefault(); d.classList.remove('hot');
-    if(e.dataTransfer.files[0]) doUpload(e.dataTransfer.files[0]);
-  });
 }
 
 /* ---------------- 组装参数 ---------------- */
@@ -2287,13 +2217,8 @@ function collect(){
       o.songSource = SEL.source || 'auto';
       if(SEL.albummid) o.albummid = SEL.albummid;
       if(SEL.id) o.songId = SEL.id;
+      if(SEL.coverUpload) o.coverUpload = SEL.coverUpload;
     }
-  }
-  else {
-    o.upload   = UPLOAD;
-    o.title    = $('#upTitle').value.trim();
-    o.artist   = $('#upArtist').value.trim();
-    o.duration = parseInt($('#upDur').value,10) || 0;
   }
   return o;
 }
@@ -2304,10 +2229,9 @@ $('#btnGo').onclick = async ()=>{
   if(MODE === 'artist' && !o.artist) return toast('先填歌手名');
   if(MODE === 'album'  && !o.artist) return toast('先填歌手名');
   if(MODE === 'song'   && !o.song)   return toast('先填歌名');
-  if(MODE === 'upload' && !o.upload) return toast('先上传一张封面图');
 
   if(!ROUTE_RESTORING) pushAppRoute('output',{});
-  if((MODE==='song' || (MODE==='upload' && LAST_SONG_INDEX!=null)) && LAST_ARTIST_DATA) setAppBack('← 返回制作设置',returnSongMaker);
+  if(MODE==='song' && LAST_ARTIST_DATA) setAppBack('← 返回制作设置',returnSongMaker);
   else if(MODE==='artist' && LAST_ARTIST_DATA) setAppBack('← 返回歌曲列表',returnArtistList);
   $('#btnGo').disabled = true;
   $('#btnGo').innerHTML = '<span class="spin"></span>生成中';
@@ -3027,7 +2951,6 @@ document.addEventListener('keydown', e=>{
 document.addEventListener('click', e=>{
   const artist=e.target.closest('[data-discover-artist]');
   if(artist){ const input=$('#globalSearch'); input.value=artist.dataset.discoverArtist; input.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true})); return; }
-  if(e.target.closest('[data-discover-upload]')){ document.body.classList.add('production-controls-open'); uiMode('upload'); $('#file').click(); }
 });
 
 /* ===== 全局搜索：历史、热搜、输入联想与两种结果入口 ===== */

@@ -1014,6 +1014,19 @@ def album_limit(opt):
 
 # ---------------------------------------------------------------- 单首渲染
 
+def uploaded_cover_path(uid):
+    """Return the stored upload selected as a cover override, without accepting paths."""
+    uid = (uid or "").strip()
+    if not uid:
+        return None
+    for name in os.listdir(UPLOAD_DIR):
+        if name.startswith(uid + "."):
+            path = os.path.join(UPLOAD_DIR, name)
+            if os.path.isfile(path):
+                return path
+    return None
+
+
 def render_song(job, s, rank, opt):
     """下载封面 + 合成播放界面。返回 (item, 失败原因)"""
     cdir = os.path.join(job["dir"], "covers")
@@ -1030,7 +1043,13 @@ def render_song(job, s, rank, opt):
 
     # --- 1) 正方形封面母版（统一裁成 coverSize 正方形）---
     tmp = os.path.join(cdir, safe_name(f"_probe {s['name']} - {s['artists']}.jpg"))
-    if src == "qq":
+    custom_cover = uploaded_cover_path(opt.get("coverUpload"))
+    c_url = ""
+    if custom_cover:
+        shutil.copyfile(custom_cover, tmp)
+        got = True
+        log(job, "使用当前歌曲的自定义封面覆盖")
+    elif src == "qq":
         c_url = cover_url_q(s["pic"], QQ_MAX_COVER)      # QQ 源最大 800x800
         got = download_q(c_url, tmp)
     else:
@@ -1153,7 +1172,10 @@ def finish(job, made, ar_name, total_label, src=None):
             [(it["playerPath"], f"{it['rank']:02d} {it['name']}") for it in play_made],
             os.path.join(job["dir"], "总览.jpg"),
             cols=min(5, len(play_made)),      # 不足 5 张时别留空列
-            title=f"{ar_name} · {total_label} · 30×50mm{tag}",
+            # 单曲调用方的 total_label 已经是“30×50mm”，批量调用方则是
+            # “热门前 N 首”。只在后者补充尺寸，避免单曲标题重复两遍尺寸。
+            title=(f"{ar_name} · {total_label}{tag}" if "30×50mm" in total_label
+                   else f"{ar_name} · {total_label} · 30×50mm{tag}"),
         )
         job["overview"] = url_of(job, os.path.relpath(grid, job["dir"]))
         job["overviewFile"] = _rel(job, grid)
@@ -1425,104 +1447,6 @@ def run_song(job, opt):
     if not job["items"]:
         return fail(job, "候选歌曲都没有可用封面，换个关键词试试")
     finish(job, job["items"], job["items"][0]["name"], "30×50mm", "163")
-
-
-def run_upload(job, opt):
-    """用上传的图片当封面, 套播放界面模板"""
-    uid = (opt.get("upload") or "").strip()
-    src = None
-    for f in os.listdir(UPLOAD_DIR):
-        if f.startswith(uid + "."):
-            src = os.path.join(UPLOAD_DIR, f)
-            break
-    if not src or not os.path.exists(src):
-        return fail(job, "上传的文件已失效，请重新上传")
-
-    title = (opt.get("title") or "").strip() or "未命名"
-    artist = (opt.get("artist") or "").strip() or "未知歌手"
-    dur = int(float(opt.get("duration") or 0) or 0)
-    log(job, f"载入上传封面：{os.path.basename(src)}")
-    job["total"] = 1
-
-    cdir = os.path.join(job["dir"], "covers")
-    pdir = os.path.join(job["dir"], "players")
-    base = safe_name(f"01 {title} - {artist}")
-
-    # 正方形母版: 居中裁切 (非正方形输入也不变形)
-    im = Image.open(src).convert("RGB")
-    s0 = min(im.size)
-    sq = im.crop(((im.width - s0) // 2, (im.height - s0) // 2,
-                  (im.width + s0) // 2, (im.height + s0) // 2))
-    if s0 != 1492:
-        sq = sq.resize((1492, 1492), Image.LANCZOS)
-    cpath = os.path.join(cdir, base + ".jpg")
-    save_retry(sq, cpath, quality=96, subsampling=0)
-
-    n = comment_total(opt["songId"]) if opt.get("songId") else 0
-    if opt["comments"] == "auto":
-        cmt = human(n) if n else "0+"
-    else:
-        cmt = str(opt["comments"])
-
-    job["phase"] = f"合成《{title}》"
-    ppath = os.path.join(pdir, base + ".png")
-    make_player(
-        cpath, ppath, title, artist, dur,
-        width=opt["width"], played_ratio=opt["played"], playlist=opt["playlist"],
-        likes=opt["likes"], comments=cmt, listeners=opt["listeners"],
-        quality=opt["quality"], statusbar=False, ratio=opt["ratio"],
-        vip=opt["vip"], follow=opt["follow"], video_tag=False, fav_loop=True,
-    )
-    with Image.open(ppath) as _f:
-        out = _f.convert("RGB")
-    save_retry(out, ppath, dpi=(opt["dpi"], opt["dpi"]))
-    jpath = os.path.join(pdir, base + ".jpg")
-    save_retry(out, jpath, quality=96, dpi=(opt["dpi"], opt["dpi"]), subsampling=0)
-    mm = (out.size[0] / opt["dpi"] * 25.4, out.size[1] / opt["dpi"] * 25.4)
-    log(job, f"完成 → {out.size[0]}×{out.size[1]}px = {mm[0]:.1f}×{mm[1]:.1f}mm", "ok")
-
-    kc_rel = None
-    if opt.get("keychain"):
-        kc_rel, kc_err = render_keychain(job, base, cpath, ppath)
-        if kc_rel:
-            log(job, "  └ 钥匙扣商品图 1920×1920 已出图", "ok")
-        else:
-            log(job, f"  └ 钥匙扣出图失败：{kc_err}", "warn")
-
-    shop_rel = {}
-    if opt.get("shop"):
-        shop_rel, shop_err = render_shop(job, base, ppath, opt)
-        if shop_rel:
-            log(job, f"  └ 商品图 {len(shop_rel)} 张已出图：{_shop_label(shop_rel)}", "ok")
-        else:
-            log(job, f"  └ 商品图出图失败：{shop_err}", "warn")
-
-    vin_rel = None
-    if opt.get("vinyl"):
-        vin_rel, vin_err = render_vinyl(job, base, cpath, title, artist, dur, opt)
-        if vin_rel:
-            log(job, f"  └ 黑胶播放界面 {vinyl_width(opt)}×{vinyl_width(opt) * 2} 已出图", "ok")
-        else:
-            log(job, f"  └ 黑胶出图失败：{vin_err}", "warn")
-
-    job["items"].append({
-        "rank": 1, "name": title, "artist": artist, "album": "自定义上传",
-        "dur": fmt_dur(dur * 1000) if dur else "--:--", "comments": cmt,
-        "coverUrl": url_of(job, os.path.relpath(cpath, job["dir"])),
-        "playerUrl": url_of(job, os.path.relpath(ppath, job["dir"])),
-        "playerJpgUrl": url_of(job, os.path.relpath(jpath, job["dir"])),
-        "keychainUrl": url_of(job, kc_rel) if kc_rel else None,
-        "vinylUrl": url_of(job, vin_rel) if vin_rel else None,
-        "shopUrls": {k: url_of(job, v) for k, v in shop_rel.items()},
-        "mm": f"{mm[0]:.1f}×{mm[1]:.1f}mm",
-        "coverPath": cpath,
-        "playerPath": ppath,
-        "keychainPath": (os.path.join(job["dir"], kc_rel) if kc_rel else None),
-        "vinylPath": (os.path.join(job["dir"], vin_rel) if vin_rel else None),
-        "shopPaths": shop_rel,
-    })
-    job["done"] = 1
-    finish(job, job["items"], title, "30×50mm")
 
 
 def run_album(job, opt):
@@ -2070,9 +1994,8 @@ class Handler(BaseHTTPRequestHandler):
                 mode = req.get("mode", "artist")
                 opt = dict(DEFAULTS)
                 for k, v in req.items():
-                    if k in DEFAULTS or k in ("artist", "song", "pick", "upload",
-                                              "title", "duration", "songId",
-                                              "songSource", "albummid"):
+                    if k in DEFAULTS or k in ("artist", "song", "pick", "songId",
+                                              "songSource", "albummid", "coverUpload"):
                         opt[k] = v
                 # 类型收敛, 防止前端传字符串把算术搞崩
                 for k in ("top", "width", "dpi", "pick", "duration"):
@@ -2117,13 +2040,12 @@ class Handler(BaseHTTPRequestHandler):
 
                 titles = {"artist": f"{opt.get('artist', '')}",
                           "album": f"{opt.get('artist', '')} · 专辑全集",
-                          "song": f"{opt.get('song', '')}",
-                          "upload": f"{opt.get('title') or '自定义'}"}
+                          "song": f"{opt.get('song', '')}"}
                 job = new_job(titles.get(mode, "任务"), mode, opt)
                 job["shopGrid"] = opt["shopGrid"]   # finish() 收尾时按它决定要不要拼版
 
                 runner = {"artist": run_artist, "song": run_song,
-                          "upload": run_upload, "album": run_album}.get(mode)
+                          "album": run_album}.get(mode)
                 if not runner:
                     fail(job, f"未知模式：{mode}")
                     return self._json(snap(job))
