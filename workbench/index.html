@@ -1427,9 +1427,29 @@ function renderArtistResultStage(data){
   box.querySelectorAll('.track-table .make button').forEach(btn=>btn.addEventListener('click',e=>{e.stopPropagation();chooseSong(Number(btn.dataset.track));}));
   const browse=()=>{uiMode('album');renderAlbumStage();showAlbumStage();};
   const browseBtn=$('#artistBrowseAlbums'),moreBtn=$('#artistSideMore');if(browseBtn)browseBtn.onclick=browse;if(moreBtn)moreBtn.onclick=browse;
-  const hot=$('#artistMakeHot');if(hot)hot.onclick=()=>{$('#exitHot').click();toast('已切换到热门歌曲生成，勾选商品后点击左侧“开始制作”');};
+  const hot=$('#artistMakeHot');if(hot)hot.onclick=()=>openHotMaker(data);
   const songMode=$('#artistSongMode');if(songMode)songMode.onclick=()=>{uiMode('song');$('#songKw').focus();};
   box.querySelectorAll('.side-album').forEach(row=>row.addEventListener('click',()=>{const album=albums[Number(row.dataset.album)];if(album)openStudio(albumParams(album));}));
+}
+
+/* 热门批量制作：和单曲制作页使用同一套选择方式，但保留原来的前 N 首整组总览。 */
+function openHotMaker(data){
+  const box=$('#albStage'); if(!box)return;
+  const artist=data.artist||{};
+  box.className='albStage song-maker-stage';
+  box.innerHTML=`<section class="song-maker-page"><button type="button" class="song-maker-back">← 返回歌曲列表</button><div class="song-maker-hero"><div class="song-maker-cover"><span>♫</span></div><div><span>HOT TRACKS / BATCH MAKER</span><h2>制作${esc(artist.name||ARTIST_Q||'当前歌手')}的热门歌曲</h2><p>按排名批量生成，并保留整组总览、钥匙扣、白底商品图和黑胶播放界面。</p></div></div><div class="song-maker-products hot-maker-count"><button type="button" class="song-maker-product" data-count="5"><i>TOP / 05</i><b>热门前 5 首</b><small>适合快速预览一组商品。</small></button><button type="button" class="song-maker-product" data-count="10"><i>TOP / 10</i><b>热门前 10 首</b><small>默认完整批量制作。</small></button><button type="button" class="song-maker-product" data-count="15"><i>TOP / 15</i><b>热门前 15 首</b><small>适合批量上新。</small></button></div><div class="song-maker-footer"><span class="song-maker-status">默认会生成整组总览 + 三类商品输出</span><button type="button" class="song-maker-cancel">取消</button><button type="button" class="song-maker-start primary">开始批量制作 →</button></div></section>`;
+  let count=5;
+  const sync=()=>box.querySelectorAll('[data-count]').forEach(b=>b.classList.toggle('is-on',Number(b.dataset.count)===count));
+  box.querySelectorAll('[data-count]').forEach(b=>b.onclick=()=>{count=Number(b.dataset.count);sync();}); sync();
+  const back=()=>renderArtistResultStage(data);
+  box.querySelector('.song-maker-back').onclick=back;box.querySelector('.song-maker-cancel').onclick=back;
+  box.querySelector('.song-maker-start').onclick=()=>{
+    MODE='artist'; TOP=count;
+    $('#p_keychain').checked=true; $('#p_keychain').dispatchEvent(new Event('change'));
+    $('#p_shop').checked=true; $('#p_shop').dispatchEvent(new Event('change'));
+    $('#p_vinyl').checked=true; $('#p_vinyl').dispatchEvent(new Event('change'));
+    $('#btnGo').click();
+  };
 }
 
 /* 搜索结果 → 右侧主区铺成专辑网格 */
@@ -2226,6 +2246,8 @@ function albumItem(it){
 
 function paint(d){
   const box = $('#content');
+  const compactSingle = d.mode === 'song' && (d.items||[]).length === 1;
+  const previewStyle = compactSingle ? 'width:100%;max-width:1040px;margin:0 auto;display:block;cursor:zoom-in' : 'width:100%;display:block;cursor:zoom-in';
   let html = '';
   if(d.status === 'error')
     html += `<div class="alert"><b>任务失败</b><br>${esc(d.error||'未知错误')}</div>`;
@@ -2241,7 +2263,7 @@ function paint(d){
       overflow:hidden;background:#fbfbfc">
       <div style="padding:9px 14px;font-size:11.5px;color:var(--dim);
         border-bottom:1px solid var(--line)">整组总览</div>
-      <img src="${esc(asset(d.overview))}" style="width:100%;display:block;cursor:zoom-in"
+      <img src="${esc(asset(d.overview))}" style="${previewStyle}"
            onclick="zoom('${jsq(asset(d.overview))}','整组总览')">
     </div>`;
   }
@@ -2251,7 +2273,7 @@ function paint(d){
       overflow:hidden;background:#fbfbfc">
       <div style="padding:9px 14px;font-size:11.5px;color:var(--dim);
         border-bottom:1px solid var(--line)">钥匙扣商品图总览</div>
-      <img src="${esc(asset(d.keychainOverview))}" style="width:100%;display:block;cursor:zoom-in"
+      <img src="${esc(asset(d.keychainOverview))}" style="${previewStyle}"
            onclick="zoom('${jsq(asset(d.keychainOverview))}','钥匙扣商品图总览')">
     </div>`;
   }
@@ -2261,7 +2283,7 @@ function paint(d){
       overflow:hidden;background:#fbfbfc">
       <div style="padding:9px 14px;font-size:11.5px;color:var(--dim);
         border-bottom:1px solid var(--line)">${esc(g.label)}</div>
-      <img src="${esc(asset(g.url))}" style="width:100%;display:block;cursor:zoom-in"
+      <img src="${esc(asset(g.url))}" style="${previewStyle}"
            onclick="zoom('${jsq(asset(g.url))}','${jsq(g.label)}')">
     </div>`;
   });
@@ -2271,7 +2293,7 @@ function paint(d){
       overflow:hidden;background:#fbfbfc">
       <div style="padding:9px 14px;font-size:11.5px;color:var(--dim);
         border-bottom:1px solid var(--line)">黑胶播放界面总览</div>
-      <img src="${esc(asset(d.vinylOverview))}" style="width:100%;display:block;cursor:zoom-in"
+      <img src="${esc(asset(d.vinylOverview))}" style="${previewStyle}"
            onclick="zoom('${jsq(asset(d.vinylOverview))}','黑胶播放界面总览')">
     </div>`;
   }
@@ -2281,7 +2303,7 @@ function paint(d){
       overflow:hidden;background:#fbfbfc">
       <div style="padding:9px 14px;font-size:11.5px;color:var(--dim);
         border-bottom:1px solid var(--line)">专辑墙总览 · 全部专辑</div>
-      <img src="${esc(asset(d.albumWall))}" style="width:100%;display:block;cursor:zoom-in"
+      <img src="${esc(asset(d.albumWall))}" style="${previewStyle}"
            onclick="zoom('${jsq(asset(d.albumWall))}','专辑墙总览')">
     </div>`;
   }
