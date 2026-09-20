@@ -32,3 +32,15 @@ class HotMakerPageTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+class BatchDeliveryTests(unittest.TestCase):
+    def test_completed_artist_batch_uses_fixed_delivery_shell(self):
+        html = PAGE.read_text(encoding='utf-8')
+        self.assertIn("d.mode === 'artist'", html)
+        self.assertIn("const compactBatch = d.mode === 'artist'", html)
+        self.assertIn("if((compactSingle || compactBatch)", html)
+        self.assertIn("keychainOverview", html)
+        self.assertIn("vinylOverview", html)
+
+
+
