@@ -83,3 +83,26 @@ Expected: PASS。
 Run: `git diff --check`。
 Expected: PASS。
 
+
+### Task 3: 统一热门批量交付页
+
+**Files:**
+- Modify: `workbench/index.html: singleDeliveryView, paint`
+- Test: `tests/test_hot_maker_page.py`
+
+**Interfaces:**
+- Consumes: 批量任务快照中的 `overview`、`keychainOverview`、`shopGrids`、`vinylOverview` 和 `playerPrints`。
+- Produces: 与单曲一致的固定交付目录和单一画布预览。
+
+- [x] **Step 1: 为 artist 批量任务启用交付壳**
+
+在 `paint(d)` 内对已完成、包含多首歌曲的 `d.mode === 'artist'` 调用现有交付视图。
+
+- [x] **Step 2: 使用批量资源填充目录**
+
+交付视图继续从现有概览、钥匙扣、商品拼版、黑胶和打印资源建立标签，不新增后端数据。
+
+- [x] **Step 3: 验证**
+
+Run: `python -m unittest tests.test_hot_maker_page -v`、`node --check <提取的脚本>`、`git diff --check`。
+Expected: PASS。
