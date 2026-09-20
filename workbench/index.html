@@ -1172,7 +1172,6 @@ html:not([data-theme="dark"]) .song-maker-replace:hover{color:#fffdf6;border-bot
       </div>
       <div class="acts" data-page-node-id="nA8nfcPZ8EFbpGO8AKelGL">
         <button class="btn" id="btnHome" type="button">首页</button>
-        <button class="btn" id="btnHistoryBack" type="button" hidden>↶ 回退</button>
         <button class="btn" id="btnAppBack" type="button" hidden>← 返回</button>
         <button class="btn" id="btnLib" data-page-node-id="LibBtn0Xq7Lm2NvB4tRw">作品库</button>
         <button class="btn" id="btnZip" disabled data-page-node-id="8dnzDgZKgdLJkvAyCGhr6J">下载 ZIP</button>
@@ -1412,10 +1411,8 @@ let ALBUM_SEL  = new Set(); // 已勾选的专辑下标（批量设计用）
 let ROUTE_RESTORING = false;
 let LAST_ARTIST_DATA = null;
 let LAST_SONG_INDEX = null;
-function setHistoryBack(show){ const b=$('#btnHistoryBack'); if(b)b.hidden=!show; }
-function goHistoryBack(){ if(history.length>1) history.back(); else goAppBack(); }
-function setAppBack(label, action){ const b=$('#btnAppBack'); if(!b)return; b.textContent=label; b.hidden=false; b.onclick=action; setHistoryBack(true); }
-function hideAppBack(){ const b=$('#btnAppBack'); if(b)b.hidden=true; setHistoryBack(false); }
+function setAppBack(label, action){ const b=$('#btnAppBack'); if(!b)return; b.textContent=label; b.hidden=false; b.onclick=action; }
+function hideAppBack(){ const b=$('#btnAppBack'); if(b)b.hidden=true; }
 function goHome(){ history.pushState({route:'home'},'',location.pathname); location.reload(); }
 function updateAppBack(){} // 返回按钮由当前页面语义控制，避免出现两个相同的“返回”。
 function pushAppRoute(route, payload={}){ if(ROUTE_RESTORING) return; history.pushState({route,payload},'',location.pathname); }
@@ -1461,7 +1458,6 @@ window.addEventListener('popstate',e=>{
   } finally { ROUTE_RESTORING=false; }
 });
 $('#btnAppBack').onclick=goAppBack;
-$('#btnHistoryBack').onclick=goHistoryBack;
 $('#btnHome').onclick=goHome;
 
 /* 把 ALBUM_SEL 回写到 DOM：行高亮 / 复选框 / 计数 / 批量按钮。
