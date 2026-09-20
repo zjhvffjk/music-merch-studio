@@ -1973,6 +1973,11 @@ class Handler(BaseHTTPRequestHandler):
                     "songs": [{
                         "id": s["id"], "name": s["name"], "artist": s["artists"],
                         "album": s["album"], "dur": fmt_dur(s["dur_ms"]),
+                        # QQ 热门接口给的是 albummid；这里直接转为封面 URL，
+                        # 前端点“制作”无需再等一次单曲搜索才显示该曲封面。
+                        "pic": (cover_url_q(s.get("pic") or "") if src == "qq"
+                                else (s.get("pic") or "")),
+                        "albummid": ((s.get("pic") or "") if src == "qq" else ""),
                     } for s in pool],
                 }
                 # albums=1：搜一次歌手，顺手把「全部专辑」也带回来，前端两个出口
@@ -2045,7 +2050,8 @@ class Handler(BaseHTTPRequestHandler):
                     seen.add(key)
                     out.append({"id": sid, "name": nm, "artist": arts,
                                 "album": alb, "dur": dur, "source": src,
-                                "albummid": amid})
+                                "albummid": amid,
+                                "pic": cover_url_q(amid) if src == "qq" else ""})
 
                 # QQ 音乐排前面：版权曲目（周杰伦等）只有这里有，用户多半要点它
                 if mode in ("auto", "qq"):
