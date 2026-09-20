@@ -36,24 +36,24 @@
 - Consumes: `data.artist`、`data.songs`、既有 `#p_*` 参数输入和 `SHOP_*` 状态。
 - Produces: `MODE='artist'`、`TOP` 和三个商品开关，供既有 `#btnGo` 使用。
 
-- [ ] **Step 1: 扩展批量页面标记**
+- [x] **Step 1: 扩展批量页面标记**
 
 在 `openHotMaker(data)` 中保留数量卡片，并追加与单曲页同名的 `song-maker-products`、`song-maker-details` 和页底状态区。
 
-- [ ] **Step 2: 复用商品和参数事件**
+- [x] **Step 2: 复用商品和参数事件**
 
 为输出卡片维护 `{keychain, shop, vinyl}`，将参数输入、复选框和画布/底色/黑胶尺寸芯片同步到既有全局字段。
 
-- [ ] **Step 3: 回写并启动既有批量生成**
+- [x] **Step 3: 回写并启动既有批量生成**
 
 开始按钮设置 `MODE='artist'`、`TOP=count`，将所选输出回写到 `#p_keychain`、`#p_shop`、`#p_vinyl` 并触发 `#btnGo`。
 
-- [ ] **Step 4: 验证页面结构与脚本语法**
+- [x] **Step 4: 验证页面结构与脚本语法**
 
 Run: `node --check <提取出的 workbench/index.html 脚本>`
 Expected: PASS。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add workbench/index.html
@@ -69,16 +69,17 @@ git commit -m "unify hot batch maker with song setup"
 - Consumes: Task 1 的批量制作入口。
 - Produces: 可复现的接口与静态检查结果。
 
-- [ ] **Step 1: 检查服务端与前端语法**
+- [x] **Step 1: 检查服务端与前端语法**
 
 Run: `python -m py_compile workbench/server.py` 和前端脚本 `node --check`。
 Expected: PASS。
 
-- [ ] **Step 2: 验证生成参数入口**
+- [x] **Step 2: 验证生成参数入口**
 
 确认 `openHotMaker` 内的 `TOP=count`、三个商品开关回写和 `#btnGo.click()` 均存在；确认批量页不包含任何打印预览标记。
 
-- [ ] **Step 3: 检查未预期改动**
+- [x] **Step 3: 检查未预期改动**
 
 Run: `git diff --check`。
 Expected: PASS。
+

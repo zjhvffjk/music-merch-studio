@@ -1631,20 +1631,50 @@ function showArtistAlbums(){
 function openHotMaker(data){
   const box=$('#albStage'); if(!box)return;
   const artist=data.artist||{};
+  const tracks=(data.songs||[]);
+  const lead=tracks[0]||{};
   box.className='albStage song-maker-stage';
   hideAppBack();
   pushAppRoute('batch',{data});
-  box.innerHTML=`<section class="song-maker-page"><button type="button" class="song-maker-back">← 返回歌曲列表</button><div class="song-maker-hero"><div class="song-maker-cover"><span>♫</span></div><div><span>HOT TRACKS / BATCH MAKER</span><h2>制作${esc(artist.name||ARTIST_Q||'当前歌手')}的热门歌曲</h2><p>按排名批量生成，并保留整组总览、钥匙扣、白底商品图和黑胶播放界面。</p></div></div><div class="song-maker-products hot-maker-count"><button type="button" class="song-maker-product" data-count="5"><i>TOP / 05</i><b>热门前 5 首</b><small>适合快速预览一组商品。</small></button><button type="button" class="song-maker-product" data-count="10"><i>TOP / 10</i><b>热门前 10 首</b><small>默认完整批量制作。</small></button><button type="button" class="song-maker-product" data-count="15"><i>TOP / 15</i><b>热门前 15 首</b><small>适合批量上新。</small></button></div><div class="song-maker-footer"><span class="song-maker-status">默认会生成整组总览 + 三类商品输出</span><button type="button" class="song-maker-cancel">取消</button><button type="button" class="song-maker-start primary">开始批量制作 →</button></div></section>`;
+  box.innerHTML=`<section class="song-maker-page"><button type="button" class="song-maker-back">← 返回歌曲列表</button><div class="song-maker-hero"><div class="song-maker-cover"><span>♫</span>${lead.pic?`<img src="${esc(asset(lead.pic))}" alt="" onerror="this.style.display='none'">`:''}</div><div><span>HOT TRACKS / BATCH MAKER</span><h2>制作${esc(artist.name||ARTIST_Q||'当前歌手')}的热门歌曲</h2><p>按排名批量生成；封面和歌曲信息会分别带入每一首商品。</p></div></div><div class="song-maker-choice-head"><div><i>制作范围</i><h3>先决定，要制作热门歌曲中的哪些</h3></div><p>数量决定每种商品会生成几首歌；开始制作后会进入整组总览与打印交付。</p></div><div class="song-maker-products hot-maker-count"><button type="button" class="song-maker-product" data-count="5"><i>TOP / 05</i><b>热门前 5 首</b><small>适合快速预览一组商品。</small></button><button type="button" class="song-maker-product" data-count="10"><i>TOP / 10</i><b>热门前 10 首</b><small>默认完整批量制作。</small></button><button type="button" class="song-maker-product" data-count="15"><i>TOP / 15</i><b>热门前 15 首</b><small>适合批量上新。</small></button></div><div class="song-maker-choice-head"><div><i>选择商品</i><h3>再决定，要把这些歌做成什么</h3></div><p>每首歌使用各自的封面；取消某类商品后，本次批量任务不会生成它。</p></div><div class="song-maker-products"><button type="button" class="song-maker-product" data-output="keychain"><i>01 / OUTPUT</i><b>钥匙扣商品图</b><small>主图 · 实物合成</small></button><button type="button" class="song-maker-product" data-output="shop"><i>02 / OUTPUT</i><b>电商白底图</b><small>白底 · 透明底 · 拼版</small></button><button type="button" class="song-maker-product" data-output="vinyl"><i>03 / OUTPUT</i><b>黑胶播放界面</b><small>竖图 · 唱片 · 控制区</small></button><button type="button" class="song-maker-product song-maker-product--soon" disabled><i>04 / NEXT</i><b>NFC 音乐小卡</b><small>封面 · 链接 · 收藏卡</small></button></div><details class="song-maker-details"><summary>制作细节参数</summary><div class="song-maker-detail-grid"><label><span>播放列表标题</span><input data-detail="playlist" value="${esc($('#p_playlist').value)}"></label><label><span>热度 / 评论文案</span><div style="display:flex;gap:6px"><input data-detail="likes" value="${esc($('#p_likes').value)}"><input data-detail="comments" value="${esc($('#p_comments').value)}"></div></label><label><span>在线人数文案</span><input data-detail="listeners" value="${esc($('#p_listeners').value)}"></label><label><span>主图尺寸 / DPI</span><div style="display:flex;gap:6px"><input type="number" data-detail="width" value="${esc($('#p_width').value)}"><input type="number" data-detail="dpi" value="${esc($('#p_dpi').value)}"></div></label><label><span>白底商品图画布</span><div class="detail-chips">${SHOP_PRESETS.map(p=>`<button type="button" data-detail-canvas="${esc(p.key)}">${esc(p.tag||p.label||p.key)}</button>`).join('')}</div></label><label><span>白底商品图底色</span><div class="detail-chips"><button type="button" data-detail-bg="white">白底</button><button type="button" data-detail-bg="transparent">透明</button><button type="button" data-detail-bg="both">两种</button></div></label><label><span>黑胶播放图宽度</span><div class="detail-chips"><button type="button" data-detail-vinyl="900">900</button><button type="button" data-detail-vinyl="1200">1200</button><button type="button" data-detail-vinyl="1500">1500</button></div></label><label><span>显示与封面规则</span><div class="detail-switch">VIP 标签<input type="checkbox" data-detail-check="vip" ${$('#p_vip').checked?'checked':''}></div><div class="detail-switch">歌手关注按钮<input type="checkbox" data-detail-check="follow" ${$('#p_follow').checked?'checked':''}></div><div class="detail-switch">无封面自动补位<input type="checkbox" data-detail-check="ph" ${$('#p_ph').checked?'checked':''}></div></label><label><span>印刷与商品图附加输出</span><div class="detail-switch">额外输出商品拼版总览<input type="checkbox" data-detail-check="shopGrid" ${$('#p_shopGrid').checked?'checked':''}></div><div class="detail-switch">播放界面 A4 印刷拼版<input type="checkbox" data-detail-check="playerPrint" ${$('#p_playerPrint').checked?'checked':''}></div><select data-detail="playerPrintLayout"><option value="landscape32" ${$('#p_playerPrintLayout').value==='landscape32'?'selected':''}>横向高密 · 32 张</option><option value="portrait30" ${$('#p_playerPrintLayout').value==='portrait30'?'selected':''}>竖向直排 · 30 张</option><option value="landscape21" ${$('#p_playerPrintLayout').value==='landscape21'?'selected':''}>横向留缝 · 21 张</option></select></label></div></details><div class="song-maker-footer"><span class="song-maker-status">已选热门前 5 首 · 完整商品包</span><button type="button" class="song-maker-cancel">取消</button><button type="button" class="song-maker-start primary">开始批量制作 →</button></div></section>`;
   let count=5;
-  const sync=()=>box.querySelectorAll('[data-count]').forEach(b=>b.classList.toggle('is-on',Number(b.dataset.count)===count));
+  const selected={keychain:true,shop:true,vinyl:true};
+  const status=box.querySelector('.song-maker-status');
+  const sync=()=>{
+    box.querySelectorAll('[data-count]').forEach(b=>b.classList.toggle('is-on',Number(b.dataset.count)===count));
+    box.querySelectorAll('.song-maker-product[data-output]').forEach(b=>b.classList.toggle('is-on',!!selected[b.dataset.output]));
+    const n=Object.values(selected).filter(Boolean).length;
+    status.textContent=`已选热门前 ${count} 首 · ${n?'已选 '+n+' 类商品':'请选择至少一种商品'}`;
+  };
   box.querySelectorAll('[data-count]').forEach(b=>b.onclick=()=>{count=Number(b.dataset.count);sync();}); sync();
+  box.querySelectorAll('.song-maker-product[data-output]').forEach(b=>b.onclick=()=>{selected[b.dataset.output]=!selected[b.dataset.output];sync();});
   const back=returnArtistList;
   box.querySelector('.song-maker-back').onclick=back;box.querySelector('.song-maker-cancel').onclick=back;
+  box.querySelectorAll('[data-detail]').forEach(el=>{
+    const syncDetail=()=>{const target=$('#p_'+el.dataset.detail); if(target) target.value=el.value;};
+    el.addEventListener('input',syncDetail); el.addEventListener('change',syncDetail);
+  });
+  box.querySelectorAll('[data-detail-check]').forEach(el=>el.addEventListener('change',()=>{
+    const target=$('#p_'+el.dataset.detailCheck); if(target){target.checked=el.checked;target.dispatchEvent(new Event('change'));}
+  }));
+  box.querySelectorAll('[data-detail-canvas]').forEach(el=>{
+    el.classList.toggle('on',SHOP_CV.includes(el.dataset.detailCanvas));
+    el.onclick=()=>{const key=el.dataset.detailCanvas,at=SHOP_CV.indexOf(key);if(at>=0){if(SHOP_CV.length===1)return toast('至少保留一种商品图画布');SHOP_CV.splice(at,1)}else SHOP_CV.push(key);box.querySelectorAll('[data-detail-canvas]').forEach(x=>x.classList.toggle('on',SHOP_CV.includes(x.dataset.detailCanvas)));renderShopCanvasChips();};
+  });
+  box.querySelectorAll('[data-detail-bg]').forEach(el=>{
+    el.classList.toggle('on',el.dataset.detailBg===SHOP_BG);
+    el.onclick=()=>{SHOP_BG=el.dataset.detailBg;box.querySelectorAll('[data-detail-bg]').forEach(x=>x.classList.toggle('on',x===el));$$('#shopBgChips button').forEach(x=>x.classList.toggle('on',x.dataset.v===SHOP_BG));};
+  });
+  box.querySelectorAll('[data-detail-vinyl]').forEach(el=>{
+    el.classList.toggle('on',Number(el.dataset.detailVinyl)===VINYL_W);
+    el.onclick=()=>{VINYL_W=Number(el.dataset.detailVinyl);box.querySelectorAll('[data-detail-vinyl]').forEach(x=>x.classList.toggle('on',x===el));bindVinylChips();};
+  });
   box.querySelector('.song-maker-start').onclick=()=>{
+    if(!Object.values(selected).some(Boolean)) return toast('至少选择一种商品');
     MODE='artist'; TOP=count;
-    $('#p_keychain').checked=true; $('#p_keychain').dispatchEvent(new Event('change'));
-    $('#p_shop').checked=true; $('#p_shop').dispatchEvent(new Event('change'));
-    $('#p_vinyl').checked=true; $('#p_vinyl').dispatchEvent(new Event('change'));
+    $('#p_keychain').checked=selected.keychain; $('#p_keychain').dispatchEvent(new Event('change'));
+    $('#p_shop').checked=selected.shop; $('#p_shop').dispatchEvent(new Event('change'));
+    $('#p_vinyl').checked=selected.vinyl; $('#p_vinyl').dispatchEvent(new Event('change'));
     $('#btnGo').click();
   };
 }
