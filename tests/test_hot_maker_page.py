@@ -41,3 +41,9 @@ class BatchPrintGalleryTests(unittest.TestCase):
         self.assertIn('下载 PNG', html)
         self.assertIn('下载 PDF', html)
         self.assertIn("if(d.mode === 'artist' && ((d.playerPrints||[]).length", html)
+
+class BatchPrintGalleryLayoutTests(unittest.TestCase):
+    def test_preview_clips_paper_image_above_its_metadata(self):
+        html = PAGE.read_text(encoding='utf-8')
+        self.assertIn('.batch-print-card__preview{height:172px;padding:10px;overflow:hidden;', html)
+        self.assertIn('max-height:152px', html)
