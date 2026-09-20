@@ -1149,6 +1149,7 @@ html:not([data-theme="dark"]) body:not(.has-music-result):not(.has-active-produc
         <div class="search-popover" id="searchPopover" hidden></div>
       </div>
       <div class="acts" data-page-node-id="nA8nfcPZ8EFbpGO8AKelGL">
+        <button class="btn" id="btnHome" type="button">首页</button>
         <button class="btn" id="btnAppBack" type="button" hidden>← 返回</button>
         <button class="btn" id="btnLib" data-page-node-id="LibBtn0Xq7Lm2NvB4tRw">作品库</button>
         <button class="btn" id="btnZip" disabled data-page-node-id="8dnzDgZKgdLJkvAyCGhr6J">下载 ZIP</button>
@@ -1388,6 +1389,7 @@ let LAST_ARTIST_DATA = null;
 let LAST_SONG_INDEX = null;
 function setAppBack(label, action){ const b=$('#btnAppBack'); if(!b)return; b.textContent=label; b.hidden=false; b.onclick=action; }
 function hideAppBack(){ const b=$('#btnAppBack'); if(b)b.hidden=true; }
+function goHome(){ history.pushState({route:'home'},'',location.pathname); location.reload(); }
 function updateAppBack(){} // 返回按钮由当前页面语义控制，避免出现两个相同的“返回”。
 function pushAppRoute(route, payload={}){ if(ROUTE_RESTORING) return; history.pushState({route,payload},'',location.pathname); }
 function returnArtistList(){
@@ -1395,6 +1397,8 @@ function returnArtistList(){
   document.body.classList.remove('has-active-production');
   $('main').classList.add('music-search-active');
   renderArtistResultStage(LAST_ARTIST_DATA);
+  const artist=LAST_ARTIST_DATA.artist||{};
+  setTitle((artist.name||ARTIST_Q||'音乐')+' · 音乐搜索', '热门歌曲 '+((LAST_ARTIST_DATA.songs||[]).length||0)+' 首 · 选择歌曲或专辑后制作商品');
   const stage=$('#albStage'),content=$('#content');if(stage)stage.hidden=false;if(content)content.hidden=true;
   history.replaceState({route:'artist',payload:{data:LAST_ARTIST_DATA}},'',location.pathname);
 }
@@ -1413,8 +1417,8 @@ function returnSongMaker(){
 function goAppBack(){
   const route=history.state&&history.state.route;
   if(route==='output') return returnSongMaker();
-  if(route==='song' || route==='batch') return returnArtistList();
-  if(route==='artist') return location.reload();
+  if(route==='song' || route==='batch' || route==='album') return returnArtistList();
+  if(route==='artist') return goHome();
   location.reload();
 }
 history.replaceState({route:'home'},'',location.pathname);
@@ -1424,10 +1428,12 @@ window.addEventListener('popstate',e=>{
     if(st.route==='artist' && st.payload && st.payload.data){LAST_ARTIST_DATA=st.payload.data;returnArtistList();}
     else if(st.route==='song' && st.payload && st.payload.data){LAST_ARTIST_DATA=st.payload.data;LAST_SONG_INDEX=Number(st.payload.index||0);returnSongMaker();}
     else if(st.route==='batch' && st.payload && st.payload.data){LAST_ARTIST_DATA=st.payload.data;openHotMaker(st.payload.data);}
+    else if(st.route==='album' && st.payload && st.payload.data){LAST_ARTIST_DATA=st.payload.data;renderArtistResultStage(st.payload.data);showArtistAlbums();}
     else if(st.route==='home') location.reload();
   } finally { ROUTE_RESTORING=false; }
 });
 $('#btnAppBack').onclick=goAppBack;
+$('#btnHome').onclick=goHome;
 
 /* 把 ALBUM_SEL 回写到 DOM：行高亮 / 复选框 / 计数 / 批量按钮。
    🔴 只做局部更新，不整体重渲染 —— 92 张专辑重渲染会把滚动位置弹回顶部。 */
@@ -1523,7 +1529,7 @@ function albumParams(a){
 /* ===== 歌手搜索结果：音乐详情页（热门曲目 + 关联专辑） ===== */
 function renderArtistResultStage(data){
   LAST_ARTIST_DATA=data;
-  setAppBack('← 返回首页',()=>location.reload());
+  hideAppBack();
   const box=$('#albStage'); if(!box) return;
   const artist=data.artist||{}; const songs=(data.songs||[]).slice(0,18); const albums=(data.albumList||ALBUM_LIST||[]).slice(0,6);
   const fallbackPic=(albums[0]&&albums[0].pic)||''; const pic=artist.pic ? asset(artist.pic) : (fallbackPic ? asset(fallbackPic) : '');
@@ -1580,11 +1586,19 @@ function renderArtistResultStage(data){
   };
   box.querySelectorAll('.artist-track').forEach(row=>row.addEventListener('click',()=>chooseSong(Number(row.dataset.track))));
   box.querySelectorAll('.track-table .make button').forEach(btn=>btn.addEventListener('click',e=>{e.stopPropagation();chooseSong(Number(btn.dataset.track));}));
-  const browse=()=>{uiMode('album');renderAlbumStage();showAlbumStage();};
+  const browse=()=>showArtistAlbums();
   const browseBtn=$('#artistBrowseAlbums'),moreBtn=$('#artistSideMore');if(browseBtn)browseBtn.onclick=browse;if(moreBtn)moreBtn.onclick=browse;
   const hot=$('#artistMakeHot');if(hot)hot.onclick=()=>openHotMaker(data);
   const songMode=$('#artistSongMode');if(songMode)songMode.onclick=()=>{uiMode('song');$('#songKw').focus();};
   box.querySelectorAll('.side-album').forEach(row=>row.addEventListener('click',()=>{const album=albums[Number(row.dataset.album)];if(album)openStudio(albumParams(album));}));
+}
+
+/* 从歌曲资料页进入专辑全集：应用内返回回歌曲列表，首页由顶栏独立负责。 */
+function showArtistAlbums(){
+  if(!LAST_ARTIST_DATA) return;
+  uiMode('album'); renderAlbumStage(); showAlbumStage();
+  setAppBack('← 返回歌曲列表',returnArtistList);
+  pushAppRoute('album',{data:LAST_ARTIST_DATA});
 }
 
 /* 热门批量制作：和单曲制作页使用同一套选择方式，但保留原来的前 N 首整组总览。 */
