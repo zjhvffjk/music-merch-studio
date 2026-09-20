@@ -2445,11 +2445,10 @@ function albumItem(it){
 let SINGLE_DELIVERY_TAB = 'overview';
 function singleDeliveryView(d){
   const item=(d.items||[])[0]||{};
-  const isBatch=d.mode === 'artist' && (d.items||[]).length > 1;
   const tabs=[];
   if(d.overview) tabs.push({key:'overview',no:'01',label:'整组总览',sub:'全部成品概览',url:d.overview,title:'整组总览'});
   if(item.keychainUrl || d.keychainOverview) tabs.push({key:'keychain',no:'02',label:'钥匙扣商品图',sub:'实物合成主图',url:item.keychainUrl||d.keychainOverview,title:(item.name||'')+' 钥匙扣商品图'});
-  (d.shopGrids||[]).forEach((shop,i)=>tabs.push({key:'shop-'+i,no:String(3+i).padStart(2,'0'),label:'电商白底图',sub:shop.label||'商品图拼版',url:shop.url,title:shop.label||'电商白底图'}));
+  const shop=(d.shopGrids||[])[0]; if(shop) tabs.push({key:'shop',no:'03',label:'电商白底图',sub:shop.label||'商品图拼版',url:shop.url,title:shop.label||'电商白底图'});
   if(item.vinylUrl || d.vinylOverview) tabs.push({key:'vinyl',no:'04',label:'黑胶播放界面',sub:'竖图 · 播放卡',url:item.vinylUrl||d.vinylOverview,title:(item.name||'')+' 黑胶播放界面'});
   const print=(d.playerPrints||[])[0]; if(print) tabs.push({key:'print',no:'05',label:'打印制作',sub:print.label||'A4 印刷拼版',url:print.url,pdf:print.pdfUrl,title:print.label||'播放界面 A4 印刷拼版',print:true});
   const foldPrints=d.playerFoldPrints||[];
@@ -2461,8 +2460,7 @@ function singleDeliveryView(d){
   if(!tabs.some(t=>t.key===SINGLE_DELIVERY_TAB)) SINGLE_DELIVERY_TAB=tabs[0].key;
   const active=tabs.find(t=>t.key===SINGLE_DELIVERY_TAB)||tabs[0];
   const log=(d.log||[]).map(x=>`<div>${esc(x.t||'')}　${esc(x.m||'')}</div>`).join('');
-  const heading=isBatch ? `${esc(d.title||'热门歌曲')} 制作完成` : `《${esc(item.name||d.title||'当前歌曲')}》制作完成`;
-  return `<section class="single-delivery"><div class="single-delivery__head"><div><span>${isBatch?'HOT TRACKS / DELIVERY':'SONG OBJECT / DELIVERY'}</span><h3>${heading}</h3></div><p>先浏览成品；需要打印时进入“打印制作”，在这里查看适配画布并下载原尺寸文件。</p></div><div class="single-delivery__shell"><nav class="single-delivery__nav"><b>本次交付</b>${tabs.map(t=>`<button type="button" class="${t.key===active.key?'on':''} ${t.print?'print':''}" data-delivery-tab="${t.key}"><i>${t.no}</i><span>${esc(t.label)}<small>${esc(t.sub)}</small></span></button>`).join('')}</nav><div class="single-delivery__canvas"><div class="single-delivery__canvas-head"><span>${esc(active.label)} · ${esc(active.sub)}</span>${active.pdf?`<a class="mini" href="${esc(asset(active.pdf))}?dl=1">下载印刷 PDF</a>`:''}<a class="mini" href="${esc(asset(active.url))}?dl=1">下载原图</a></div><div class="single-delivery__canvas-frame ${active.print?'print-canvas':''}"><img src="${esc(asset(active.url))}" alt="" onclick="zoom('${jsq(asset(active.url))}','${jsq(active.title)}')"></div>${active.print?`<div class="single-delivery__print-note"><b>打印制作</b><span>这是适配网页窗口的预览。下载 PDF 或原图后，请以 100% 原尺寸输出。</span></div>`:''}${log?`<details class="single-delivery__logs"><summary>查看制作记录</summary><div>${log}</div></details>`:''}</div></div></section>`;
+  return `<section class="single-delivery"><div class="single-delivery__head"><div><span>SONG OBJECT / DELIVERY</span><h3>《${esc(item.name||d.title||'当前歌曲')}》制作完成</h3></div><p>先浏览成品；需要打印时进入“打印制作”，在这里查看适配画布并下载原尺寸文件。</p></div><div class="single-delivery__shell"><nav class="single-delivery__nav"><b>本次交付</b>${tabs.map(t=>`<button type="button" class="${t.key===active.key?'on':''} ${t.print?'print':''}" data-delivery-tab="${t.key}"><i>${t.no}</i><span>${esc(t.label)}<small>${esc(t.sub)}</small></span></button>`).join('')}</nav><div class="single-delivery__canvas"><div class="single-delivery__canvas-head"><span>${esc(active.label)} · ${esc(active.sub)}</span>${active.pdf?`<a class="mini" href="${esc(asset(active.pdf))}?dl=1">下载印刷 PDF</a>`:''}<a class="mini" href="${esc(asset(active.url))}?dl=1">下载原图</a></div><div class="single-delivery__canvas-frame ${active.print?'print-canvas':''}"><img src="${esc(asset(active.url))}" alt="" onclick="zoom('${jsq(asset(active.url))}','${jsq(active.title)}')"></div>${active.print?`<div class="single-delivery__print-note"><b>打印制作</b><span>这是适配网页窗口的预览。下载 PDF 或原图后，请以 100% 原尺寸输出。</span></div>`:''}${log?`<details class="single-delivery__logs"><summary>查看制作记录</summary><div>${log}</div></details>`:''}</div></div></section>`;
 }
 function bindSingleDelivery(){
   $$('.single-delivery [data-delivery-tab]').forEach(btn=>btn.onclick=()=>{SINGLE_DELIVERY_TAB=btn.dataset.deliveryTab; if(LAST_PAINT) paint(LAST_PAINT);});
@@ -2472,8 +2470,7 @@ function paint(d){
   LAST_PAINT=d;
   const box = $('#content');
   const compactSingle = d.mode === 'song' && (d.items||[]).length === 1;
-  const compactBatch = d.mode === 'artist' && (d.items||[]).length > 1;
-  if((compactSingle || compactBatch) && d.status !== 'running'){ const delivery=singleDeliveryView(d); if(delivery){box.innerHTML=delivery;bindSingleDelivery();return;} }
+  if(compactSingle && d.status !== 'running'){ const delivery=singleDeliveryView(d); if(delivery){box.innerHTML=delivery;bindSingleDelivery();return;} }
   // 单曲的总览源文件本身只含一张缩略卡；不能像批量总览那样拉伸到整行。
   const previewStyle = compactSingle ? 'width:auto;max-width:100%;height:auto;margin:0 auto;display:block;cursor:zoom-in' : 'width:100%;display:block;cursor:zoom-in';
   const overviewBoxStyle = compactSingle ? 'max-width:620px;margin:0 auto 18px' : 'margin-bottom:18px';
