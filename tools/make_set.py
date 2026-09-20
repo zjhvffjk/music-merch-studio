@@ -253,9 +253,16 @@ def contact_sheet(players, out_path, cols=5, thumb_w=300, title="", ratio=None):
     canvas = Image.new("RGB", (W, H), (18, 18, 22))
     d = ImageDraw.Draw(canvas)
     if title:
+        # 单曲时画布只有一列，沿用批量任务的 30px 标题会直接超出画布并被裁切。
+        # 根据实际可用宽度缩小标题，确保歌名、歌手和规格完整可读。
+        max_title_w = W - pad * 2
+        title_size = 30
+        title_font = ImageFont.truetype(FONT_BD, title_size, index=0)
+        while title_size > 14 and d.textbbox((0, 0), title, font=title_font)[2] > max_title_w:
+            title_size -= 1
+            title_font = ImageFont.truetype(FONT_BD, title_size, index=0)
         d.text((W // 2, pad + 14), title,
-               font=ImageFont.truetype(FONT_BD, 30, index=0),
-               fill=(235, 235, 242), anchor="mm")
+               font=title_font, fill=(235, 235, 242), anchor="mm")
     y0 = pad + (60 if title else 0)
     for i, (p, label) in enumerate(players):
         r, c = divmod(i, cols)
