@@ -870,6 +870,14 @@ html:not([data-theme="dark"]) .song-maker-footer button.primary{border-color:#1d
 html:not([data-theme="dark"]) .song-maker-footer button.primary:hover{background:#123c2d}
 @media(max-width:720px){html:not([data-theme="dark"]) .discover-home{padding:30px 25px;min-height:290px}html:not([data-theme="dark"]) .discover-home h2{font-size:34px}html:not([data-theme="dark"]) .discover-home::after{right:-65px;top:auto;bottom:-76px;transform:none;width:190px;height:190px}html:not([data-theme="dark"]) .discover-home::before{right:9px;top:auto;bottom:23px;transform:rotate(8deg);padding:12px;font-size:9px}html:not([data-theme="dark"]) .song-maker-hero{padding:21px 18px;gap:18px}html:not([data-theme="dark"]) .song-maker-cover,html:not([data-theme="dark"]) .song-maker-cover img{width:90px;height:90px}html:not([data-theme="dark"]) .song-maker-hero h2{font-size:26px}html:not([data-theme="dark"]) .song-maker-hero::after{right:-110px}}
 
+
+
+/* 首页只负责发现音乐：去掉与主视觉重复的页面说明和流程面包屑。 */
+html:not([data-theme="dark"]) body:not(.has-music-result):not(.has-active-production) .bar{height:76px}
+html:not([data-theme="dark"]) body:not(.has-music-result):not(.has-active-production) .bar .ttl{display:none}
+html:not([data-theme="dark"]) body:not(.has-music-result):not(.has-active-production) .bar::before{content:'FOLD / MUSIC OBJECTS';min-width:175px;color:#1d513c;font:800 10px/1 Inter,"Microsoft YaHei",sans-serif;letter-spacing:.16em}
+html:not([data-theme="dark"]) body:not(.has-music-result):not(.has-active-production) .music-flowbar{display:none}
+
 </style>
 </head>
 <body data-page-node-id="Na2JkVOieEwQ90ny6oba1N">
