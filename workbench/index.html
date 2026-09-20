@@ -1172,6 +1172,7 @@ html:not([data-theme="dark"]) .song-maker-replace:hover{color:#fffdf6;border-bot
       </div>
       <div class="acts" data-page-node-id="nA8nfcPZ8EFbpGO8AKelGL">
         <button class="btn" id="btnHome" type="button">首页</button>
+        <button class="btn" id="btnHistoryBack" type="button" hidden>↶ 回退</button>
         <button class="btn" id="btnAppBack" type="button" hidden>← 返回</button>
         <button class="btn" id="btnLib" data-page-node-id="LibBtn0Xq7Lm2NvB4tRw">作品库</button>
         <button class="btn" id="btnZip" disabled data-page-node-id="8dnzDgZKgdLJkvAyCGhr6J">下载 ZIP</button>
@@ -1411,8 +1412,10 @@ let ALBUM_SEL  = new Set(); // 已勾选的专辑下标（批量设计用）
 let ROUTE_RESTORING = false;
 let LAST_ARTIST_DATA = null;
 let LAST_SONG_INDEX = null;
-function setAppBack(label, action){ const b=$('#btnAppBack'); if(!b)return; b.textContent=label; b.hidden=false; b.onclick=action; }
-function hideAppBack(){ const b=$('#btnAppBack'); if(b)b.hidden=true; }
+function setHistoryBack(show){ const b=$('#btnHistoryBack'); if(b)b.hidden=!show; }
+function goHistoryBack(){ if(history.length>1) history.back(); else goAppBack(); }
+function setAppBack(label, action){ const b=$('#btnAppBack'); if(!b)return; b.textContent=label; b.hidden=false; b.onclick=action; setHistoryBack(true); }
+function hideAppBack(){ const b=$('#btnAppBack'); if(b)b.hidden=true; setHistoryBack(false); }
 function goHome(){ history.pushState({route:'home'},'',location.pathname); location.reload(); }
 function updateAppBack(){} // 返回按钮由当前页面语义控制，避免出现两个相同的“返回”。
 function pushAppRoute(route, payload={}){ if(ROUTE_RESTORING) return; history.pushState({route,payload},'',location.pathname); }
@@ -1453,10 +1456,12 @@ window.addEventListener('popstate',e=>{
     else if(st.route==='song' && st.payload && st.payload.data){LAST_ARTIST_DATA=st.payload.data;LAST_SONG_INDEX=Number(st.payload.index||0);returnSongMaker();}
     else if(st.route==='batch' && st.payload && st.payload.data){LAST_ARTIST_DATA=st.payload.data;openHotMaker(st.payload.data);}
     else if(st.route==='album' && st.payload && st.payload.data){LAST_ARTIST_DATA=st.payload.data;renderArtistResultStage(st.payload.data);showArtistAlbums();}
+    else if(st.route==='library-output' && st.payload && st.payload.job){libOpenWork(st.payload.job.id,st.payload.job);}
     else if(st.route==='home') location.reload();
   } finally { ROUTE_RESTORING=false; }
 });
 $('#btnAppBack').onclick=goAppBack;
+$('#btnHistoryBack').onclick=goHistoryBack;
 $('#btnHome').onclick=goHome;
 
 /* 把 ALBUM_SEL 回写到 DOM：行高亮 / 复选框 / 计数 / 批量按钮。
@@ -2740,6 +2745,30 @@ function libOpenStudio(id){
   openStudio({jid: id, from: 'proj'});
 }
 
+/* 商品图任务的结果已经完整落在作品库记录里；从库里打开时重新喂给
+   同一个交付渲染器，不重新生成，也不依赖服务进程仍保留旧内存任务。 */
+function libDeliveryData(j){
+  return {id:j.id,title:j.title,mode:j.mode,status:j.status||'done',phase:j.phase||'已完成',
+    total:j.total||((j.items||[]).length),done:j.done||((j.items||[]).length),elapsed:j.elapsed||0,
+    overview:j.overviewUrl,keychainOverview:j.keychainOverviewUrl,vinylOverview:j.vinylOverviewUrl,
+    albumWall:j.albumWallUrl,shopGrids:j.shopGrids||[],playerPrints:j.playerPrints||[],
+    playerFoldPrints:j.playerFoldPrints||[],items:j.items||[],skipped:[],
+    log:[{t:'作品库',lv:'ok',m:'已打开已保存的制作结果，可继续预览、打印和下载。'}]};
+}
+function libOpenWork(id, restoredJob){
+  const j=restoredJob || LIB_JOBS.find(x=>x.id===id);
+  if(!j) return toast('这条作品尚未加载，请先刷新作品库');
+  libClose(); JOB=j.id; MODE=j.mode||'song'; SINGLE_DELIVERY_TAB='overview';
+  document.body.classList.add('has-active-production');
+  document.body.classList.remove('production-controls-open','has-music-result');
+  $('main').classList.remove('music-search-active'); hideAlbumStage();
+  $('#btnZip').disabled=false; $('#btnOpen').disabled=false;
+  setTitle(j.title||'已保存的制作结果','从作品库恢复 · 可继续查看、打印与下载');
+  setProgress(100); setAppBack('← 返回作品库',()=>libOpen('work'));
+  if(!ROUTE_RESTORING) pushAppRoute('library-output',{job:j});
+  paint(libDeliveryData(j));
+}
+
 /* 回看：把这条作品里"产出了什么"摊开 —— 总览 + 每首的下载。
    商品图变体不写死 key，直接按对象里有的列出来（画布是可配置的）。 */
 function libDetail(j){
@@ -2952,6 +2981,7 @@ function libRow(j){
       </div>
       <div class="ops">
         <button class="btn" onclick="libToggle('${jsq(j.id)}')">回看</button>
+        ${!mini ? `<button class="btn" onclick="libOpenWork('${jsq(j.id)}')">打开制作结果</button>` : ''}
         ${zipHref ? `<a class="mini" href="${esc(asset(zipHref))}" title="打包下载">ZIP</a>` : ''}
         <button class="btn" onclick="libReveal('${jsq(j.id)}')">文件夹</button>
         <button class="btn del" onclick="libDel('${jsq(j.id)}')">回收站</button>
