@@ -1976,7 +1976,7 @@ class Handler(BaseHTTPRequestHandler):
                         # QQ 热门接口给的是 albummid；这里直接转为封面 URL，
                         # 前端点“制作”无需再等一次单曲搜索才显示该曲封面。
                         "pic": (cover_url_q(s.get("pic") or "") if src == "qq"
-                                else (s.get("pic") or "")),
+                                else cover_url(s.get("pic") or "", 800)),
                         "albummid": ((s.get("pic") or "") if src == "qq" else ""),
                     } for s in pool],
                 }
@@ -2043,7 +2043,7 @@ class Handler(BaseHTTPRequestHandler):
                 mode = (q.get("source") or ["auto"])[0]
                 out, seen = [], set()
 
-                def push(nm, arts, alb, dur, sid, amid, src):
+                def push(nm, arts, alb, dur, sid, amid, src, pic=""):
                     key = (nm or "").strip()
                     if not key or key in seen:
                         return
@@ -2051,7 +2051,8 @@ class Handler(BaseHTTPRequestHandler):
                     out.append({"id": sid, "name": nm, "artist": arts,
                                 "album": alb, "dur": dur, "source": src,
                                 "albummid": amid,
-                                "pic": cover_url_q(amid) if src == "qq" else ""})
+                                "pic": (cover_url_q(amid) if src == "qq"
+                                        else cover_url(pic, 800))})
 
                 # QQ 音乐排前面：版权曲目（周杰伦等）只有这里有，用户多半要点它
                 if mode in ("auto", "qq"):
@@ -2061,18 +2062,22 @@ class Handler(BaseHTTPRequestHandler):
                                  "/".join(x.get("name", "?") for x in (s.get("singer") or [])),
                                  s.get("albumname") or "",
                                  fmt_dur((s.get("interval") or 0) * 1000),
-                                 s.get("songid"), s.get("albummid") or "", "qq")
+                             s.get("songid"), s.get("albummid") or "", "qq")
                     except Exception as e:
                         print(f"[qq search] {type(e).__name__}: {e}")
 
                 if mode in ("auto", "163"):
                     res = search(name, "song", 20)
                     for s in (res.get("songs") or [])[:20]:
+                        # 网易云搜索接口通常只给 album.picId，需补查详情才有 picUrl。
+                        # 不补这一步，直接搜索单曲进入制作页仍会退回音符占位。
+                        pic = resolve_picurl(s)
                         arts = "/".join(x.get("name", "?") for x in s.get("artists", []))
                         push(s.get("name"), arts,
                              (s.get("album") or {}).get("name", ""),
                              fmt_dur(s.get("duration") or 0),
-                             s.get("id"), "", "163")
+                             s.get("id"), "", "163",
+                             pic)
                 return self._json({"songs": out[:30]})
 
             if p == "/api/state":
