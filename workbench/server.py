@@ -86,7 +86,7 @@ if _missing:
     print("请执行:  pip install pillow numpy requests")
     sys.exit(1)
 
-from PIL import Image  # noqa: E402
+from PIL import Image, ImageDraw, ImageFont, ImageOps  # noqa: E402
 # 「专辑包装工坊」(packaging_*) 是**另做的独立工作台**，按用户要求不接入本工作台：
 # 文件仍保留在 workbench/ 内，需要时把下面这行 import 与 do_GET/do_POST 里的
 # `PACKAGING.handle(...)` 两处分发恢复，即重新挂上。
@@ -107,7 +107,7 @@ from fetch_qq import (  # noqa: E402
 from make_player import make as make_player  # noqa: E402
 from make_set import (  # noqa: E402
     LEAD_MIN, comment_total, contact_sheet, fmt_dur, hot_songs, hot_songs_ex,
-    human, is_placeholder, lead_rate, norm, normalize_cover, save_retry,
+    human, is_placeholder, lead_rate, norm, normalize_cover, save_retry, FONT_BD,
 )
 
 # 钥匙扣商品图（5 层合成）。缺贴片/曲线时只让这一项功能不可用，
@@ -205,6 +205,7 @@ DEFAULTS = {
     "shopGrid": True,          # 商品图是否另出拼版总览
     "vinyl": False,            # 是否同时出「黑胶播放界面」（1:2 竖图）
     "vinylWidth": 1200,        # 黑胶图宽（高 = 2×宽）；900/1200/1500 三档给前端选
+    "playerPrint": True,       # 播放界面 A4 印刷拼版（4×8，旋转后裁切）
     "albumCard": True,         # 专辑模式：是否出「专辑卡」（每张专辑一张方形卡）
     "albumWall": True,         # 专辑模式：是否出「专辑墙总览」（全部封面拼版）
     "albumCardSize": 1500,     # 专辑卡边长；1200/1500/2000 三档给前端选
@@ -242,6 +243,7 @@ def new_job(title, mode, opt=None):
         "done": 0, "total": 0, "phase": "准备中",
         "items": [], "skipped": [], "error": None,
         "overview": None, "keychainOverview": None, "shopGrids": [], "zip": None,
+        "playerPrints": [],
         "albumWall": None,
         "dir": d,
         "elapsed": 0.0, "t0": t0,
@@ -288,6 +290,7 @@ def snap(job):
             "overview": job["overview"],
             "keychainOverview": job.get("keychainOverview"),
             "vinylOverview": job.get("vinylOverview"),
+            "playerPrints": list(job.get("playerPrints") or []),
             "albumWall": job.get("albumWall"),
             "shopGrids": job.get("shopGrids") or [],
             "elapsed": round(job["elapsed"], 1),
@@ -378,6 +381,7 @@ def _meta_of(job):
         "overview": job.get("overviewFile"),
         "keychainOverview": job.get("keychainOverviewFile"),
         "vinylOverview": job.get("vinylOverviewFile"),
+        "playerPrints": list(job.get("playerPrints") or []),
         "albumWall": job.get("albumWallFile"),
         "shopGrids": list(job.get("shopGrids") or []),
         "counts": {
@@ -386,6 +390,7 @@ def _meta_of(job):
             "vinyl": sum(1 for i in items if i.get("vinyl")),
             "shop": sum(len(i.get("shop") or {}) for i in items),
             "grids": len(job.get("shopGrids") or []),
+            "prints": len(job.get("playerPrints") or []),
             "albums": sum(1 for i in items if i.get("albumCover")),
             "albumCards": sum(1 for i in items if i.get("albumCard")),
         },
@@ -586,6 +591,10 @@ def job_card(m):
         "overviewUrl": _asset_url(jid, m.get("overview")),
         "keychainOverviewUrl": _asset_url(jid, m.get("keychainOverview")),
         "vinylOverviewUrl": _asset_url(jid, m.get("vinylOverview")),
+        "playerPrints": [{"label": x.get("label"),
+                           "url": _asset_url(jid, x.get("file")),
+                           "pdfUrl": _asset_url(jid, x.get("pdf"))}
+                         for x in _as_list(m.get("playerPrints")) if isinstance(x, dict)],
         "albumWallUrl": _asset_url(jid, m.get("albumWall")),
         "shopGrids": [{"label": g.get("label"),
                        "url": _asset_url(jid, g.get("file"))}
@@ -1159,6 +1168,78 @@ def _shop_label(shop_rel):
     return " / ".join(tags)
 
 
+PRINT_DPI = 300
+
+
+def _mm_px(value, dpi=PRINT_DPI):
+    return round(float(value) * dpi / 25.4)
+
+
+def render_player_print_sheets(job, made, dpi=PRINT_DPI):
+    """将每首 30×50mm 播放界面排为 A4 成品拼版。
+
+    用户实际裁切流程是一张歌图重复印多份，而不是把不同歌曲缩在同一页：
+    A4 竖版，播放图逆时针旋转，4 列 × 8 行，共 32 张。这样裁切后方向正确，
+    并且和用户已有的排版习惯完全一致。
+    """
+    if not made:
+        return []
+    out_dir = os.path.join(job["dir"], "print")
+    os.makedirs(out_dir, exist_ok=True)
+
+    page_w, page_h = _mm_px(210, dpi), _mm_px(297, dpi)  # A4 portrait
+    trim_w, trim_h = _mm_px(50, dpi), _mm_px(30, dpi)   # rotate 30×50 → 50×30
+    cols, rows = 4, 8
+    grid_w, grid_h = trim_w * cols, trim_h * rows
+    origin_x = (page_w - grid_w) // 2
+    origin_y = _mm_px(5, dpi)
+    cut = (115, 115, 115)
+    note_font = ImageFont.truetype(FONT_BD, _mm_px(2.3, dpi), index=0)
+    out = []
+
+    for item in made:
+        ppath = item.get("playerPath")
+        if not ppath or not os.path.isfile(ppath):
+            continue
+        page = Image.new("RGB", (page_w, page_h), "white")
+        with Image.open(ppath) as source:
+            # 对齐用户的现有拼版：封面在左、播放控制区在右。
+            card = source.convert("RGB").transpose(Image.Transpose.ROTATE_90)
+            card = ImageOps.fit(card, (trim_w, trim_h), method=Image.Resampling.LANCZOS)
+        for row in range(rows):
+            for col in range(cols):
+                x = origin_x + col * trim_w
+                y = origin_y + row * trim_h
+                page.paste(card, (x, y))
+
+        # 细裁切线只标示成品边缘，不占用卡面，也不改变你给的 4×8 排版密度。
+        draw = ImageDraw.Draw(page)
+        for col in range(cols + 1):
+            x = origin_x + col * trim_w
+            draw.line((x, origin_y, x, origin_y + grid_h), fill=cut, width=1)
+        for row in range(rows + 1):
+            y = origin_y + row * trim_h
+            draw.line((origin_x, y, origin_x + grid_w, y), fill=cut, width=1)
+        foot = "A4 · 30×50mm 播放界面 · 4×8 = 32 张 · 请以 100% 原尺寸打印"
+        draw.text((origin_x, origin_y + grid_h + _mm_px(8, dpi)), foot,
+                  font=note_font, fill=(105, 105, 105))
+
+        base = safe_name(f"{item.get('rank', 0):02d} {item.get('name') or '播放界面'}")
+        png = os.path.join(out_dir, base + "-播放界面-A4-32张.png")
+        pdf = os.path.join(out_dir, base + "-播放界面-A4-32张.pdf")
+        page.save(png, dpi=(dpi, dpi))
+        page.save(pdf, "PDF", resolution=dpi)
+        rel_png, rel_pdf = _rel(job, png), _rel(job, pdf)
+        out.append({
+            "label": f"{item.get('rank', 0):02d} {item.get('name') or '播放界面'} · A4 印刷拼版（32张）",
+            "file": rel_png, "url": url_of(job, rel_png),
+            "pdf": rel_pdf, "pdfUrl": url_of(job, rel_pdf),
+        })
+        card.close()
+        page.close()
+    return out
+
+
 
 def finish(job, made, ar_name, total_label, src=None):
     """收尾: 生成总览 + ZIP"""
@@ -1180,6 +1261,14 @@ def finish(job, made, ar_name, total_label, src=None):
         job["overview"] = url_of(job, os.path.relpath(grid, job["dir"]))
         job["overviewFile"] = _rel(job, grid)
         log(job, "总览九宫格已生成", "ok")
+
+    # 每首播放界面都另出一页 A4 生产拼版；它和电商预览总览用途不同，
+    # 是用户可以直接打印、裁切的实际物料。
+    if play_made and job.get("playerPrint", True):
+        job["phase"] = "生成播放界面印刷拼版"
+        job["playerPrints"] = render_player_print_sheets(job, play_made)
+        if job["playerPrints"]:
+            log(job, f"播放界面 A4 印刷拼版已生成（{len(job['playerPrints'])} 页，每页32张）", "ok")
 
     # 钥匙扣总览（1:1，用方形缩略图，别按 3:5 压扁）
     kc_made = [it for it in made if it.get("keychainPath")]
@@ -1517,7 +1606,7 @@ def build_zip(dirpath, title):
     """
     zpath = os.path.join(dirpath, f"{safe_name(title or '作品')}.zip")
     with zipfile.ZipFile(zpath, "w", zipfile.ZIP_DEFLATED) as z:
-        for sub in ("covers", "players", "keychain", "vinyl", "shop",
+        for sub in ("covers", "players", "print", "keychain", "vinyl", "shop",
                     "albums", "album_cards"):
             d = os.path.join(dirpath, sub)
             if not os.path.isdir(d):
@@ -2022,6 +2111,7 @@ class Handler(BaseHTTPRequestHandler):
                 opt["shop"] = _as_bool(opt.get("shop"), False)
                 opt["shopGrid"] = _as_bool(opt.get("shopGrid"), True)
                 opt["vinyl"] = _as_bool(opt.get("vinyl"), False)
+                opt["playerPrint"] = _as_bool(opt.get("playerPrint"), True)
                 # 宽档位在这里就收敛好，落盘 meta.json 里存的就是干净值
                 opt["vinylWidth"] = vinyl_width(opt)
                 # 专辑模式（v1.9.0）
@@ -2043,6 +2133,7 @@ class Handler(BaseHTTPRequestHandler):
                           "song": f"{opt.get('song', '')}"}
                 job = new_job(titles.get(mode, "任务"), mode, opt)
                 job["shopGrid"] = opt["shopGrid"]   # finish() 收尾时按它决定要不要拼版
+                job["playerPrint"] = opt["playerPrint"]
 
                 runner = {"artist": run_artist, "song": run_song,
                           "album": run_album}.get(mode)
