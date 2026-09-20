@@ -437,6 +437,18 @@ main.studio-on .content,main.studio-on .albStage{display:none}
   min-height:28px;display:inline-flex;align-items:center}
 .mini:hover{background:var(--card2);color:var(--fg);border-color:#aeb5c0}
 
+/* 热门批量的印刷文件很多：保持整组结果全页展示，但把 A4 文件收成可逐张下载的生产台，
+   避免 5～15 张整页预览纵向堆叠成无法浏览的长卷。 */
+.batch-print-gallery{margin-top:20px;padding:18px;border:1px solid var(--line);border-radius:14px;background:#fbfbf9;box-shadow:0 7px 18px rgba(30,42,34,.035)}
+.batch-print-gallery__head{display:flex;align-items:end;justify-content:space-between;gap:16px;padding-bottom:13px;border-bottom:1px solid var(--line)}
+.batch-print-gallery__head h3{font-size:16px;color:#253a31;font-weight:650}.batch-print-gallery__head p{max-width:430px;color:var(--dim);font-size:11px;line-height:1.6}
+.batch-print-gallery__group{margin-top:16px}.batch-print-gallery__group h4{margin-bottom:9px;color:#627067;font-size:11px;font-weight:650;letter-spacing:.04em}
+.batch-print-gallery__grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(185px,1fr));gap:11px}
+.batch-print-card{border:1px solid #dfe3de;border-radius:10px;overflow:hidden;background:#fff;box-shadow:0 2px 6px rgba(28,37,31,.035)}
+.batch-print-card__preview{height:172px;padding:10px;background:#edf0ed;cursor:zoom-in;display:grid;place-items:center}.batch-print-card__preview img{max-width:100%;max-height:100%;display:block;object-fit:contain;box-shadow:0 4px 10px rgba(28,36,30,.16)}
+.batch-print-card__meta{padding:9px 10px 10px}.batch-print-card__meta b{display:block;overflow:hidden;color:#3d4d44;font-size:11px;font-weight:650;text-overflow:ellipsis;white-space:nowrap}.batch-print-card__meta small{display:block;margin-top:3px;color:#89938d;font-size:9.5px}.batch-print-card__actions{display:flex;gap:6px;margin-top:9px}.batch-print-card__actions .mini{flex:1;justify-content:center;font-size:10px}
+@media(max-width:650px){.batch-print-gallery{padding:13px}.batch-print-gallery__head{align-items:start;flex-direction:column}.batch-print-gallery__grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.batch-print-card__preview{height:130px}}
+
 /* 日志 */
 .logs{margin-top:26px;border:1px solid var(--line);border-radius:12px;
   background:#fbfbfc;overflow:hidden}
@@ -2465,6 +2477,15 @@ function singleDeliveryView(d){
 function bindSingleDelivery(){
   $$('.single-delivery [data-delivery-tab]').forEach(btn=>btn.onclick=()=>{SINGLE_DELIVERY_TAB=btn.dataset.deliveryTab; if(LAST_PAINT) paint(LAST_PAINT);});
 }
+function batchPrintGallery(d){
+  const renderCard=(p, kind)=>{
+    const label=p.label||'印刷拼版'; const url=asset(p.url||''); const pdf=p.pdfUrl?asset(p.pdfUrl):'';
+    return `<article class="batch-print-card"><div class="batch-print-card__preview" onclick="zoom('${jsq(url)}','${jsq(label)}')"><img src="${esc(url)}" alt="${esc(label)}" loading="lazy"></div><div class="batch-print-card__meta"><b title="${esc(label)}">${esc(label)}</b><small>${esc(kind)}</small><div class="batch-print-card__actions"><a class="mini" href="${esc(url)}?dl=1">下载 PNG</a>${pdf?`<a class="mini" href="${esc(pdf)}?dl=1">下载 PDF</a>`:''}</div></div></article>`;
+  };
+  const normal=(d.playerPrints||[]), fold=(d.playerFoldPrints||[]);
+  if(!normal.length&&!fold.length)return '';
+  return `<section class="batch-print-gallery"><div class="batch-print-gallery__head"><div><h3>打印制作</h3></div><p>每首歌的印刷文件均独立保留。点击缩略图查看原图，直接在对应卡片下载 PNG 或 PDF。</p></div>${normal.length?`<div class="batch-print-gallery__group"><h4>播放界面 A4 拼版 · ${normal.length} 张</h4><div class="batch-print-gallery__grid">${normal.map(p=>renderCard(p,'播放界面 · A4 拼版')).join('')}</div></div>`:''}${fold.length?`<div class="batch-print-gallery__group"><h4>对折卡印刷文件 · ${fold.length} 张</h4><div class="batch-print-gallery__grid">${fold.map(p=>renderCard(p,p.kind==='sheet'?'对折卡 · A4 拼版':'对折卡 · 1:1 版面总览')).join('')}</div></div>`:''}</section>`;
+}
 let LAST_PAINT=null;
 function paint(d){
   LAST_PAINT=d;
@@ -2514,7 +2535,9 @@ function paint(d){
     </div>`;
   });
 
-  (d.playerPrints||[]).forEach(p=>{
+  if(d.mode === 'artist' && ((d.playerPrints||[]).length || (d.playerFoldPrints||[]).length)){
+    html += batchPrintGallery(d);
+  }else (d.playerPrints||[]).forEach(p=>{
     html += `<div style="${overviewBoxStyle};border:1px solid var(--line);border-radius:12px;
       overflow:hidden;background:#fbfbfc">
       <div style="padding:9px 14px;font-size:11.5px;color:var(--dim);

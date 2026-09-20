@@ -32,3 +32,12 @@ class HotMakerPageTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+class BatchPrintGalleryTests(unittest.TestCase):
+    def test_batch_prints_use_downloadable_gallery_instead_of_full_size_stack(self):
+        html = PAGE.read_text(encoding='utf-8')
+        self.assertIn('function batchPrintGallery(d)', html)
+        self.assertIn('class="batch-print-gallery"', html)
+        self.assertIn('下载 PNG', html)
+        self.assertIn('下载 PDF', html)
+        self.assertIn("if(d.mode === 'artist' && ((d.playerPrints||[]).length", html)
