@@ -44,3 +44,11 @@ class BatchDeliveryTests(unittest.TestCase):
 
 
 
+
+class BatchDeliveryResourceTests(unittest.TestCase):
+    def test_batch_delivery_prefers_batch_overviews_and_keeps_all_print_sheets(self):
+        source = hot_maker_source.__globals__['PAGE'].read_text(encoding='utf-8')
+        self.assertIn("isBatch ? d.keychainOverview", source)
+        self.assertIn("isBatch ? d.vinylOverview", source)
+        self.assertIn("const prints=isBatch ? (d.playerPrints||[]) : (d.playerPrints||[]).slice(0,1)", source)
+        self.assertIn("const foldPrints=isBatch ? (d.playerFoldPrints||[])", source)
