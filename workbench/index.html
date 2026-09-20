@@ -1128,8 +1128,18 @@ html:not([data-theme="dark"]) .song-maker-replace:hover{color:#fffdf6;border-bot
           </span>
           <input type="checkbox" id="p_playerPrint" checked>
         </div>
+        <div class="kcopts" id="playerPrintOpts">
+          <div class="optrow">
+            <span class="olbl">拼版模板</span>
+            <select id="p_playerPrintLayout">
+              <option value="landscape32">横向高密 · 32 张</option>
+              <option value="portrait30">竖向直排 · 30 张</option>
+              <option value="landscape21">横向留缝 · 21 张</option>
+            </select>
+          </div>
+        </div>
         <div class="kchint">
-          将每首 30×50mm 播放界面排成可裁切的 A4 PNG 与 PDF，打印时选择 100% 原尺寸。
+          每种模板都保持 30×50mm 成品尺寸；将每首排成可裁切的 A4 PNG 与 PDF，打印时选择 100% 原尺寸。
         </div>
       </div>
 
@@ -1522,6 +1532,8 @@ function albumParams(a){
   if(a && a.pic)     u.set('pic', a.pic);
   if(a && a.company) u.set('company', a.company || '');
   if(a && a.date)    u.set('date', a.date || '');
+  // 专辑入口的目的就是完成可打印实体；设计完成后直接落在“打印制作”模块。
+  u.set('flow', 'print');
   return u;
 }
 /* ===== 歌手搜索结果：音乐详情页（热门曲目 + 关联专辑） ===== */
@@ -1541,7 +1553,7 @@ function renderArtistResultStage(data){
     LAST_SONG_INDEX=i;
     hideAppBack();
     pushAppRoute('song',{data,index:i});
-    box.innerHTML=`<section class="song-maker-page"><button type="button" class="song-maker-back">← 返回歌曲列表</button><div class="song-maker-hero"><div class="song-maker-cover"><span>♪</span><img src="${esc(asset(track.pic||''))}" alt="" onerror="this.style.display='none'"></div><div><span>SONG / PRODUCT MAKER</span><h2>制作《${esc(track.name||'未命名歌曲')}》</h2><p>${esc(artist.name||track.artist||'')}　·　${esc(track.album||'单曲')}　·　${esc(track.dur||'')}</p><button type="button" class="song-maker-replace">更换封面</button></div></div><div class="song-maker-choice-head"><div><i>选择商品</i><h3>先决定，要把这首歌做成什么</h3></div><p>当前歌曲封面会自动带入已选商品；以后新增 NFC 小卡等品类也会在这里出现。</p></div><div class="song-maker-products"><button type="button" class="song-maker-product" data-output="keychain"><i>01 / OUTPUT</i><b>钥匙扣商品图</b><small>主图 · 实物合成</small></button><button type="button" class="song-maker-product" data-output="shop"><i>02 / OUTPUT</i><b>电商白底图</b><small>白底 · 透明底 · 拼版</small></button><button type="button" class="song-maker-product" data-output="vinyl"><i>03 / OUTPUT</i><b>黑胶播放界面</b><small>竖图 · 唱片 · 控制区</small></button><button type="button" class="song-maker-product song-maker-product--soon" disabled><i>04 / NEXT</i><b>NFC 音乐小卡</b><small>封面 · 链接 · 收藏卡</small></button></div><details class="song-maker-details"><summary>制作细节参数</summary><div class="song-maker-detail-grid"><label><span>播放列表标题</span><input data-detail="playlist" value="${esc($('#p_playlist').value)}"></label><label><span>热度 / 评论文案</span><div style="display:flex;gap:6px"><input data-detail="likes" value="${esc($('#p_likes').value)}"><input data-detail="comments" value="${esc($('#p_comments').value)}"></div></label><label><span>在线人数文案</span><input data-detail="listeners" value="${esc($('#p_listeners').value)}"></label><label><span>主图尺寸 / DPI</span><div style="display:flex;gap:6px"><input type="number" data-detail="width" value="${esc($('#p_width').value)}"><input type="number" data-detail="dpi" value="${esc($('#p_dpi').value)}"></div></label><label><span>白底商品图画布</span><div class="detail-chips">${SHOP_PRESETS.map(p=>`<button type="button" data-detail-canvas="${esc(p.key)}">${esc(p.tag||p.label||p.key)}</button>`).join('')}</div></label><label><span>白底商品图底色</span><div class="detail-chips"><button type="button" data-detail-bg="white">白底</button><button type="button" data-detail-bg="transparent">透明</button><button type="button" data-detail-bg="both">两种</button></div></label><label><span>黑胶播放图宽度</span><div class="detail-chips"><button type="button" data-detail-vinyl="900">900</button><button type="button" data-detail-vinyl="1200">1200</button><button type="button" data-detail-vinyl="1500">1500</button></div></label><label><span>显示与封面规则</span><div class="detail-switch">VIP 标签<input type="checkbox" data-detail-check="vip" ${$('#p_vip').checked?'checked':''}></div><div class="detail-switch">歌手关注按钮<input type="checkbox" data-detail-check="follow" ${$('#p_follow').checked?'checked':''}></div><div class="detail-switch">无封面自动补位<input type="checkbox" data-detail-check="ph" ${$('#p_ph').checked?'checked':''}></div></label><label><span>印刷与商品图附加输出</span><div class="detail-switch">额外输出商品拼版总览<input type="checkbox" data-detail-check="shopGrid" ${$('#p_shopGrid').checked?'checked':''}></div><div class="detail-switch">播放界面 A4 印刷拼版<input type="checkbox" data-detail-check="playerPrint" ${$('#p_playerPrint').checked?'checked':''}></div></label></div></details><div class="song-maker-footer"><span class="song-maker-status">正在匹配当前歌曲封面…</span><button type="button" class="song-maker-cancel">取消</button><button type="button" class="song-maker-start primary" disabled>开始制作 →</button></div></section>`;
+    box.innerHTML=`<section class="song-maker-page"><button type="button" class="song-maker-back">← 返回歌曲列表</button><div class="song-maker-hero"><div class="song-maker-cover"><span>♪</span><img src="${esc(asset(track.pic||''))}" alt="" onerror="this.style.display='none'"></div><div><span>SONG / PRODUCT MAKER</span><h2>制作《${esc(track.name||'未命名歌曲')}》</h2><p>${esc(artist.name||track.artist||'')}　·　${esc(track.album||'单曲')}　·　${esc(track.dur||'')}</p><button type="button" class="song-maker-replace">更换封面</button></div></div><div class="song-maker-choice-head"><div><i>选择商品</i><h3>先决定，要把这首歌做成什么</h3></div><p>当前歌曲封面会自动带入已选商品；以后新增 NFC 小卡等品类也会在这里出现。</p></div><div class="song-maker-products"><button type="button" class="song-maker-product" data-output="keychain"><i>01 / OUTPUT</i><b>钥匙扣商品图</b><small>主图 · 实物合成</small></button><button type="button" class="song-maker-product" data-output="shop"><i>02 / OUTPUT</i><b>电商白底图</b><small>白底 · 透明底 · 拼版</small></button><button type="button" class="song-maker-product" data-output="vinyl"><i>03 / OUTPUT</i><b>黑胶播放界面</b><small>竖图 · 唱片 · 控制区</small></button><button type="button" class="song-maker-product song-maker-product--soon" disabled><i>04 / NEXT</i><b>NFC 音乐小卡</b><small>封面 · 链接 · 收藏卡</small></button></div><details class="song-maker-details"><summary>制作细节参数</summary><div class="song-maker-detail-grid"><label><span>播放列表标题</span><input data-detail="playlist" value="${esc($('#p_playlist').value)}"></label><label><span>热度 / 评论文案</span><div style="display:flex;gap:6px"><input data-detail="likes" value="${esc($('#p_likes').value)}"><input data-detail="comments" value="${esc($('#p_comments').value)}"></div></label><label><span>在线人数文案</span><input data-detail="listeners" value="${esc($('#p_listeners').value)}"></label><label><span>主图尺寸 / DPI</span><div style="display:flex;gap:6px"><input type="number" data-detail="width" value="${esc($('#p_width').value)}"><input type="number" data-detail="dpi" value="${esc($('#p_dpi').value)}"></div></label><label><span>白底商品图画布</span><div class="detail-chips">${SHOP_PRESETS.map(p=>`<button type="button" data-detail-canvas="${esc(p.key)}">${esc(p.tag||p.label||p.key)}</button>`).join('')}</div></label><label><span>白底商品图底色</span><div class="detail-chips"><button type="button" data-detail-bg="white">白底</button><button type="button" data-detail-bg="transparent">透明</button><button type="button" data-detail-bg="both">两种</button></div></label><label><span>黑胶播放图宽度</span><div class="detail-chips"><button type="button" data-detail-vinyl="900">900</button><button type="button" data-detail-vinyl="1200">1200</button><button type="button" data-detail-vinyl="1500">1500</button></div></label><label><span>显示与封面规则</span><div class="detail-switch">VIP 标签<input type="checkbox" data-detail-check="vip" ${$('#p_vip').checked?'checked':''}></div><div class="detail-switch">歌手关注按钮<input type="checkbox" data-detail-check="follow" ${$('#p_follow').checked?'checked':''}></div><div class="detail-switch">无封面自动补位<input type="checkbox" data-detail-check="ph" ${$('#p_ph').checked?'checked':''}></div></label><label><span>印刷与商品图附加输出</span><div class="detail-switch">额外输出商品拼版总览<input type="checkbox" data-detail-check="shopGrid" ${$('#p_shopGrid').checked?'checked':''}></div><div class="detail-switch">播放界面 A4 印刷拼版<input type="checkbox" data-detail-check="playerPrint" ${$('#p_playerPrint').checked?'checked':''}></div><select data-detail="playerPrintLayout"><option value="landscape32" ${$('#p_playerPrintLayout').value==='landscape32'?'selected':''}>横向高密 · 32 张</option><option value="portrait30" ${$('#p_playerPrintLayout').value==='portrait30'?'selected':''}>竖向直排 · 30 张</option><option value="landscape21" ${$('#p_playerPrintLayout').value==='landscape21'?'selected':''}>横向留缝 · 21 张</option></select></label></div></details><div class="song-maker-footer"><span class="song-maker-status">正在匹配当前歌曲封面…</span><button type="button" class="song-maker-cancel">取消</button><button type="button" class="song-maker-start primary" disabled>开始制作 →</button></div></section>`;
     const page=box.querySelector('.song-maker-page'), status=page.querySelector('.song-maker-status'), start=page.querySelector('.song-maker-start');
     const coverKey=(artist.name||track.artist||'')+'::'+(track.name||'');
     let customCover=CUSTOM_COVERS.get(coverKey)||null;
@@ -1558,9 +1570,10 @@ function renderArtistResultStage(data){
     page.querySelector('.song-maker-back').onclick=returnArtistList;
     page.querySelector('.song-maker-cancel').onclick=returnArtistList; sync();
     // 当前单曲的细节编辑同步至既有参数模型，后端收参和生成逻辑无需复制。
-    page.querySelectorAll('[data-detail]').forEach(el=>el.addEventListener('input',()=>{
-      const target=$('#p_'+el.dataset.detail); if(target) target.value=el.value;
-    }));
+    page.querySelectorAll('[data-detail]').forEach(el=>{
+      const syncDetail=()=>{const target=$('#p_'+el.dataset.detail); if(target) target.value=el.value;};
+      el.addEventListener('input',syncDetail); el.addEventListener('change',syncDetail);
+    });
     page.querySelectorAll('[data-detail-check]').forEach(el=>el.addEventListener('change',()=>{
       const target=$('#p_'+el.dataset.detailCheck); if(target){target.checked=el.checked;target.dispatchEvent(new Event('change'));}
     }));
@@ -1656,7 +1669,7 @@ function renderAlbumStage(){
       <div class="dt">
         <b class="nm" title="${esc(a.name)}">${esc(a.name)}</b>
         <span class="mt">${String(i+1).padStart(2,'0')} · ${esc(metaOf(a)||'—')}</span>
-        <button class="go" data-i="${i}">设计这张</button>
+        <button class="go" data-i="${i}">设计并打印</button>
       </div>
     </div>`).join('');
   box.className='albStage album-grid-page';
@@ -2214,7 +2227,8 @@ function collect(){
     shopGrid:   $('#p_shopGrid').checked,
     vinyl:      $('#p_vinyl').checked && !$('#p_vinyl').disabled,
     vinylWidth: VINYL_W,
-    playerPrint: $('#p_playerPrint').checked
+    playerPrint: $('#p_playerPrint').checked,
+    playerPrintLayout: $('#p_playerPrintLayout').value
   };
   if(MODE === 'artist'){ o.artist = $('#artistName').value.trim(); o.top = TOP; o.source = SRC; }
   else if(MODE === 'album'){

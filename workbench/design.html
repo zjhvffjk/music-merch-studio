@@ -580,7 +580,7 @@ $('#btnBuild').onclick=async()=>{
     $('#resCard').hidden=false;$('#printBody').hidden=false;$('#printEmpty').hidden=true;
     $('#printCard').hidden=false;$('#batchRes').hidden=true;
     $('#buildState').textContent='完成 ✓（任务 '+d.jid+'）';
-    showMod('design');
+    showMod(q.get('flow') === 'print' ? 'print' : 'design');
     $('#resCard').scrollIntoView({behavior:'smooth',block:'start'});
   }catch(e){err(e.message);$('#buildState').textContent='';}
   finally{building=false;$('#btnBuild').disabled=false;}

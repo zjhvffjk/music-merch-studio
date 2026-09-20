@@ -206,6 +206,7 @@ DEFAULTS = {
     "vinyl": False,            # 是否同时出「黑胶播放界面」（1:2 竖图）
     "vinylWidth": 1200,        # 黑胶图宽（高 = 2×宽）；900/1200/1500 三档给前端选
     "playerPrint": True,       # 播放界面 A4 印刷拼版（4×8，旋转后裁切）
+    "playerPrintLayout": "landscape32",
     "albumCard": True,         # 专辑模式：是否出「专辑卡」（每张专辑一张方形卡）
     "albumWall": True,         # 专辑模式：是否出「专辑墙总览」（全部封面拼版）
     "albumCardSize": 1500,     # 专辑卡边长；1200/1500/2000 三档给前端选
@@ -1170,29 +1171,47 @@ def _shop_label(shop_rel):
 
 PRINT_DPI = 300
 
+# 播放界面是实际要裁切的卡片，模板不是单纯缩略图的视觉差异，而是不同的
+# 纸张利用率 / 裁切习惯。默认值严格对齐用户现有的 4×8 横向密排。
+PLAYER_PRINT_LAYOUTS = {
+    "landscape32": {"label": "横向高密 · 32张", "cols": 4, "rows": 8,
+                    "trim_mm": (50, 30), "rotate": True, "gap_mm": 0, "top_mm": 5},
+    "portrait30": {"label": "竖向直排 · 30张", "cols": 6, "rows": 5,
+                   "trim_mm": (30, 50), "rotate": False, "gap_mm": 0, "top_mm": None},
+    "landscape21": {"label": "横向留缝 · 21张", "cols": 3, "rows": 7,
+                    "trim_mm": (50, 30), "rotate": True, "gap_mm": 5, "top_mm": None},
+}
+
+
+def player_print_layout(value):
+    """裸 API 传来的模板键只接受明确定义的三种。"""
+    return value if value in PLAYER_PRINT_LAYOUTS else "landscape32"
+
 
 def _mm_px(value, dpi=PRINT_DPI):
     return round(float(value) * dpi / 25.4)
 
 
-def render_player_print_sheets(job, made, dpi=PRINT_DPI):
+def render_player_print_sheets(job, made, layout="landscape32", dpi=PRINT_DPI):
     """将每首 30×50mm 播放界面排为 A4 成品拼版。
 
     用户实际裁切流程是一张歌图重复印多份，而不是把不同歌曲缩在同一页：
-    A4 竖版，播放图逆时针旋转，4 列 × 8 行，共 32 张。这样裁切后方向正确，
-    并且和用户已有的排版习惯完全一致。
+    每种模板仍严格保留 30×50mm 成品尺寸；区别只是旋转方向、间距和每页数量。
     """
     if not made:
         return []
     out_dir = os.path.join(job["dir"], "print")
     os.makedirs(out_dir, exist_ok=True)
 
+    spec = PLAYER_PRINT_LAYOUTS[player_print_layout(layout)]
     page_w, page_h = _mm_px(210, dpi), _mm_px(297, dpi)  # A4 portrait
-    trim_w, trim_h = _mm_px(50, dpi), _mm_px(30, dpi)   # rotate 30×50 → 50×30
-    cols, rows = 4, 8
-    grid_w, grid_h = trim_w * cols, trim_h * rows
+    trim_w, trim_h = (_mm_px(n, dpi) for n in spec["trim_mm"])
+    cols, rows, gap = spec["cols"], spec["rows"], _mm_px(spec["gap_mm"], dpi)
+    grid_w = trim_w * cols + gap * (cols - 1)
+    grid_h = trim_h * rows + gap * (rows - 1)
     origin_x = (page_w - grid_w) // 2
-    origin_y = _mm_px(5, dpi)
+    origin_y = (_mm_px(spec["top_mm"], dpi) if spec["top_mm"] is not None
+                else (page_h - grid_h) // 2)
     cut = (115, 115, 115)
     note_font = ImageFont.truetype(FONT_BD, _mm_px(2.3, dpi), index=0)
     out = []
@@ -1203,35 +1222,39 @@ def render_player_print_sheets(job, made, dpi=PRINT_DPI):
             continue
         page = Image.new("RGB", (page_w, page_h), "white")
         with Image.open(ppath) as source:
-            # 对齐用户的现有拼版：封面在左、播放控制区在右。
-            card = source.convert("RGB").transpose(Image.Transpose.ROTATE_90)
+            card = source.convert("RGB")
+            if spec["rotate"]:
+                # 用户的横向模板：封面在左、播放控制区在右。
+                card = card.transpose(Image.Transpose.ROTATE_90)
             card = ImageOps.fit(card, (trim_w, trim_h), method=Image.Resampling.LANCZOS)
         for row in range(rows):
             for col in range(cols):
-                x = origin_x + col * trim_w
-                y = origin_y + row * trim_h
+                x = origin_x + col * (trim_w + gap)
+                y = origin_y + row * (trim_h + gap)
                 page.paste(card, (x, y))
 
-        # 细裁切线只标示成品边缘，不占用卡面，也不改变你给的 4×8 排版密度。
+        # 细裁切线只标示成品边缘，不占用卡面。
         draw = ImageDraw.Draw(page)
-        for col in range(cols + 1):
-            x = origin_x + col * trim_w
-            draw.line((x, origin_y, x, origin_y + grid_h), fill=cut, width=1)
-        for row in range(rows + 1):
-            y = origin_y + row * trim_h
-            draw.line((origin_x, y, origin_x + grid_w, y), fill=cut, width=1)
-        foot = "A4 · 30×50mm 播放界面 · 4×8 = 32 张 · 请以 100% 原尺寸打印"
+        for row in range(rows):
+            for col in range(cols):
+                x = origin_x + col * (trim_w + gap)
+                y = origin_y + row * (trim_h + gap)
+                draw.rectangle((x, y, x + trim_w, y + trim_h), outline=cut, width=1)
+        foot = (f"A4 · 30×50mm 播放界面 · {cols}×{rows} = {cols * rows} 张 · "
+                "请以 100% 原尺寸打印")
         draw.text((origin_x, origin_y + grid_h + _mm_px(8, dpi)), foot,
                   font=note_font, fill=(105, 105, 105))
 
         base = safe_name(f"{item.get('rank', 0):02d} {item.get('name') or '播放界面'}")
-        png = os.path.join(out_dir, base + "-播放界面-A4-32张.png")
-        pdf = os.path.join(out_dir, base + "-播放界面-A4-32张.pdf")
+        suffix = safe_name(f"播放界面-A4-{cols}x{rows}-{cols * rows}张")
+        png = os.path.join(out_dir, base + "-" + suffix + ".png")
+        pdf = os.path.join(out_dir, base + "-" + suffix + ".pdf")
         page.save(png, dpi=(dpi, dpi))
         page.save(pdf, "PDF", resolution=dpi)
         rel_png, rel_pdf = _rel(job, png), _rel(job, pdf)
         out.append({
-            "label": f"{item.get('rank', 0):02d} {item.get('name') or '播放界面'} · A4 印刷拼版（32张）",
+            "label": (f"{item.get('rank', 0):02d} {item.get('name') or '播放界面'} · "
+                      f"A4 印刷拼版（{spec['label']}）"),
             "file": rel_png, "url": url_of(job, rel_png),
             "pdf": rel_pdf, "pdfUrl": url_of(job, rel_pdf),
         })
@@ -1266,9 +1289,11 @@ def finish(job, made, ar_name, total_label, src=None):
     # 是用户可以直接打印、裁切的实际物料。
     if play_made and job.get("playerPrint", True):
         job["phase"] = "生成播放界面印刷拼版"
-        job["playerPrints"] = render_player_print_sheets(job, play_made)
+        job["playerPrints"] = render_player_print_sheets(
+            job, play_made, job.get("playerPrintLayout", "landscape32"))
         if job["playerPrints"]:
-            log(job, f"播放界面 A4 印刷拼版已生成（{len(job['playerPrints'])} 页，每页32张）", "ok")
+            label = PLAYER_PRINT_LAYOUTS[player_print_layout(job.get("playerPrintLayout"))]["label"]
+            log(job, f"播放界面 A4 印刷拼版已生成（{len(job['playerPrints'])} 页，{label}）", "ok")
 
     # 钥匙扣总览（1:1，用方形缩略图，别按 3:5 压扁）
     kc_made = [it for it in made if it.get("keychainPath")]
@@ -2112,6 +2137,7 @@ class Handler(BaseHTTPRequestHandler):
                 opt["shopGrid"] = _as_bool(opt.get("shopGrid"), True)
                 opt["vinyl"] = _as_bool(opt.get("vinyl"), False)
                 opt["playerPrint"] = _as_bool(opt.get("playerPrint"), True)
+                opt["playerPrintLayout"] = player_print_layout(opt.get("playerPrintLayout"))
                 # 宽档位在这里就收敛好，落盘 meta.json 里存的就是干净值
                 opt["vinylWidth"] = vinyl_width(opt)
                 # 专辑模式（v1.9.0）
@@ -2134,6 +2160,7 @@ class Handler(BaseHTTPRequestHandler):
                 job = new_job(titles.get(mode, "任务"), mode, opt)
                 job["shopGrid"] = opt["shopGrid"]   # finish() 收尾时按它决定要不要拼版
                 job["playerPrint"] = opt["playerPrint"]
+                job["playerPrintLayout"] = opt["playerPrintLayout"]
 
                 runner = {"artist": run_artist, "song": run_song,
                           "album": run_album}.get(mode)
