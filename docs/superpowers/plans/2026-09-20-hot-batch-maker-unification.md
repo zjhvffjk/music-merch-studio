@@ -106,3 +106,7 @@ Expected: PASS。
 
 Run: `python -m unittest tests.test_hot_maker_page -v`、`node --check <提取的脚本>`、`git diff --check`。
 Expected: PASS。
+
+### Ruling: 批量交付不复用单曲固定壳
+
+用户验证后确认，批量的 N 首结果应一次完整展示；固定单项画布只用于单曲。已回退批量交付壳，保留统一的批量制作设置页。
