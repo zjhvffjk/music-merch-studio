@@ -796,6 +796,80 @@ body.has-active-production main.workspace-compact .content{padding-top:18px}
 
 /* 单曲制作页：从歌曲列表进入后，只对当前歌曲配置商品输出。 */
 .song-maker-page{width:min(980px,calc(100% - 48px));margin:32px auto 54px;color:#2e3552}.song-maker-back{padding:0;border:0;background:transparent;color:#5267df;font:12px Inter,"Microsoft YaHei",sans-serif;cursor:pointer}.song-maker-hero{display:flex;gap:24px;align-items:center;margin:18px 0 30px;padding:22px;border:1px solid #e0e4f1;border-radius:14px;background:#fff}.song-maker-cover{width:118px;height:118px;flex:none;position:relative;overflow:hidden;border-radius:8px;background:linear-gradient(145deg,#e9ecff,#d7ddfb)}.song-maker-cover span{position:absolute;inset:0;display:grid;place-items:center;color:#6576e9;font:42px/1 Georgia,serif}.song-maker-cover img{position:relative;z-index:1;width:118px;height:118px;object-fit:cover}.song-maker-hero span{font-size:10px;font-weight:800;color:#6173e9;letter-spacing:.14em}.song-maker-hero h2{margin:8px 0 6px;font-size:25px;letter-spacing:-.04em}.song-maker-hero p{margin:0;color:#7c839d;font-size:12px}.song-maker-choice-head{display:flex;justify-content:space-between;gap:24px;align-items:end;margin:0 0 14px}.song-maker-choice-head i{display:block;color:#6576eb;font-style:normal;font-size:10px;font-weight:800;letter-spacing:.14em}.song-maker-choice-head h3{margin:5px 0 0;color:#2e3552;font-size:22px;letter-spacing:-.04em}.song-maker-choice-head p{max-width:285px;margin:0;color:#7a8299;font-size:11px;line-height:1.65}.song-maker-products{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.song-maker-product{min-height:178px;padding:19px;border:1px solid #dde1ef;border-radius:12px;background:#fff;text-align:left;color:#39405d;font-family:inherit;cursor:pointer;transition:.18s}.song-maker-product:hover{border-color:#9ba8f4;transform:translateY(-2px)}.song-maker-product.is-on{border-color:#6374ec;background:#eef0ff;box-shadow:inset 0 0 0 1px #6374ec}.song-maker-product--soon{cursor:not-allowed;opacity:.54;background:#f3f4f7}.song-maker-product i{display:block;color:#6576eb;font-style:normal;font-size:11px;font-weight:800}.song-maker-product b{display:block;margin-top:35px;font-size:16px}.song-maker-product small{display:block;margin-top:7px;color:#8188a0;font-size:11px;line-height:1.55}.song-maker-details{margin-top:18px;border:1px solid #dfe3ef;border-radius:12px;background:#fff;overflow:hidden}.song-maker-details summary{padding:14px 16px;cursor:pointer;color:#37405d;font-size:12px;font-weight:700;list-style:none}.song-maker-details summary::-webkit-details-marker{display:none}.song-maker-details summary::after{content:'展开';float:right;color:#6978df;font-size:10px;font-weight:600}.song-maker-details[open] summary::after{content:'收起'}.song-maker-detail-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;padding:0 16px 16px;border-top:1px solid #edf0f6}.song-maker-detail-grid label{display:block;color:#737b95;font-size:10px;line-height:1.5}.song-maker-detail-grid label>span{display:block;margin:12px 0 5px;color:#575f7c;font-weight:700}.song-maker-detail-grid input{width:100%;box-sizing:border-box;padding:8px 9px;border:1px solid #d8deec;border-radius:6px;font:12px Inter,"Microsoft YaHei",sans-serif}.song-maker-detail-grid .detail-chips{display:flex;gap:5px;flex-wrap:wrap}.song-maker-detail-grid .detail-chips button{padding:6px 9px;border:1px solid #d8deec;border-radius:999px;background:#fff;color:#66708d;font:11px Inter,"Microsoft YaHei",sans-serif;cursor:pointer}.song-maker-detail-grid .detail-chips button.on{border-color:#6374ec;background:#eef0ff;color:#4b5ed6}.song-maker-detail-grid .detail-switch{display:flex;align-items:center;justify-content:space-between;padding-top:10px}.song-maker-detail-grid .detail-switch input{width:auto;accent-color:#6374ec}@media(max-width:720px){.song-maker-choice-head{align-items:start;flex-direction:column}.song-maker-detail-grid{grid-template-columns:1fr}}.song-maker-footer{display:flex;align-items:center;gap:15px;margin-top:18px;padding:17px 0;border-top:1px solid #e0e4ee}.song-maker-footer span{margin-right:auto;color:#7a8299;font-size:11px}.song-maker-footer button{padding:10px 17px;border:1px solid #ccd2e5;border-radius:6px;background:#fff;color:#535a75;font:12px Inter,"Microsoft YaHei",sans-serif;cursor:pointer}.song-maker-footer button.primary{border-color:#286eb3;background:linear-gradient(#4aa3e9,#1f79c4);color:#fff}.song-maker-footer button:disabled{opacity:.55;cursor:wait}@media(max-width:920px){.song-maker-products{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:720px){.song-maker-page{width:calc(100% - 28px);margin:20px auto}.song-maker-hero{align-items:flex-start}.song-maker-cover,.song-maker-cover img{width:84px;height:84px}.song-maker-products{grid-template-columns:1fr}.song-maker-footer{flex-wrap:wrap}.song-maker-footer span{width:100%}}
+
+
+/* Premium music-object studio skin: keep the production flow, restore the record-workshop character. */
+html:not([data-theme="dark"]) body{background:#f5f1e8;color:#17382c}
+html:not([data-theme="dark"]) main{background:#f5f1e8}
+html:not([data-theme="dark"]) .bar{background:rgba(248,245,238,.94);border-bottom:1px solid #ded7c9;box-shadow:0 8px 22px rgba(28,57,42,.06)}
+html:not([data-theme="dark"]) .bar .ttl{color:#17382c}
+html:not([data-theme="dark"]) .bar .ttl small{color:#69776d}
+html:not([data-theme="dark"]) .bar .acts .btn{border-color:#d8d0c1;background:#fbf9f4;color:#284638;box-shadow:none}
+html:not([data-theme="dark"]) .bar .acts .btn:hover{background:#e3ebd0;border-color:#8ca274;color:#17382c;box-shadow:none}
+html:not([data-theme="dark"]) .global-search input{border-color:#d7d0c1;border-radius:6px;background:#fffdf8;color:#17382c}
+html:not([data-theme="dark"]) .global-search input:focus{border-color:#4c7358;box-shadow:0 0 0 3px rgba(76,115,88,.12)}
+html:not([data-theme="dark"]) .global-search__icon,html:not([data-theme="dark"]) .global-search button{color:#65786b}
+html:not([data-theme="dark"]) .music-flowbar{background:#f8f5ee;border-bottom-color:#ded7c9;color:#798278}
+html:not([data-theme="dark"]) .music-flowbar span:first-child{color:#315943}
+html:not([data-theme="dark"]) .music-flowbar i{color:#a9ad9d}
+
+/* Discovery is an editorial invitation, not an empty SaaS dashboard. */
+html:not([data-theme="dark"]) .discover-home{width:min(1120px,calc(100% - 48px));min-height:230px;margin:34px auto 56px;padding:37px 42px;border:0;border-radius:16px;background:#1d513c;box-shadow:0 24px 40px -34px rgba(17,54,39,.78)}
+html:not([data-theme="dark"]) .discover-home::after{content:'';right:35px;top:50%;width:210px;height:210px;transform:translateY(-50%);border:2px solid rgba(240,239,216,.7);border-radius:50%;background:repeating-radial-gradient(circle at center,#153a2d 0 3px,#48705b 4px 5px,#153a2d 6px 9px);box-shadow:inset 0 0 0 25px #173d30, inset 0 0 0 27px rgba(240,239,216,.35)}
+html:not([data-theme="dark"]) .discover-home::before{content:'FOLD\A\A MAKE IT\A PLAYABLE';white-space:pre;position:absolute;right:82px;top:50%;transform:translateY(-50%) rotate(8deg);z-index:1;padding:20px 18px;background:#e1e7c2;color:#17382c;font:700 12px/1.5 Georgia,"Songti SC",serif;letter-spacing:.08em;box-shadow:8px 9px 0 rgba(11,37,27,.2)}
+html:not([data-theme="dark"]) .discover-home__eyebrow{color:#e6efbd}
+html:not([data-theme="dark"]) .discover-home h2{max-width:520px;margin:12px 0 13px;color:#fffdf6;font:400 45px/1.12 Georgia,"Songti SC","SimSun",serif;letter-spacing:-.045em}
+html:not([data-theme="dark"]) .discover-home p{max-width:500px;color:#d9e2d1;font-size:13px;line-height:1.8}
+html:not([data-theme="dark"]) .discover-home__quick{margin-top:27px}
+html:not([data-theme="dark"]) .discover-home__quick span{color:#b9cabb}
+html:not([data-theme="dark"]) .discover-home__quick button{border-color:rgba(234,241,211,.35);border-radius:999px;background:transparent;color:#f5f5e8}
+html:not([data-theme="dark"]) .discover-home__quick button:hover{background:#e0e8c6;border-color:#e0e8c6;color:#16392b}
+html:not([data-theme="dark"]) .discover-home__footer{margin-top:26px;padding-top:15px;border-top-color:rgba(234,241,211,.2)}
+html:not([data-theme="dark"]) .discover-home__footer button{color:#e6efbd}
+html:not([data-theme="dark"]) .discover-home__footer small{color:#b7c5b8}
+
+/* Song maker: an album-production sheet with strong material contrast and clear output states. */
+html:not([data-theme="dark"]) .song-maker-page{width:min(1080px,calc(100% - 48px));margin:30px auto 58px;color:#17382c}
+html:not([data-theme="dark"]) .song-maker-back{display:inline-flex;align-items:center;padding:8px 0;color:#315943;font:700 12px Inter,"Microsoft YaHei",sans-serif;letter-spacing:.02em}
+html:not([data-theme="dark"]) .song-maker-back:hover{color:#c25a43}
+html:not([data-theme="dark"]) .song-maker-hero{position:relative;gap:28px;min-height:150px;margin:10px 0 38px;padding:25px 31px;border:0;border-radius:15px;background:#1d513c;box-shadow:0 18px 32px -27px rgba(17,54,39,.85);overflow:hidden}
+html:not([data-theme="dark"]) .song-maker-hero::after{content:'';position:absolute;right:-80px;top:-90px;width:290px;height:290px;border:1px solid rgba(232,237,208,.38);border-radius:50%;background:repeating-radial-gradient(circle,#1a4936 0 3px,#4b755e 4px 5px,#1a4936 6px 10px);opacity:.85}
+html:not([data-theme="dark"]) .song-maker-hero>div{position:relative;z-index:1}
+html:not([data-theme="dark"]) .song-maker-cover{width:138px;height:138px;border-radius:2px;background:#dfe7c8;box-shadow:7px 8px 0 rgba(8,30,22,.28)}
+html:not([data-theme="dark"]) .song-maker-cover span{color:#1d513c;font-size:46px}
+html:not([data-theme="dark"]) .song-maker-cover img{width:138px;height:138px}
+html:not([data-theme="dark"]) .song-maker-hero span{color:#e7efbf}
+html:not([data-theme="dark"]) .song-maker-hero h2{margin:8px 0 7px;color:#fffdf6;font:400 33px/1.15 Georgia,"Songti SC","SimSun",serif;letter-spacing:-.045em}
+html:not([data-theme="dark"]) .song-maker-hero p{color:#d1ded1;font-size:12px}
+html:not([data-theme="dark"]) .song-maker-choice-head{margin-bottom:17px}
+html:not([data-theme="dark"]) .song-maker-choice-head i{color:#c25a43}
+html:not([data-theme="dark"]) .song-maker-choice-head h3{color:#17382c;font:400 28px/1.2 Georgia,"Songti SC","SimSun",serif;letter-spacing:-.04em}
+html:not([data-theme="dark"]) .song-maker-choice-head p{color:#68776a;font-size:11px}
+html:not([data-theme="dark"]) .song-maker-products{gap:11px}
+html:not([data-theme="dark"]) .song-maker-product{min-height:160px;padding:17px 18px;border:1px solid #d8d0c0;border-radius:10px;background:#fffdf8;color:#17382c;box-shadow:none}
+html:not([data-theme="dark"]) .song-maker-product:hover{border-color:#71906f;background:#fbfcf5;transform:translateY(-3px)}
+html:not([data-theme="dark"]) .song-maker-product.is-on{border-color:#86a073;background:#dfe9c9;box-shadow:inset 0 3px 0 #1d513c}
+html:not([data-theme="dark"]) .song-maker-product--soon{background:#ebe7dd;border-color:#ddd6c7;opacity:.72}
+html:not([data-theme="dark"]) .song-maker-product i{color:#c25a43}
+html:not([data-theme="dark"]) .song-maker-product b{margin-top:29px;color:#17382c;font:400 19px/1.25 Georgia,"Songti SC","SimSun",serif}
+html:not([data-theme="dark"]) .song-maker-product small{color:#657568}
+html:not([data-theme="dark"]) .song-maker-details{margin-top:20px;border:1px solid #d9d1c1;border-radius:8px;background:#fbf9f3}
+html:not([data-theme="dark"]) .song-maker-details summary{padding:15px 17px;color:#17382c}
+html:not([data-theme="dark"]) .song-maker-details summary::after{color:#315943}
+html:not([data-theme="dark"]) .song-maker-detail-grid{border-top-color:#e1dbcf}
+html:not([data-theme="dark"]) .song-maker-detail-grid label{color:#6d786e}
+html:not([data-theme="dark"]) .song-maker-detail-grid label>span{color:#355243}
+html:not([data-theme="dark"]) .song-maker-detail-grid input{border-color:#d7d0c1;border-radius:4px;background:#fffdf8;color:#17382c}
+html:not([data-theme="dark"]) .song-maker-detail-grid .detail-chips button{border-color:#d7d0c1;background:#fffdf8;color:#4c6253}
+html:not([data-theme="dark"]) .song-maker-detail-grid .detail-chips button.on{border-color:#76946f;background:#e0e9cb;color:#17382c}
+html:not([data-theme="dark"]) .song-maker-detail-grid .detail-switch input{accent-color:#1d513c}
+html:not([data-theme="dark"]) .song-maker-footer{border-top-color:#d8d0c0}
+html:not([data-theme="dark"]) .song-maker-footer span{color:#68776a}
+html:not([data-theme="dark"]) .song-maker-footer button{border-color:#d1c9ba;border-radius:5px;background:#fffdf8;color:#355243}
+html:not([data-theme="dark"]) .song-maker-footer button.primary{border-color:#1d513c;background:#1d513c;color:#fffdf6}
+html:not([data-theme="dark"]) .song-maker-footer button.primary:hover{background:#123c2d}
+@media(max-width:720px){html:not([data-theme="dark"]) .discover-home{padding:30px 25px;min-height:290px}html:not([data-theme="dark"]) .discover-home h2{font-size:34px}html:not([data-theme="dark"]) .discover-home::after{right:-65px;top:auto;bottom:-76px;transform:none;width:190px;height:190px}html:not([data-theme="dark"]) .discover-home::before{right:9px;top:auto;bottom:23px;transform:rotate(8deg);padding:12px;font-size:9px}html:not([data-theme="dark"]) .song-maker-hero{padding:21px 18px;gap:18px}html:not([data-theme="dark"]) .song-maker-cover,html:not([data-theme="dark"]) .song-maker-cover img{width:90px;height:90px}html:not([data-theme="dark"]) .song-maker-hero h2{font-size:26px}html:not([data-theme="dark"]) .song-maker-hero::after{right:-110px}}
+
 </style>
 </head>
 <body data-page-node-id="Na2JkVOieEwQ90ny6oba1N">
