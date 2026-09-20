@@ -2266,7 +2266,9 @@ function albumItem(it){
 function paint(d){
   const box = $('#content');
   const compactSingle = d.mode === 'song' && (d.items||[]).length === 1;
-  const previewStyle = compactSingle ? 'width:100%;max-width:1040px;margin:0 auto;display:block;cursor:zoom-in' : 'width:100%;display:block;cursor:zoom-in';
+  // 单曲的总览源文件本身只含一张缩略卡；不能像批量总览那样拉伸到整行。
+  const previewStyle = compactSingle ? 'width:auto;max-width:100%;height:auto;margin:0 auto;display:block;cursor:zoom-in' : 'width:100%;display:block;cursor:zoom-in';
+  const overviewBoxStyle = compactSingle ? 'max-width:620px;margin:0 auto 18px' : 'margin-bottom:18px';
   let html = '';
   if(d.status === 'error')
     html += `<div class="alert"><b>任务失败</b><br>${esc(d.error||'未知错误')}</div>`;
@@ -2278,7 +2280,7 @@ function paint(d){
   }
 
   if(d.overview){
-    html += `<div style="margin-bottom:18px;border:1px solid var(--line);border-radius:12px;
+    html += `<div style="${overviewBoxStyle};border:1px solid var(--line);border-radius:12px;
       overflow:hidden;background:#fbfbfc">
       <div style="padding:9px 14px;font-size:11.5px;color:var(--dim);
         border-bottom:1px solid var(--line)">整组总览</div>
@@ -2288,7 +2290,7 @@ function paint(d){
   }
 
   if(d.keychainOverview){
-    html += `<div style="margin-bottom:18px;border:1px solid var(--line);border-radius:12px;
+    html += `<div style="${overviewBoxStyle};border:1px solid var(--line);border-radius:12px;
       overflow:hidden;background:#fbfbfc">
       <div style="padding:9px 14px;font-size:11.5px;color:var(--dim);
         border-bottom:1px solid var(--line)">钥匙扣商品图总览</div>
@@ -2298,7 +2300,7 @@ function paint(d){
   }
 
   (d.shopGrids||[]).forEach(g=>{
-    html += `<div style="margin-bottom:18px;border:1px solid var(--line);border-radius:12px;
+    html += `<div style="${overviewBoxStyle};border:1px solid var(--line);border-radius:12px;
       overflow:hidden;background:#fbfbfc">
       <div style="padding:9px 14px;font-size:11.5px;color:var(--dim);
         border-bottom:1px solid var(--line)">${esc(g.label)}</div>
@@ -2308,7 +2310,7 @@ function paint(d){
   });
 
   if(d.vinylOverview){
-    html += `<div style="margin-bottom:18px;border:1px solid var(--line);border-radius:12px;
+    html += `<div style="${overviewBoxStyle};border:1px solid var(--line);border-radius:12px;
       overflow:hidden;background:#fbfbfc">
       <div style="padding:9px 14px;font-size:11.5px;color:var(--dim);
         border-bottom:1px solid var(--line)">黑胶播放界面总览</div>
@@ -2318,7 +2320,7 @@ function paint(d){
   }
 
   if(d.albumWall){
-    html += `<div style="margin-bottom:18px;border:1px solid var(--line);border-radius:12px;
+    html += `<div style="${overviewBoxStyle};border:1px solid var(--line);border-radius:12px;
       overflow:hidden;background:#fbfbfc">
       <div style="padding:9px 14px;font-size:11.5px;color:var(--dim);
         border-bottom:1px solid var(--line)">专辑墙总览 · 全部专辑</div>
