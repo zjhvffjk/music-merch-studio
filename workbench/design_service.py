@@ -69,12 +69,12 @@ import spec_minicd as SP
 import make_minicd as MC
 import design_parts as DP
 import copy_typography as CT
+import typo as TYPO
 import title_typography as TT
 import title_assets as TA
 import title_compositor as TC
 import title_reference as TR
 import make_minicd_sheet as MS
-import qwen_minicd as QWEN
 
 from PIL import Image, ImageDraw
 
@@ -377,9 +377,13 @@ def build_preview(data):
     token = "p-" + uuid.uuid4().hex[:16]
     dest = PREVIEW_DIR / token
     dest.mkdir(parents=True, exist_ok=True)
-    disc, fold, strip = build_parts(cover, album, artist, D, tracks, company,
-                                    ai if any(ai.values()) else None, PREVIEW_DPI,
-                                    inner_copy, barcode_code, copyright_text, release_year, str(data.get("backLayout") or "auto"), copy_settings)
+    font_token = TYPO.set_font_overrides(copy_settings.get("typography"))
+    try:
+        disc, fold, strip = build_parts(cover, album, artist, D, tracks, company,
+                                        ai if any(ai.values()) else None, PREVIEW_DPI,
+                                        inner_copy, barcode_code, copyright_text, release_year, str(data.get("backLayout") or "auto"), copy_settings)
+    finally:
+        TYPO.reset_font_overrides(font_token)
     for name, image in (("disc.png", disc), ("cover.png", fold), ("strip.png", strip)):
         image.save(str(dest / name), optimize=True)
     _clean_preview_cache()
@@ -428,9 +432,13 @@ def build_job(data):
     # 仍支持用户手动上传已确认的底图；默认始终使用程序的稳定封面延展。
     use_local_ai = False
 
-    disc, fold, strip = build_parts(cover, album, artist, D, tracks, company,
-                                    ai if has_ai else None, DPI,
-                                    inner_copy, barcode_code, copyright_text, release_year, str(data.get("backLayout") or "auto"), copy_settings)
+    font_token = TYPO.set_font_overrides(copy_settings.get("typography"))
+    try:
+        disc, fold, strip = build_parts(cover, album, artist, D, tracks, company,
+                                        ai if has_ai else None, DPI,
+                                        inner_copy, barcode_code, copyright_text, release_year, str(data.get("backLayout") or "auto"), copy_settings)
+    finally:
+        TYPO.reset_font_overrides(font_token)
     disc.save(str(d / "part-disc.png"))
     fold.save(str(d / "part-cover.png"))
     strip.save(str(d / "part-strip.png"))

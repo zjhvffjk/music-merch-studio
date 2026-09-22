@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import os
 import sys
+from contextvars import ContextVar
 
 from PIL import ImageDraw, ImageFont
 
@@ -88,6 +89,58 @@ _ENV = {"display": "MINUET_FONT_DISPLAY", "serif": "MINUET_FONT_SERIF",
 
 _cache: dict[tuple, object] = {}
 
+# 工作台字体库：这些是当前 Windows 主机已安装、且由程序实际载入的字体。
+# 选择只影响对应排版角色；曲目、时长、版权等功能文字不会被艺术字替代。
+_FONT_PRESETS = {
+    "noto-serif-sc": {"path": "NotoSerifSC-VF.ttf", "language": "CJK"},
+    "noto-sans-sc": {"path": "NotoSansSC-VF.ttf", "language": "CJK"},
+    "kaiti": {"path": "simkai.ttf", "language": "CJK"},
+    "simsun": {"path": "simsun.ttc", "language": "CJK"},
+    "microsoft-yahei": {"path": "msyh.ttc", "language": "CJK"},
+    "microsoft-yahei-bold": {"path": "msyhbd.ttc", "language": "CJK"},
+    "georgia": {"path": "georgia.ttf", "language": "Latin"},
+    "gabriola": {"path": "Gabriola.ttf", "language": "Latin"},
+    "bahnschrift": {"path": "bahnschrift.ttf", "language": "Latin"},
+}
+
+# ContextVar 让并行的预览/正式出图互不串字体。
+_FONT_OVERRIDES: ContextVar[dict] = ContextVar("minuet_font_overrides", default={})
+_ROLE_SLOT = {
+    "serif": "display", "heavy": "display",
+    "hand": "chineseCopy",
+    "display": "englishCopy", "editorial": "englishCopy", "hand_latin": "englishCopy",
+    "sans": "metadata", "num": "metadata",
+}
+
+
+def set_font_overrides(overrides: dict | None):
+    """在一次出图范围内应用用户选择，返回供 reset_font_overrides 使用的 token。"""
+    clean = {str(k): str(v) for k, v in (overrides or {}).items()
+             if str(v) and str(v) != "auto"}
+    return _FONT_OVERRIDES.set(clean)
+
+
+def reset_font_overrides(token):
+    _FONT_OVERRIDES.reset(token)
+
+
+def _preset_path(font_id: str | None, text: str | None = None) -> str | None:
+    preset = _FONT_PRESETS.get(str(font_id or ""))
+    if not preset:
+        return None
+    # 不能用仅拉丁字体渲染中文，否则会出现方框；此时回退本角色的 CJK 字体。
+    if text and _has_cjk(text) and preset["language"] == "Latin":
+        return None
+    path = os.path.join(_win_fonts(), preset["path"])
+    return path if os.path.isfile(path) else None
+
+
+def resolved_font_path(role: str, text: str | None = None) -> str | None:
+    """返回当前实际会用于该角色的字体文件，供测试和工作台诊断使用。"""
+    slot = _ROLE_SLOT.get(role)
+    selected = _FONT_OVERRIDES.get().get(slot) if slot else None
+    return _preset_path(selected, text) or path_for(role, text)
+
 # 某些角色天生没有汉字（DIN 数字体 / Georgia / Inkfree）—— 一旦文本里出现汉字
 # 必须换角色，否则画出来是一排「豆腐块」。踩过：封底的「℗ & © 周杰伦」全成 □。
 _CJK_REDIRECT = {"num": "sans", "display": "serif", "hand_latin": "hand"}
@@ -106,17 +159,18 @@ def font(role: str, size: int, text: str | None = None):
     if text and _has_cjk(text) and role in _CJK_REDIRECT:
         role = _CJK_REDIRECT[role]
     size = max(6, int(size))
-    key = (role, size, bool(text and _has_cjk(text)))
+    path = resolved_font_path(role, text)
+    key = (role, size, bool(text and _has_cjk(text)), path)
     got = _cache.get(key)
     if got is not None:
         return got
-    f = _load(role, size)
+    f = _load(role, size, path)
     _cache[key] = f
     return f
 
 
-def _load(role: str, size: int):
-    p = path_for(role, None)
+def _load(role: str, size: int, path: str | None = None):
+    p = path or path_for(role, None)
     f = None
     if p:
         try:

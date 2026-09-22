@@ -321,8 +321,16 @@ body.embed .proj .t small{display:none}   /* 外层已有专辑名，这里不�
             <div class="advancedBody">
             <div class="templateFieldTitle">固定模板内容 <span>这些字段会实时套入对应部件</span></div>
             <label class="field">内页文案（出现在 ② 左页）<textarea id="innerCopy" rows="2" maxlength="80" placeholder="例如：把平凡的日子，过成喜欢的样子。"></textarea></label>
-            <div class="templateFieldTitle">文案与字体 <span>程序叠字，不写入 Artwork</span></div>
-            <label class="field">文案布局<select id="copyLayout" class="input"><option value="auto">自动推荐</option><option value="editorial">A · Editorial / 丰富型</option><option value="minimal">B · Minimal / 克制型</option></select></label><div class="fieldGrid"><label class="field">字体方案<select id="typographyStyle" class="input"><option value="auto">自动匹配原封面</option><option value="writing">书写感：楷体 + 斜体衬线</option><option value="classic">优雅：宋体 + 斜体衬线</option><option value="modern">现代：无衬线</option></select></label><label class="field">文案倾斜<select id="copyAngle" class="input"><option value="upRight">向右上 3°</option><option value="none">不倾斜</option><option value="downRight">向右下 3°</option></select></label></div><small class="muted">倾斜只作用于中文/英文概念文案；曲目、时长、版权与条码始终保持规整。</small>
+            <div class="templateFieldTitle">字体 <span>选择后立即套入预览与正式出件</span></div>
+            <div class="fieldGrid">
+              <label class="field">专辑标题<select id="fontDisplay" class="input"><option value="auto">自动跟随封面</option><option value="noto-serif-sc">思源宋体</option><option value="kaiti">楷体</option><option value="microsoft-yahei-bold">微软雅黑粗体</option></select></label>
+              <label class="field">中文文案<select id="fontChineseCopy" class="input"><option value="auto">自动</option><option value="noto-serif-sc">思源宋体</option><option value="kaiti">楷体</option><option value="microsoft-yahei">微软雅黑</option></select></label>
+              <label class="field">英文文案<select id="fontEnglishCopy" class="input"><option value="auto">自动</option><option value="georgia">Georgia Serif</option><option value="gabriola">Gabriola 手写</option></select></label>
+              <label class="field">曲目与信息<select id="fontMetadata" class="input"><option value="auto">自动</option><option value="noto-sans-sc">思源黑体</option><option value="microsoft-yahei">微软雅黑</option><option value="bahnschrift">Bahnschrift（仅拉丁数字）</option></select></label>
+            </div>
+            <small class="muted">中文内容不会错误套用只支持英文的字体；曲目、时长、版权仍保持清晰可读。</small>
+            <div class="templateFieldTitle">文案布局 <span>程序叠字，不写入 Artwork</span></div>
+            <label class="field">文案布局<select id="copyLayout" class="input"><option value="auto">自动推荐</option><option value="editorial">A · Editorial / 丰富型</option><option value="minimal">B · Minimal / 克制型</option></select></label><label class="field">文案倾斜<select id="copyAngle" class="input"><option value="upRight">向右上 3°</option><option value="none">不倾斜</option><option value="downRight">向右下 3°</option></select></label><small class="muted">倾斜只作用于中文/英文概念文案；曲目、时长、版权与条码始终保持规整。</small>
             <label class="field">中文主文案<textarea id="primaryCopy" rows="2" maxlength="52" placeholder="自动生成，也可手动修改"></textarea><small class="muted"><label><input id="showBackChineseCopy" type="checkbox"> 同时显示在单列封底右侧</label>（默认保留给英文副文案）</small></label>
             <div class="fieldGrid"><label class="field">英文概念副文案<input id="secondaryCopy" class="input" maxlength="64" placeholder="例如：STAY TRUE TO THE FEELING."><small class="muted">单列显示在右侧条码上方；双列固定拆成两行显示在左下、版权上方</small></label><label class="field">短英文标签<input id="shortTag" class="input" maxlength="36" placeholder="例如：A QUIET PLACE"></label></div>
             <div class="fieldGrid">
@@ -460,7 +468,7 @@ function currentTrackData(){
   return normTracks().map((title,i)=>{const src=SEARCH_TRACKS[i]||{};return {rank:Number(src.rank)||i+1,title,duration:String(src.duration||src.dur||'')};});
 }
 let TITLE_ASSET_ID="";
-function currentCopySettings(){const titleMode=$('#titleMode'),titleProvider=$('#titleProvider');return {copyLayout:$('#copyLayout').value||'auto',typographyStyle:$('#typographyStyle').value||'auto',copyAngle:$('#copyAngle').value||'upRight',conceptCopy:{primaryChinese:$('#primaryCopy').value.trim(),secondaryEnglish:$('#secondaryCopy').value.trim(),shortEnglish:$('#shortTag').value.trim()},showBackChineseCopy:$('#showBackChineseCopy').checked,typography:{display:'auto',artist:'auto',chineseCopy:'auto',englishCopy:'auto',metadata:'auto',spine:'auto'},titleMode:titleMode?titleMode.value:'cover-follow',titleProvider:titleProvider?titleProvider.value:'unavailable',selectedTitleAssetId:TITLE_ASSET_ID}}
+function currentCopySettings(){const titleMode=$('#titleMode'),titleProvider=$('#titleProvider'),fontValue=id=>{const el=$('#'+id);return el?el.value:'auto'};return {copyLayout:$('#copyLayout').value||'auto',typographyStyle:($('#typographyStyle')?$('#typographyStyle').value:'auto'),copyAngle:$('#copyAngle').value||'upRight',conceptCopy:{primaryChinese:$('#primaryCopy').value.trim(),secondaryEnglish:$('#secondaryCopy').value.trim(),shortEnglish:$('#shortTag').value.trim()},showBackChineseCopy:$('#showBackChineseCopy').checked,typography:{display:fontValue('fontDisplay'),artist:'auto',chineseCopy:fontValue('fontChineseCopy'),englishCopy:fontValue('fontEnglishCopy'),metadata:fontValue('fontMetadata'),spine:'auto'},titleMode:titleMode?titleMode.value:'cover-follow',titleProvider:titleProvider?titleProvider.value:'unavailable',selectedTitleAssetId:TITLE_ASSET_ID}}
 function recommendedBackLayout(){
   const rows=currentTrackData(), n=rows.length, longest=Math.max(0,...rows.map(x=>x.title.length));
   return (n>=8||longest>=12)?'双列':'单列';
@@ -721,7 +729,7 @@ syncRail();
 syncBuildEnabled();
 $('#album').addEventListener('input',()=>{syncRail();syncBuildEnabled();});
 $('#artist').addEventListener('input',()=>{syncRail();syncBuildEnabled();});
-['album','artist','company','tracks','innerCopy','barcode','copyright','safeBands','primaryCopy','secondaryCopy','shortTag','showBackChineseCopy','copyLayout','typographyStyle','copyAngle','titleMode','titleProvider'].forEach(id=>{
+['album','artist','company','tracks','innerCopy','barcode','copyright','safeBands','primaryCopy','secondaryCopy','shortTag','showBackChineseCopy','copyLayout','typographyStyle','copyAngle','fontDisplay','fontChineseCopy','fontEnglishCopy','fontMetadata','titleMode','titleProvider'].forEach(id=>{
   const el=$('#'+id); if(!el)return;
   el.addEventListener('input',queuePreview);
   el.addEventListener('change',queuePreview);

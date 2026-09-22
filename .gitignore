@@ -23,3 +23,5 @@ tools/qwen_minicd.py
 tools/run_minicd_single_cover_test.py
 tools/test_qwen_locked_extension.py
 tools/test_qwen_official_edit_chain.py
+
+.superpowers/
