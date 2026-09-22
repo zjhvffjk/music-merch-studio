@@ -51,6 +51,9 @@ def _candidates(role: str) -> list[str]:
         return [os.path.join(win, x) for x in
                 ("georgia.ttf", "times.ttf", "pala.ttf", "constan.ttf", "cambria.ttc")] + [
                 os.path.join(mac, "Times New Roman.ttf"), "/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf"]
+    if role == "editorial":  # English concept copy: true italic typeface, not rotated normal text
+        return [os.path.join(win, x) for x in ("palai.ttf", "georgiai.ttf", "timesi.ttf", "Gabriola.ttf")] + [
+                "/System/Library/Fonts/Supplemental/Times New Roman Italic.ttf"]
     if role == "serif":                       # 中文衬线（专辑标题的高级感来源）
         return [os.path.join(win, "NotoSerifSC-VF.ttf"), os.path.join(win, "simsun.ttc"),
                 os.path.join(win, "SimsunExtG.ttf"),

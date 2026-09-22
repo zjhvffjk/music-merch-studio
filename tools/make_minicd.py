@@ -160,12 +160,23 @@ def fb_back(cover_im, w, h, album, artist):
 
 
 # ---------------- 三大部件 ----------------
-def make_cover_fold(inner_im, cover_im, w_px, h_px):
-    """左内页 + 右封面，中间有对折线。"""
+def make_cover_fold(inner_im, cover_im, w_px, h_px, D=None, copy_settings=None):
+    """左内页 + 右封面，中间有对折线；正封面叠加真实字体短标签。"""
     half = w_px // 2
     out = Image.new("RGB", (w_px, h_px), "white")
     out.paste(cover_crop(inner_im, half, h_px), (0, 0))
     out.paste(cover_crop(cover_im, w_px - half, h_px), (half, 0))
+    if DP is not None and copy_settings:
+        _primary, _secondary, short = DP._copy_text(copy_settings)
+        tag = short or _secondary
+        if tag:
+            d = ImageDraw.Draw(out)
+            preset = DP._copy_preset(copy_settings)
+            x = int(w_px * (0.94 if preset == "editorial" else 0.93))
+            y = int(h_px * (0.88 if preset == "editorial" else 0.11))
+            # true type, on the front panel only; A lower-right / B upper-right
+            DP._angled_tag(out, (x, y), tag, max(7, int(h_px * 0.027)), (55,55,55),
+                            "right", int(half * 0.46), angle=DP._copy_angle(copy_settings, D))
     return out
 
 
@@ -195,7 +206,8 @@ def _solid_block(cover_im, w_px, h_px, album, artist):
 
 
 def make_back_strip(back_im, tray_im, w_px, h_px, cover_im, album, artist,
-                    D=None, tracks=None, seed=0, company=""):
+                    D=None, tracks=None, seed=0, company="", inner_copy="",
+                    barcode_code="", copyright_text="", release_year="", back_layout="auto", copy_settings=None):
     """[右侧封][封底][左侧封][背脊][内盘底] 一条连续展开图。
 
     封底与内盘底缺件时走**封面衍生设计**（design_back / design_tray）；
@@ -212,7 +224,9 @@ def make_back_strip(back_im, tray_im, w_px, h_px, cover_im, album, artist,
         b = cover_crop(back_im, p[1], h_px)
     elif use_dp:
         b = DP.design_back2(cover_im, p[1], h_px, D, album, artist, tracks,
-                            seed, company=company)
+                            seed, quote=inner_copy or None, company=company,
+                            barcode_code=barcode_code, copyright_text=copyright_text,
+                            release_year=release_year, back_layout=back_layout, copy_settings=copy_settings)
     else:
         b = _solid_block(cover_im, p[1], h_px, album, artist)
     out.paste(b, (p[0], 0))
@@ -221,7 +235,7 @@ def make_back_strip(back_im, tray_im, w_px, h_px, cover_im, album, artist,
     if tray_im is not None:
         t = cover_crop(tray_im, p[4], h_px)
     elif use_dp:
-        t = DP.design_tray2(cover_im, p[4], h_px, D, album, artist, company)
+        t = DP.design_tray2(cover_im, p[4], h_px, D, album, artist, company, copy_settings=copy_settings)
     else:
         t = _solid_block(cover_im, p[4], h_px, album, artist)
     out.paste(t, (p[0] + p[1] + p[2] + p[3], 0))
@@ -229,6 +243,10 @@ def make_back_strip(back_im, tray_im, w_px, h_px, cover_im, album, artist,
     # --- 侧封 / 背脊（各 4mm 级）：从相邻件边缘延展 ---
     out.paste(_edge_stretch(b, p[0], h_px), (0, 0))                  # 右侧封 ← 封底左缘
     out.paste(_edge_stretch(t, p[2] + p[3], h_px), (p[0] + p[1], 0))  # 左侧封+背脊 ← 内盘底左缘
+    # 左侧封背面是独立的 4.4mm 文案区，不能只拉伸照片边缘。
+    if use_dp and copy_settings:
+        spine = DP.design_spine2(p[3], h_px, D, album, artist, company, copy_settings=copy_settings)
+        out.paste(spine, (p[0] + p[1] + p[2], 0))
 
     # 各段逐 0.1mm 四舍五入后求和可能与 BACK_W 取整差 ±1px（如 111.2mm：
     # sum(各段)=1314 vs round(111.2)=1313）。统一对齐到调用方给的 w_px，避免断言崩。
@@ -283,7 +301,7 @@ def build_page(parts_meta, dpi, page="a4l", max_sets=0, artist="", album="",
     # --- 盘面 ---
     disc_d = mm(DISC_D, dpi)
     hole_d = mm(DISC_HOLE, dpi)
-    src = parts_meta.get("disc", (None, False))[0]
+    src = parts_meta.get("rendered_disc", parts_meta.get("disc", (None, False)))[0]
     if src is not None:
         disc = disc_face(src, disc_d, hole_d)
     elif cover_im is not None and DP is not None and D is not None:
@@ -296,6 +314,7 @@ def build_page(parts_meta, dpi, page="a4l", max_sets=0, artist="", album="",
 
     # --- 封面对折 ---
     fold_w, fold_h = mm(COVER_W, dpi), mm(COVER_H, dpi)
+    ready_fold = (parts_meta.get("rendered_fold") or (None,))[0]
     inner_im = (parts_meta.get("inner") or (None,))[0]
     if inner_im is None and cover_im is not None:
         if DP is not None and D is not None:
@@ -305,14 +324,15 @@ def build_page(parts_meta, dpi, page="a4l", max_sets=0, artist="", album="",
             inner_im = fb_inner(cover_im, fold_w // 2, fold_h)
     if cover_im is None:
         raise SystemExit("缺少封面 cover —— 它是主素材，缺了无法自动补")
-    fold = make_cover_fold(inner_im, cover_im, fold_w, fold_h)
+    fold = cover_crop(ready_fold, fold_w, fold_h) if ready_fold is not None else make_cover_fold(inner_im, cover_im, fold_w, fold_h)
 
     # --- 封底条 ---
     strip_w, strip_h = mm(BACK_W, dpi), mm(BACK_H, dpi)
+    ready_strip = (parts_meta.get("rendered_strip") or (None,))[0]
     back_im = (parts_meta.get("back") or (None,))[0]
     tray_im = (parts_meta.get("tray") or (None,))[0]
-    strip = make_back_strip(back_im, tray_im, strip_w, strip_h, cover_im,
-                            album, artist, D, tracks, seed, company)
+    strip = cover_crop(ready_strip, strip_w, strip_h) if ready_strip is not None else make_back_strip(
+        back_im, tray_im, strip_w, strip_h, cover_im, album, artist, D, tracks, seed, company)
 
     # --- 三列布局，列内叠 N 个，成套取 min ---
     cols = [(disc, disc_d), (fold, fold_w), (strip, strip_w)]

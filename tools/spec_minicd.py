@@ -20,6 +20,34 @@ BACK_H = 38.0
 BLEED = 3.0          # 印刷出血
 A4L = (297.0, 210.0)  # A4 横版（4 套/页）
 
+# 封底条码：**只**以 49×38mm 的「封底」局部坐标计算，绝不以 111.2mm 展开条计算。
+# decorative 是当前默认：程序叠加的 EAN 风格视觉条码；scannable 留给后续按真实
+# EAN/UPC 的模块宽度和 quiet zone 重新计算尺寸。图片模型只负责底图，不能移动条码。
+BACK_PANEL_W = BACK_SEGS[1]
+BACK_PANEL_H = BACK_H
+BARCODE = {
+    "panel": "back-cover",
+    "mode": "decorative",
+    "xMm": 33.0,
+    "yMm": 30.0,
+    "widthMm": 14.0,
+    "heightMm": 6.0,
+}
+BARCODE_MODES = {
+    "decorative": {"status": "active", "description": "固定 14×6mm 的程序叠加视觉条码"},
+    "scannable": {"status": "reserved", "description": "后续按真实 EAN/UPC 规范计算尺寸与 quiet zone"},
+}
+
+# 封底版权区：同样只按 49×38mm 的封底局部坐标计算。版权归属与两行固定
+# Rights Notice 由程序叠加，不能随底图或 AI 构图漂移。
+COPYRIGHT = {
+    "panel": "back-cover",
+    "xMm": 1.5,
+    "yMm": 31.0,
+    "widthMm": 26.0,
+    "heightMm": 5.0,
+}
+
 SEG_NAMES = ("右侧封", "封底", "左侧封", "左侧封背面", "内盘底")
 
 MM_PER_INCH = 25.4
@@ -28,6 +56,32 @@ MM_PER_INCH = 25.4
 def mm_to_px(value_mm, dpi=300):
     """毫米 → 像素（四舍五入）。前端实尺寸画布与后端出件共用同一换算式。"""
     return int(round(value_mm * dpi / MM_PER_INCH))
+
+
+def barcode_rect_px(panel_width_px, panel_height_px, config=None):
+    """把封底局部 mm 坐标换成像素；调用方必须传入**封底**而非整条展开图尺寸。"""
+    cfg = config or BARCODE
+    sx = float(panel_width_px) / BACK_PANEL_W
+    sy = float(panel_height_px) / BACK_PANEL_H
+    return {
+        "x": int(round(float(cfg["xMm"]) * sx)),
+        "y": int(round(float(cfg["yMm"]) * sy)),
+        "w": int(round(float(cfg["widthMm"]) * sx)),
+        "h": int(round(float(cfg["heightMm"]) * sy)),
+    }
+
+
+def copyright_rect_px(panel_width_px, panel_height_px, config=None):
+    """把封底版权区的局部 mm 坐标换成像素。"""
+    cfg = config or COPYRIGHT
+    sx = float(panel_width_px) / BACK_PANEL_W
+    sy = float(panel_height_px) / BACK_PANEL_H
+    return {
+        "x": int(round(float(cfg["xMm"]) * sx)),
+        "y": int(round(float(cfg["yMm"]) * sy)),
+        "w": int(round(float(cfg["widthMm"]) * sx)),
+        "h": int(round(float(cfg["heightMm"]) * sy)),
+    }
 
 
 # ======================================================================
@@ -131,6 +185,29 @@ def spec_dict():
         "sheet": {"page": [A4L[0], A4L[1]], "margin": SHEET_MARGIN, "gap": SHEET_GAP,
                   "cols": list(SHEET_COLS), "setsPerPage": SHEET_SETS_PER_PAGE},
         "print": PRINT_PROFILE,
+        "barcode": {**BARCODE, "modes": {k: dict(v) for k, v in BARCODE_MODES.items()}},
+        "copyright": dict(COPYRIGHT),
         "guides": [dict(g) for g in GUIDE_LEGEND],
         "outputs": [dict(o) for o in OUTPUT_FILES],
     }
+
+# Title-lettering production safety (mm).  These only add exclusion data;
+# component dimensions and fold positions above remain the single source of truth.
+TITLE_SAFE_INSET = 1.0
+
+def disc_hole_bounds_mm():
+    r = DISC_HOLE / 2.0
+    c = DISC_D / 2.0
+    return {"x": c-r, "y": c-r, "w": DISC_HOLE, "h": DISC_HOLE}
+
+def back_protected_rects_mm():
+    return [
+        {"x": 3.2, "y": 7.5, "w": 25.5, "h": 20.2, "role": "tracklist"},
+        {"x": COPYRIGHT["xMm"], "y": COPYRIGHT["yMm"], "w": COPYRIGHT["widthMm"], "h": COPYRIGHT["heightMm"], "role": "copyright"},
+        {"x": BARCODE["xMm"], "y": BARCODE["yMm"], "w": BARCODE["widthMm"], "h": BARCODE["heightMm"], "role": "barcode"},
+    ]
+
+def title_protected_rects_mm(panel):
+    if panel == "disc": return [disc_hole_bounds_mm()]
+    if panel == "back": return back_protected_rects_mm()
+    return []

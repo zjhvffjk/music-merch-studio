@@ -36,6 +36,7 @@ workbench 工作台的「作品库」把商品图任务与迷你CD任务合并�
 import io
 import json
 import os
+import re
 import shutil
 import sys
 import time
@@ -54,6 +55,10 @@ for p in (TOOLS, HERE):
 
 OUT_DIR = Path(ROOT) / "outputs" / "迷你CD设计"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
+# 设计页的即时预览不属于正式作品，也不产出打印件。只保留短时的小图缓存，
+# 让用户在按下「生成三件套」前就能确认三个实物部件的结构与取景。
+PREVIEW_DIR = OUT_DIR / "_preview_cache"
+PREVIEW_DIR.mkdir(parents=True, exist_ok=True)
 
 try:
     import noproxy  # noqa: F401  绕过本机代理（server 已 import；这里兜底）
@@ -63,12 +68,19 @@ except Exception:
 import spec_minicd as SP
 import make_minicd as MC
 import design_parts as DP
+import copy_typography as CT
+import title_typography as TT
+import title_assets as TA
+import title_compositor as TC
+import title_reference as TR
 import make_minicd_sheet as MS
+import qwen_minicd as QWEN
 
 from PIL import Image, ImageDraw
 
 DPI = 300
 SHEET_DPI = 300
+PREVIEW_DPI = 96
 
 
 def _slog(*a):
@@ -115,21 +127,34 @@ def _fetch_cover(pic):
 
 
 def _norm_tracks(v):
+    """标准化曲目：保留搜索页给出的排名、歌名与时长，兼容手输的一行一首。"""
     if v is None:
         return None
-    if isinstance(v, (list, tuple)):
-        items = [str(x).strip() for x in v]
-    else:
-        s = str(v).strip()
-        if s.startswith("["):
+    raw = v
+    if isinstance(v, str):
+        text = v.strip()
+        if text.startswith("["):
             try:
-                items = [str(x).strip() for x in json.loads(s)]
+                raw = json.loads(text)
             except Exception:
-                items = [t.strip() for t in s.strip("[]").replace("，", ";")
-                         .replace("；", ";").split(";")]
+                raw = None
+        if raw is None or isinstance(raw, str):
+            raw = [t.strip() for t in text.replace("；", ";").replace("\n", ";").split(";")]
+    if not isinstance(raw, (list, tuple)):
+        return None
+    items = []
+    for i, item in enumerate(raw, 1):
+        if isinstance(item, dict):
+            title = str(item.get("title") or item.get("name") or item.get("song") or "").strip()
+            dur = str(item.get("duration") or item.get("dur") or item.get("time") or "").strip()
+            try: rank = int(item.get("rank") or i)
+            except Exception: rank = i
         else:
-            items = [t.strip() for t in s.replace("；", ";").split(";")]
-    items = [t for t in items if t]
+            title, dur, rank = str(item).strip(), "", i
+        if title:
+            items.append({"rank": max(1, rank), "title": title, "duration": dur})
+        if len(items) >= 10:
+            break
     return items or None
 
 
@@ -172,27 +197,72 @@ def _read_design(cover, mood="", style="", bands=None):
     return D
 
 
-def build_parts(cover, album, artist, D, tracks, company, ai=None, dpi=DPI):
+def _release_metadata(data, artist, album, company=""):
+    """取得真实的专辑发行年份与发行公司。
+
+    从专辑墙进入时 URL 已带 ``date/company``，无需二次请求；单曲或旧链接则
+    用网易云专辑详情补齐。这里不以当前年份冒充发行年份。
+    """
+    company = str(company or "").strip()
+    date = str(data.get("date") or data.get("releaseDate") or "").strip()
+    found_company, found_date = company, date
+    album_id = str(data.get("id") or "").strip()
+    if album_id.isdigit() and (not found_company or not re.search(r"(?:19|20)\d{2}", found_date)):
+        try:
+            import fetch163
+            detail, _songs = fetch163.album_detail(int(album_id))
+            found_company = found_company or str(detail.get("company") or "").strip()
+            found_date = found_date or str(detail.get("publishTime") or "")
+            if found_date.isdigit() and len(found_date) >= 10:
+                found_date = time.strftime("%Y-%m-%d", time.localtime(int(found_date) / 1000))
+        except Exception as e:
+            _slog("album metadata lookup skipped:", type(e).__name__)
+    # 网易云有时只给日期、不给唱片公司；再用 QQ 专辑详情补齐。
+    if not found_company or not re.search(r"(?:19|20)\d{2}", found_date):
+        try:
+            import fetch_qq
+            qq = fetch_qq.album_metadata_q(album, artist)
+            found_company = found_company or str(qq.get("company") or "").strip()
+            found_date = found_date or str(qq.get("date") or "").strip()
+        except Exception as e:
+            _slog("qq album metadata lookup skipped:", type(e).__name__)
+    year_match = re.search(r"(?:19|20)\d{2}", found_date)
+    return found_company, (year_match.group(0) if year_match else ""), found_date
+
+
+def build_parts(cover, album, artist, D, tracks, company, ai=None, dpi=DPI,
+                inner_copy="", barcode_code="", copyright_text="", release_year="", back_layout="auto", copy_settings=None):
     """出 ①②③ 三件（override-aware）。返回 (disc, fold, strip)。"""
     MC._dpi[0] = dpi  # make_back_strip 用模块级 _dpi
 
+    title_state = TT.title_typography_state(copy_settings or {}, D, album, artist)
+    selected_title_asset = title_state.get("selectedTitleAssetId") if title_state.get("titleMode") == "artistic" else None
+    title_asset_image = None
+    if selected_title_asset:
+        try:
+            _asset, title_asset_image = TA.load_title_asset(selected_title_asset)
+        except Exception:
+            title_asset_image = None
+    rendered_album = "" if title_asset_image is not None else album
     # ① 盘面
     disc_d = mm(SP.DISC_D, dpi)
     hole_d = mm(SP.DISC_HOLE, dpi)
     if ai and ai.get("disc"):
         disc = MC.cover_crop(ai["disc"], disc_d, disc_d)
     else:
-        disc = DP.design_disc2(cover, disc_d, hole_d, D, album, artist, company)
+        disc = DP.design_disc2((ai or {}).get("discArt") or cover, disc_d, hole_d, D, rendered_album, artist, company, copy_settings=copy_settings)
 
     # ② 封面折件（左内页 + 右封面）
     fold_w = mm(SP.COVER_W, dpi)
     fold_h = mm(SP.COVER_H, dpi)
     if ai and ai.get("fold"):
         inner_im = MC.cover_crop(ai["fold"], fold_w // 2, fold_h)
-        fold = MC.make_cover_fold(inner_im, cover, fold_w, fold_h)
+        fold = MC.make_cover_fold(inner_im, cover, fold_w, fold_h, D, copy_settings)
     else:
-        inner_im = DP.design_inner2(cover, fold_w // 2, fold_h, D, album, artist, tracks)
-        fold = MC.make_cover_fold(inner_im, cover, fold_w, fold_h)
+        inner_im = DP.design_inner2((ai or {}).get("insideArt") or cover, fold_w // 2, fold_h, D, rendered_album, artist,
+                                    tracks, quote=(copy_settings or {}).get("conceptCopy", {}).get("primaryChinese") or inner_copy or None,
+                                    copy_settings=copy_settings)
+        fold = MC.make_cover_fold(inner_im, cover, fold_w, fold_h, D, copy_settings)
 
     # ③ 封底条（封底 + 内盘底 + 侧封边缘延展）
     strip_w = mm(SP.BACK_W, dpi)
@@ -200,13 +270,38 @@ def build_parts(cover, album, artist, D, tracks, company, ai=None, dpi=DPI):
     if ai and ai.get("strip"):
         strip = MC.cover_crop(ai["strip"], strip_w, strip_h)
     else:
-        strip = MC.make_back_strip(None, None, strip_w, strip_h, cover, album,
-                                   artist, D, tracks, 0, company)
+        strip = MC.make_back_strip((ai or {}).get("backArt"), (ai or {}).get("trayArt"), strip_w, strip_h, cover, rendered_album,
+                                   artist, D, tracks, 0, company,
+                                   barcode_code=barcode_code,
+                                   copyright_text=copyright_text,
+                                   release_year=release_year, back_layout=back_layout, copy_settings=copy_settings)
+    if title_asset_image is not None:
+        reports = {}
+        disc, reports["disc"] = TC.place_title_asset(disc, title_asset_image, TC.resolve_title_placement("disc", SP), SP.title_protected_rects_mm("disc"), dpi)
+        front = TC.resolve_title_placement("cover-front", SP); front.x_mm += SP.COVER_W / 2
+        fold, reports["cover-front"] = TC.place_title_asset(fold, title_asset_image, front, [], dpi)
+        inside = TC.resolve_title_placement("cover-inside", SP)
+        fold, reports["cover-inside"] = TC.place_title_asset(fold, title_asset_image, inside, [], dpi)
+        back = TC.resolve_title_placement("back", SP); back.x_mm += SP.BACK_SEGS[0]
+        protected = [{**r, "x": r["x"] + SP.BACK_SEGS[0]} for r in SP.back_protected_rects_mm()]
+        strip, reports["back"] = TC.place_title_asset(strip, title_asset_image, back, protected, dpi)
+        tray = TC.resolve_title_placement("inner-tray", SP); tray.x_mm += sum(SP.BACK_SEGS[:4])
+        strip, reports["inner-tray"] = TC.place_title_asset(strip, title_asset_image, tray, [], dpi)
+        setattr(build_parts, "last_title_usage", {"assetId": selected_title_asset, "placements": reports})
+    else:
+        setattr(build_parts, "last_title_usage", {})
     return disc, fold, strip
 
 
 UPLOAD_DIR = Path(ROOT) / "outputs" / "工作台" / "_uploads"
 
+
+def _upload_path(uid):
+    uid = str(uid or "").strip()
+    if not uid or not all(ch.isascii() and (ch.isalnum() or ch in "-_") for ch in uid):
+        return None
+    hits = sorted(UPLOAD_DIR.glob(uid + ".*"))
+    return str(hits[0]) if hits and hits[0].is_file() else None
 
 def _load_ai(path):
     """AI 增强图：绝对/相对路径直接开；或 /api/upload 返回的 uid（12hex）
@@ -231,44 +326,124 @@ def _load_ai(path):
         return None
 
 
+def _clean_preview_cache(max_age=60 * 60):
+    """清理一小时前的临时预览；正式任务永远不放在这个目录。"""
+    cutoff = time.time() - max_age
+    for item in PREVIEW_DIR.iterdir():
+        try:
+            if item.is_dir() and item.stat().st_mtime < cutoff:
+                shutil.rmtree(item, ignore_errors=True)
+        except OSError:
+            pass
+
+
+def _title_state(data, design, album, artist, cover=None):
+    """Return provider-ready title state without fabricating AI artwork."""
+    dna = dict(design or {})
+    if cover is not None:
+        ref = TR.extract_cover_title_reference(cover, dna, album)
+        if ref.get("status") == "detected":
+            dna["coverTitleReference"] = ref
+    state = TT.title_typography_state(data, dna, album, artist)
+    state["coverTitleReference"] = dna.get("coverTitleReference") or {"status": "unavailable"}
+    return state
+
+def build_preview(data):
+    """生成低分辨率临时三件套，用于设计页实时确认，不创建作品库任务。"""
+    artist = str(data.get("artist") or "")
+    album = str(data.get("album") or "")
+    pic = data.get("pic") or ""
+    company, release_year, _release_date = _release_metadata(
+        data, artist, album, str(data.get("company") or ""))
+    tracks = _norm_tracks(data.get("trackData") if data.get("trackData") is not None else data.get("tracks"))
+    inner_copy = str(data.get("innerCopy") or "")
+    barcode_code = str(data.get("barcode") or "")
+    copyright_text = str(data.get("copyright") or "")
+    copy_settings = CT.normalize_copy_settings(data)
+    cover = _fetch_cover(pic)
+    if cover is None:
+        raise ValueError("封面拉取失败（URL 不可达或被代理拦截）：%s" % pic)
+    D = _read_design(cover, str(data.get("mood") or ""),
+                     str(data.get("style") or ""),
+                     _parse_bands(data.get("safeBands")))
+    if not any(copy_settings["conceptCopy"].values()):
+        zh, en, short = CT.auto_concept_copy(album, D)
+        copy_settings["conceptCopy"] = {"primaryChinese": zh, "secondaryEnglish": en, "shortEnglish": short}
+    copy_settings["resolvedLayout"] = CT.recommend_copy_layout(copy_settings, D)
+    title_state = _title_state(data, D, album, artist, cover)
+    ai = {"disc": _load_ai(data.get("aiDisc")),
+          "fold": _load_ai(data.get("aiFold")),
+          "strip": _load_ai(data.get("aiStrip"))}
+    token = "p-" + uuid.uuid4().hex[:16]
+    dest = PREVIEW_DIR / token
+    dest.mkdir(parents=True, exist_ok=True)
+    disc, fold, strip = build_parts(cover, album, artist, D, tracks, company,
+                                    ai if any(ai.values()) else None, PREVIEW_DPI,
+                                    inner_copy, barcode_code, copyright_text, release_year, str(data.get("backLayout") or "auto"), copy_settings)
+    for name, image in (("disc.png", disc), ("cover.png", fold), ("strip.png", strip)):
+        image.save(str(dest / name), optimize=True)
+    _clean_preview_cache()
+    return {"ok": True, "token": token, "copySettings": copy_settings, "titleTypography": title_state,
+            "parts": {name: "/api/design/preview-file?token=%s&name=%s" % (token, name)
+                      for name in ("disc.png", "cover.png", "strip.png")}}
+
+
 def build_job(data):
     """落盘一个设计任务：三件套 + 1:1 总览 + A4 打印页 + 打印 PDF + meta + ZIP。"""
     artist = str(data.get("artist") or "")
     album = str(data.get("album") or "")
     pic = data.get("pic") or ""
-    company = str(data.get("company") or "")
+    company, release_year, release_date = _release_metadata(
+        data, artist, album, str(data.get("company") or ""))
     mood = str(data.get("mood") or "")
     style = str(data.get("style") or "")
-    tracks = _norm_tracks(data.get("tracks"))
+    tracks = _norm_tracks(data.get("trackData") if data.get("trackData") is not None else data.get("tracks"))
+    inner_copy = str(data.get("innerCopy") or "")
+    barcode_code = str(data.get("barcode") or "")
+    copyright_text = str(data.get("copyright") or "")
+    copy_settings = CT.normalize_copy_settings(data)
     bands = _parse_bands(data.get("safeBands"))
     cover = _fetch_cover(pic)
     if cover is None:
         raise ValueError("封面拉取失败（URL 不可达或被代理拦截）：%s" % pic)
     D = _read_design(cover, mood, style, bands)
+    if not any(copy_settings["conceptCopy"].values()):
+        zh, en, short = CT.auto_concept_copy(album, D)
+        copy_settings["conceptCopy"] = {"primaryChinese": zh, "secondaryEnglish": en, "shortEnglish": short}
+    copy_settings["resolvedLayout"] = CT.recommend_copy_layout(copy_settings, D)
 
     ai = {
         "disc": _load_ai(data.get("aiDisc")),
         "fold": _load_ai(data.get("aiFold")),
         "strip": _load_ai(data.get("aiStrip")),
     }
+    title_state = _title_state(data, D, album, artist, cover)
     has_ai = any(ai.values())
 
     jid = _safe_jid(data.get("id")) or uuid.uuid4().hex[:16]
     d = OUT_DIR / jid
     d.mkdir(parents=True, exist_ok=True)
 
+    # 本地单封面生图还没有达到生产质量，不能让它混入正式出件。
+    # 仍支持用户手动上传已确认的底图；默认始终使用程序的稳定封面延展。
+    use_local_ai = False
+
     disc, fold, strip = build_parts(cover, album, artist, D, tracks, company,
-                                    ai if has_ai else None, DPI)
+                                    ai if has_ai else None, DPI,
+                                    inner_copy, barcode_code, copyright_text, release_year, str(data.get("backLayout") or "auto"), copy_settings)
     disc.save(str(d / "part-disc.png"))
     fold.save(str(d / "part-cover.png"))
     strip.save(str(d / "part-strip.png"))
 
     # 1:1 总览
     sheet_path = str(d / "★版面总览-1比1.png")
-    MS.build_sheet(cover, album, artist, D, tracks, company, sheet_path, SHEET_DPI, png=True)
+    rendered = {"rendered_disc": (disc, False), "rendered_fold": (fold, False),
+                "rendered_strip": (strip, False)}
+    MS.build_sheet(cover, album, artist, D, tracks, company, sheet_path, SHEET_DPI,
+                   png=True, rendered_parts=rendered)
 
     # A4 打印参考页（程序衍生结构；与三件套同源引擎，无 AI 覆盖时完全一致）
-    page_im, sets, _prev = MC.build_page({"cover": (cover, False)}, DPI, "a4l", 1,
+    page_im, sets, _prev = MC.build_page({"cover": (cover, False), **rendered}, DPI, "a4l", 1,
                                           artist, album, D, tracks, 0, company)
     page_im.save(str(d / "打印拼版-A4.png"), quality=95)
     page_im.save(str(d / "打印拼版-A4.pdf"), "PDF", resolution=DPI)
@@ -276,8 +451,16 @@ def build_job(data):
     notes = DP.design_notes(D, album, artist, tracks, has_lyrics=False)
     meta = {
         "id": jid, "kind": "minicd-design", "artist": artist, "album": album,
-        "company": company, "tracks": tracks or [], "mood": D["mood"], "style": D["style"],
-        "main": list(D["main"]), "hasAi": has_ai,
+        "company": company, "releaseYear": release_year, "releaseDate": release_date,
+        "tracks": tracks or [], "innerCopy": inner_copy,
+        "barcode": barcode_code, "copyright": copyright_text,
+        "backLayout": str(data.get("backLayout") or "auto"),
+        "copyLayout": copy_settings["copyLayout"], "conceptCopy": copy_settings["conceptCopy"],
+        "typography": copy_settings["typography"],
+        "titleTypography": title_state,
+        "mood": D["mood"], "style": D["style"],
+        "main": list(D["main"]), "hasAi": has_ai or use_local_ai,
+        "localAi": use_local_ai,
         # 项目库回看要用的「原始输入」：没有 pic 就只能看出件图、不能重跑
         "pic": str(pic), "safeBands": str(data.get("safeBands") or ""),
         "created": time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -310,8 +493,9 @@ def build_job(data):
         "printPdfUrl": "/api/design/file?jid=%s&name=%s" % (jid, quote("打印拼版-A4.pdf")),
         "zipUrl": "/api/design/zip?jid=%s" % jid,
         "notes": notes,
+        "titleTypography": title_state,
         "design": {"mood": D["mood"], "style": D["style"], "main": list(D["main"]),
-                   "hasAi": has_ai},
+                   "hasAi": has_ai or use_local_ai},
     }
 
 
@@ -483,7 +667,8 @@ def build_batch(data):
             album = str(alb.get("album") or alb.get("name") or "")
             name = album
             artist = str(alb.get("artist") or artist_all)
-            company = str(alb.get("company") or company_all)
+            company, release_year, _release_date = _release_metadata(
+                alb, artist, album, str(alb.get("company") or company_all))
             tracks = _norm_tracks(alb.get("tracks"))
             cover = _fetch_cover(alb.get("pic"))
             if cover is None:
@@ -495,7 +680,8 @@ def build_batch(data):
                   "strip": _load_ai(alb.get("aiStrip"))}
             has_ai = any(ai.values())
             disc, fold, strip = build_parts(cover, album, artist, D, tracks,
-                                            company, ai if has_ai else None, DPI)
+                                            company, ai if has_ai else None, DPI,
+                                            release_year=release_year)
 
             tag = "%02d" % i
             fn = {"disc": tag + "-disc.png", "cover": tag + "-cover.png",
@@ -863,6 +1049,20 @@ def _serve_file(handler, jid, name):
     return handler._file(str(fp))
 
 
+def _serve_preview_file(handler, token, name):
+    token = _safe_jid(token)
+    if not token or not token.startswith("p-"):
+        return handler._json({"error": "bad preview token"}, 400)
+    name = (name or "").strip()
+    if name not in {"disc.png", "cover.png", "strip.png"}:
+        return handler._json({"error": "bad preview file"}, 400)
+    base = (PREVIEW_DIR / token).resolve()
+    fp = (base / name).resolve()
+    if not fp.is_file() or fp.parent != base:
+        return handler._json({"error": "preview expired"}, 404)
+    return handler._file(str(fp))
+
+
 def handle(handler, path, query, method):
     if not path.startswith("/api/design/"):
         return False
@@ -883,8 +1083,23 @@ def handle(handler, path, query, method):
             # query 作为兜底合入（个别前端习惯用 query 传参）
             for k, v in query.items():
                 data.setdefault(k, v[0] if isinstance(v, list) and v else v)
+            if path == "/api/design/title-assets":
+                upload = _upload_path(data.get("upload"))
+                if not upload:
+                    handler._json({"error": "标题上传不存在"}, 400)
+                    return True
+                try:
+                    asset = TA.save_title_asset(upload, data.get("album") or "")
+                except ValueError as exc:
+                    handler._json({"error": str(exc)}, 400)
+                    return True
+                handler._json({"ok": True, "asset": asset.to_dict()})
+                return True
             if path == "/api/design/batch":
                 handler._json(build_batch(data))
+                return True
+            if path == "/api/design/preview":
+                handler._json(build_preview(data))
                 return True
             handler._json(build_job(data))
             return True
@@ -916,6 +1131,9 @@ def handle(handler, path, query, method):
             return True
         if path == "/api/design/file":
             _serve_file(handler, value("jid"), value("name"))
+            return True
+        if path == "/api/design/preview-file":
+            _serve_preview_file(handler, value("token"), value("name"))
             return True
         if path == "/api/design/zip":
             jid = _safe_jid(value("jid"))

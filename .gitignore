@@ -8,3 +8,18 @@ __pycache__/
 _review_frames/
 output/
 .playwright-cli/
+# 本机预览与临时调试文件
+.chrome-upload-check/
+_review_frames/
+.playwright-cli/
+logs/
+_qq_album.html
+_upload-check.png
+
+# 本地 AI 工作流试验，不作为工作台源码发布
+config/qwen_*.json
+tools/generate_qwen_minicd_demo.py
+tools/qwen_minicd.py
+tools/run_minicd_single_cover_test.py
+tools/test_qwen_locked_extension.py
+tools/test_qwen_official_edit_chain.py

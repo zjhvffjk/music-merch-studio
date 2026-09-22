@@ -2171,12 +2171,17 @@ class Handler(BaseHTTPRequestHandler):
                     return self._json({"error": "文件为空"}, 400)
                 name = (q.get("name") or ["upload.jpg"])[0]
                 ext = os.path.splitext(name)[1].lower() or ".jpg"
-                if ext not in (".jpg", ".jpeg", ".png", ".webp", ".bmp"):
+                if ext not in (".jpg", ".jpeg", ".png", ".webp", ".bmp", ".svg"):
                     ext = ".jpg"
                 uid = uuid.uuid4().hex[:12]
                 path = os.path.join(UPLOAD_DIR, uid + ext)
                 with open(path, "wb") as f:
                     f.write(raw)
+                if ext == ".svg":
+                    if b"<svg" not in raw.lower()[:4096]:
+                        os.remove(path)
+                        return self._json({"error": "不是有效 SVG"}, 400)
+                    return self._json({"upload": uid, "name": name, "size": "SVG", "bytes": len(raw)})
                 try:
                     im = Image.open(path)
                     w, h = im.size

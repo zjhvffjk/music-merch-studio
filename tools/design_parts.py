@@ -16,9 +16,11 @@ import 无副作用。
 import math
 import os
 import re
+import time
 
 import numpy as np
 from PIL import Image, ImageDraw, ImageEnhance, ImageFilter
+import spec_minicd as SP
 
 try:
     from PIL import ImageFont
@@ -787,8 +789,7 @@ def ean13(d, x, y, w, h, code, ink=(0, 0, 0), paper=(255, 255, 255), quiet=0.06)
     guard_extra = int(bh * 0.13)
     fs = max(7, int(h * 0.215))
 
-    # 🔴 白底（静区）必须**连数字行一起盖住** —— 只盖竖条会让数字落在深色封底上，
-    #    印出来是一条读不出的黑字（EAN 规范也要求静区是白的）。
+    # 白底（静区）必须连数字行一起盖住，避免数字落在深色封底上。
     if paper is not None:
         d.rectangle([x - q, y - int(h * 0.06), x + w + q,
                      y + bh + int(fs * 1.55)], fill=paper)
@@ -927,71 +928,93 @@ def label_line(d, x, y, h, company, artist, ink, dim):
     return cx + adv
 
 
-def _label_credit(artist="", company=""):
-    """把「厂牌名」拼成规范版权行。
+def _label_credit(artist="", company="", release_year=""):
+    """封底版权归属的固定首行。
 
-    🔴 踩过两个坑：
-      1. 厂牌本身就叫「JVR Music」，再套模板就成了 **"JVR Music Music
-         International Ltd."**（Music 连写两遍）→ 结尾的 Music 要去重；
-      2. 中文厂牌（「华策音乐（天津）有限公司」）套英文模板会变成
-         「…有限公司 Music International Ltd.」四不像 → 中文走另一套写法。
+    厂牌名来自专辑数据或用户确认的厂牌字段；法律声明不由 AI 或自由文本决定。
     """
-    label = (company or artist or "").strip()
-    if not label:
-        return " & © All rights reserved."
-    if re.search(r"[\u4e00-\u9fff]", label):
-        return " & © %s · All rights reserved." % label
-    core = re.sub(r"[ \t]*music[ \t]*$", "", label, flags=re.I).strip() or label
-    return " & © %s Music International Ltd. All rights reserved." % core
+    label = (company or "发行公司待确认").strip()
+    year = str(release_year or "").strip()
+    if not re.fullmatch(r"(?:19|20)\d{2}", year):
+        year = time.strftime("%Y")
+    return "© %s %s." % (year, label)
 
 
-def _copy_lines(d, w, artist="", company=""):
-    """算出「℗ & © 行 + 英文声明」折行后的实际行数与字体 —— 排版前先量高度用。"""
-    fs = max(7, int(w * 0.032))
+def _copy_lines(d, w, artist="", company="", custom="", release_year=""):
+    """封底固定的版权归属行与两行权利声明。"""
+    # w 是版权区本身的 26mm 宽，不是整个 49mm 封底宽。按版权区的物理比例
+    # 换算后，300DPI 为 8px（约 0.68mm），刚好让最长声明完整可读。
+    fs = max(3, int(round((float(w) / SP.COPYRIGHT["widthMm"]) * 0.68)))
     f = _t("sans", fs, artist)
-    adv_est = int(fs * 1.15)                 # ℗ 的占位宽度（矢量画，宽度≈字号）
-    rest = _label_credit(artist, company)
-    l2 = ("Unauthorized copying, reproduction, hiring, lending, public performance "
-          "and broadcasting prohibited.")
-    a = wrap_tracked(d, rest, f, max(10, w - adv_est), 0.2)
-    b = wrap_tracked(d, l2, f, w, 0.2)
+    # 归属始终来自专辑发行数据（或用户确认的厂牌），避免旧项目的自由文本污染生产信息。
+    rest = _label_credit(artist, company, release_year)
+    a = wrap_tracked(d, rest, f, w, 0.2)
+    b = [
+        "All rights reserved. Unauthorized copying, reproduction, hiring, lending,",
+        "public performance and broadcasting prohibited.",
+    ]
     return fs, f, a, b
 
 
-def copyright_block(d, x, y, w, ink, dim, artist="", album="", company=""):
-    """℗ & © 行 + 英文声明（未经许可不得…）。
+def copyright_block(d, x, y, w, ink, dim, artist="", album="", company="", custom="", release_year=""):
+    """固定版权归属行 + 两行英文权利声明。
 
     🔴 英文声明是**固定长句**，窄列里必须**折行**。用 ``tracked(limit=w)`` 是截断，
     印出来就是 "public p…" 这种半截话 —— 实体封底上真就是折两行的。
     返回整块实际高度，方便调用方从底部反推排版位置。
     """
-    fs, f, l1, l2 = _copy_lines(d, w, artist, company)
-    step = max(9, int(fs * 1.55))
-    adv = phonogram(d, x, y, fs, dim)
+    fs, f, l1, l2 = _copy_lines(d, w, artist, company, custom, release_year)
+    step = max(4, int(round(fs * 1.55)))
     for i, ln in enumerate(l1):
-        tracked(d, (x + (adv if i == 0 else 0), y + i * step), ln, f, dim, 0.2, "left")
+        tracked(d, (x, y + i * step), ln, f, dim, 0.2, "left")
     yy = y + len(l1) * step
     for i, ln in enumerate(l2):
         tracked(d, (x, yy + i * step), ln, f, dim, 0.2, "left")
     return (yy - y) + len(l2) * step
 
 
-def copyright_height(d, w, artist="", company=""):
-    fs, f, l1, l2 = _copy_lines(d, w, artist, company)
-    return (len(l1) + len(l2)) * max(9, int(fs * 1.55))
+def copyright_height(d, w, artist="", company="", custom="", release_year=""):
+    fs, f, l1, l2 = _copy_lines(d, w, artist, company, custom, release_year)
+    return (len(l1) + len(l2)) * max(4, int(round(fs * 1.55)))
+
+
+def _track_record(value, fallback_rank):
+    """统一曲目记录：程序可接收搜索结果的名次/名称/时长，也兼容旧版纯歌名。"""
+    if isinstance(value, dict):
+        title = str(value.get("title") or value.get("name") or value.get("song") or "").strip()
+        duration = str(value.get("duration") or value.get("dur") or value.get("time") or "").strip()
+        try:
+            rank = int(value.get("rank") or fallback_rank)
+        except Exception:
+            rank = fallback_rank
+        return {"rank": max(1, rank), "title": title, "duration": duration}
+    return {"rank": fallback_rank, "title": str(value or "").strip(), "duration": ""}
+
+
+def normalized_tracks(tracks):
+    return [r for r in (_track_record(v, i) for i, v in enumerate(tracks or [], 1)) if r["title"]]
+
+
+def choose_back_layout(requested, tracks, D=None):
+    """封底排版的确定性推荐，绝不随机。
+
+    单列为少曲目与横向留白服务；双列为 8 首以上、长歌名或极简留白视觉保留可读性。
+    """
+    requested = str(requested or "auto").strip().lower()
+    if requested in ("single", "double"):
+        return requested
+    rows = normalized_tracks(tracks)
+    count = len(rows)
+    longest = max([len(r["title"]) for r in rows] or [0])
+    average = sum(len(r["title"]) for r in rows) / max(1, count)
+    minimalist = bool((D or {}).get("style") == "minimalist")
+    return "double" if count >= 8 or longest >= 12 or (count >= 6 and (average >= 8 or minimalist)) else "single"
 
 
 def tracklist(d, x, y, w, h, tracks, ink, dim, cols=1, lead=None, max_lines=None,
-              max_lead=None):
-    """曲目表：DIN 风序号 + 无衬线歌名，行距按空间自适应。
-
-    序号用 dim 色、歌名用主墨色 —— 层级一拉开就不像「一坨字」。
-
-    🔴 ``max_lead`` 必须给：不封顶时，**只有 1 首**的专辑会算出
-    「行距 = 整块高度」，序号字号跟着行距走 → 一个占半页的巨型「01」
-    （实测《Six Degrees》单曲封底就是这个事故）。
-    """
-    tracks = [t for t in (tracks or []) if str(t).strip()]
+              max_lead=None, show_duration=True):
+    """固定序号 / 歌名 / 时长三栏曲目表，支持单列和双列。"""
+    tracks = normalized_tracks(tracks)
     if not tracks:
         return 0
     cols = max(1, int(cols))
@@ -1000,23 +1023,103 @@ def tracklist(d, x, y, w, h, tracks, ink, dim, cols=1, lead=None, max_lines=None
     lh = int(min([v for v in (lead or h, avail / max(1, per), max_lead or h) if v]))
     fs = max(7, int(lh * 0.60))
     fn = _t("num", max(7, int(fs * 0.86)))
-    colw = (w - int(w * 0.04) * (cols - 1)) / cols if cols > 1 else w
+    gap = int(w * 0.045) if cols > 1 else 0
+    colw = (w - gap * (cols - 1)) / cols
+    duration_w = int(colw * 0.23) if show_duration else 0
+    number_w = max(1, int(d.textlength("00", font=fn) * 1.7))
     used = 0
     for ci in range(cols):
-        cx = x + ci * (colw + int(w * 0.04))
+        cx = int(x + ci * (colw + gap))
         cy = y
         for k in range(per):
             idx = ci * per + k
             if idx >= len(tracks) or (max_lines and k >= max_lines) or cy + lh > y + h:
                 break
-            num = "%02d" % (idx + 1)
-            tracked(d, (cx, cy + int(lh * 0.10)), num, fn, dim, 0.4)
-            nx = cx + d.textlength("00", font=fn) * 1.75
-            f2, t2 = fit_tracked(d, str(tracks[idx]), colw - (nx - cx), fs, "sans", 0.2)
-            d.text((nx, cy), t2, font=f2, fill=ink)
+            row = tracks[idx]
+            tracked(d, (cx, cy + int(lh * 0.10)), "%02d" % row["rank"], fn, dim, 0.4)
+            title_x = cx + number_w
+            title_w = int(colw - number_w - duration_w - (int(colw * 0.04) if show_duration else 0))
+            f2, t2 = fit_tracked(d, row["title"], max(4, title_w), fs, "sans", 0.2)
+            d.text((title_x, cy), t2, font=f2, fill=ink)
+            if show_duration and row["duration"]:
+                fd = _t("num", max(6, int(fs * 0.90)))
+                tracked(d, (cx + int(colw), cy + int(lh * 0.10)), row["duration"], fd, dim, 0.15, "right")
             cy += lh
             used += 1
     return used
+
+
+def back_cover_track_table(d, panel_w, panel_h, tracks, layout, ink):
+    """Golden Reference 封底曲目表：以 49×38mm 封底为唯一坐标系。
+
+    这不是通用的「把文字平均塞进一个盒子」的列表。两种预设共享同一套
+    正文字体、墨色和基线；仅曲目的 x 坐标与列数不同：
+
+    * single：01–10 一列，序号／歌名／时长三栏，右侧保留画面与金句。
+    * double：01–05／06–10 两列，短中线只覆盖曲目行高，不延伸到标题或版权。
+
+    这样无论封面是深色照片还是浅色插画，信息的印刷节奏都不会随封面或
+    曲目数漂移。所有数值先以 mm 写出，再换算到实际输出像素。
+    """
+    rows = normalized_tracks(tracks)
+    if not rows:
+        return 0
+
+    sx, sy = panel_w / SP.BACK_PANEL_W, panel_h / SP.BACK_PANEL_H
+    px = lambda mm: int(round(mm * sx))
+    py = lambda mm: int(round(mm * sy))
+
+    # Golden Reference：歌曲正文、序号与时长为同一套常规印刷黑，
+    # 数字仅用窄体以保持列对齐，不再为序号另取灰色。
+    # 三栏（序号 / 歌名 / 时长）是同一张曲目表，不是三个文字层级：
+    # 固定同一字号、同一字高、同一正文墨色。歌名过长只截短，不缩字号。
+    track_size = max(9, py(1.28))
+    song_font = _t("sans", track_size, "曲目")
+    num_font = _t("sans", track_size, "00:00")
+    text_y = py(10.0)
+
+    def draw_row(row, x_mm, right_mm, y):
+        num_x = px(x_mm)
+        title_x = px(x_mm + 3.05)
+        right_x = px(right_mm)
+        # 预留给时长的宽度是固定的，歌名再长也只在自己的栏位内缩放。
+        duration = row.get("duration") or ""
+        duration_w = d.textlength(duration, font=num_font) if duration else 0
+        title_w = max(px(5.0), int(right_x - title_x - duration_w - px(0.85)))
+        title_font = song_font
+        title = row["title"]
+        # 不缩字号。只有原始歌名本身超过固定歌名栏时才截短加省略号；
+        # 之前复用 fit_tracked 会拿“原文 + …”测试宽度，导致刚好放得下的
+        # Always Online 也被错误截成 Always Online…。
+        if d.textlength(title, font=title_font) > title_w:
+            while title and d.textlength(title + "…", font=title_font) > title_w:
+                title = title[:-1]
+            title = (title + "…") if title else ""
+        d.text((num_x, y + py(0.10)), "%02d" % row["rank"], font=num_font, fill=ink)
+        d.text((title_x, y), title, font=title_font, fill=ink)
+        if duration:
+            tracked(d, (right_x, y + py(0.10)), duration, num_font, ink, 0.0, "right")
+
+    if layout == "double":
+        # 固定成 01–05 / 06–10；少于十首时仍按前后两组顺序排，不重新均分。
+        left, right = rows[:5], rows[5:10]
+        row_pitch = py(2.42)
+        for index, row in enumerate(left):
+            draw_row(row, 3.70, 21.70, text_y + index * row_pitch)
+        for index, row in enumerate(right):
+            draw_row(row, 25.20, 45.25, text_y + index * row_pitch)
+
+        mid_x = px(23.20)
+        d.line([(mid_x, text_y - py(0.35)),
+                (mid_x, text_y + max(0, min(5, len(left))) * row_pitch - py(0.42))],
+               fill=ink, width=1)
+        return min(10, len(rows))
+
+    # 单列版：标准三栏，右缘固定在 29mm；29–49mm 交给金句和装饰视觉。
+    row_pitch = py(2.02)
+    for index, row in enumerate(rows[:10]):
+        draw_row(row, 3.70, 29.00, text_y + index * row_pitch)
+    return min(10, len(rows))
 
 
 def design_notes(D, album="", artist="", tracks=None, has_lyrics=False):
@@ -1055,7 +1158,8 @@ def _key_grade(D, span=1.0):
 
 
 def design_back2(cover, w, h, D, album="", artist="", tracks=None, seed=0,
-                 quote=None, company=""):
+                 quote=None, company="", barcode_code="", copyright_text="", release_year="",
+                 back_layout="auto", copy_settings=None):
     """封底（v2）：整幅照片做底 + 左侧压暗信息栏 + 曲目 + 金句 + 版权层 + EAN-13。
 
     版式取实体唱片的通用解法：**照片通铺、信息分区**。硬切左右两半会显得像
@@ -1064,7 +1168,8 @@ def design_back2(cover, w, h, D, album="", artist="", tracks=None, seed=0,
     w, h = int(w), int(h)
     g = _key_grade(D)
     key = D.get("main", (128, 128, 128))
-    tracks = [t for t in (tracks or []) if str(t).strip()]
+    tracks = normalized_tracks(tracks)
+    layout = choose_back_layout(back_layout, tracks, D)
 
     # 🔴 取景避开封面**自带的标题字**：封面标题/歌手名几乎都压在上缘，
     #    fy 偏小会把「周杰伦」这种字切一半带进来，看着像失误。压到画面中部取。
@@ -1073,80 +1178,105 @@ def design_back2(cover, w, h, D, album="", artist="", tracks=None, seed=0,
     base = scrim(base, left=0.70, bottom=0.46, top=0.08, power=1.6, veil=0.10)
     d = ImageDraw.Draw(base)
 
-    ink = (248, 247, 245)
-    dim = (186, 188, 194)
+    # 封底是一个独立的印刷版面：所有生产文字共用同一墨色，不能让标题、
+    # 序号、时长各自从封面色板取色。深色照片上用暖白墨，浅色封面会自然
+    # 选择深墨；由统一的 scrim 保证可读性。
+    local_luma = lum(tuple(np.asarray(base.convert("RGB").resize((1, 1)))[0, 0]))
+    ink = (248, 247, 245) if local_luma < 142 else (28, 29, 31)
     pad = max(5, int(w * 0.048))
-    lc = int(w * 0.42)                      # 左信息栏宽度
+    sx, sy = w / SP.BACK_PANEL_W, h / SP.BACK_PANEL_H
+    px = lambda mm: int(round(mm * sx))
+    py = lambda mm: int(round(mm * sy))
 
-    # 标题块
-    y = int(h * 0.070)
-    f, t = fit_tracked(d, album or "", lc, int(h * 0.135), "serif", 1.6)
-    tracked(d, (pad, y), t, f, ink, 1.6, "left", lc)
-    y += int(f.size * 1.20)
-    f2, t2 = fit_tracked(d, artist or "", lc, int(h * 0.056), "sans", 1.4)
-    tracked(d, (pad, y), t2, f2, dim, 1.4, "left", lc)
-    y += int(f2.size * 1.75)
-    hairline(d, pad, y, pad + lc, (255, 255, 255), 1)
-    y += int(h * 0.028)
+    # 两个 Golden Reference 共用的标题块：左起 4mm，上距 2.45mm，
+    # 标题／歌手／细线与曲目首行的关系固定。仅标题可因中英文字形变化。
+    title_x, title_y, title_w = px(3.70), py(2.45), px(42.0)
+    title_role = "hand" if any("\u2e80" <= c <= "\u9fff" for c in (album or "")) else "display"
+    f, t = fit_tracked(d, album or "", title_w, py(2.82), title_role, 0.55,
+                      min_s=max(10, py(1.60)))
+    tracked(d, (title_x, title_y), t, f, ink, 0.55, "left", title_w)
+    artist_y = title_y + py(3.50)
+    artist_role = "hand" if any("\u2e80" <= c <= "\u9fff" for c in (artist or "")) else "serif"
+    f2, t2 = fit_tracked(d, artist or "", px(25.0), py(1.63), artist_role, 0.15,
+                         min_s=max(9, py(1.15)))
+    tracked(d, (title_x, artist_y), t2, f2, ink, 0.15, "left", px(25.0))
+    rule_y = py(8.42)
+    hairline(d, title_x, rule_y, px(22.0), ink, 1)
 
-    # 曲目：>10 首自动两列（单列硬塞会缩到看不清）
-    cols = 2 if len(tracks) > 10 else 1
+    # 两套 Golden Reference 预设：仅信息区发生变化，49×38mm 封底和版权/条码坐标不变。
+    # 单列保留右侧横向留白；双列将 10 首稳定拆为 01–05 / 06–10。
     if tracks:
-        tracklist(d, pad, y, lc, int(h * 0.715) - y, tracks, ink, dim,
-                  cols=cols, max_lines=14, max_lead=int(h * 0.052))
+        back_cover_track_table(d, w, h, tracks, layout, ink)
     else:
         # 🔴 以前这里再印一遍 artist：标题块 + 这行 + 金句落款 = 无曲目时歌手名
         #    出现三次（用户实测指出的重复）。实体封底这个位置通常印的是
         #    「COMPACT DISC DIGITAL AUDIO」格式标识 —— 印这个，不再重复人名。
-        f3, t3 = fit_tracked(d, "COMPACT DISC DIGITAL AUDIO", lc, int(h * 0.05), "sans", 1.2)
-        tracked(d, (pad, y), t3, f3, dim, 1.2, "left", lc)
+        f3, t3 = fit_tracked(d, "COMPACT DISC DIGITAL AUDIO", px(25.0), py(1.30), "sans", 1.2)
+        tracked(d, (title_x, py(10.0)), t3, f3, ink, 1.2, "left", px(25.0))
 
-    # 厂牌 / 版权层（实体封底的信息层，缺了就只是「设计稿」）
-    # 🔴 从底部反推位置：版权块折行后行数不定（1~3 行），写死 ly 会让底边被裁。
-    word = (company or artist or "").strip()
-    fL, wL = (fit_tracked(d, word.upper(), lc * 0.94, max(8, int(h * 0.070)),
-                          "heavy", 2.2, min_s=9) if word else (None, ""))
-    if fL is not None and "…" in wL:
-        # 缩到最小还放不下 → 拆两行（厂牌名不该出现「华策音乐（…」这种半截）
-        fL = _t("heavy", max(8, int(h * 0.052)), word)
-        wL = word.upper()
-    blk = (int(fL.size * 1.30) if fL else 0) + copyright_height(d, lc, artist, word)
-    ly = max(int(h * 0.70), h - int(h * 0.030) - blk)
-    hairline(d, pad, ly - int(h * 0.030), pad + lc, (255, 255, 255), 1)
-    if fL:
-        for i, ln in enumerate(wrap_tracked(d, wL, fL, lc * 0.94, 2.2)):
-            tracked(d, (pad, ly + i * int(fL.size * 1.30)), ln, fL, ink, 2.2, "left")
-        ly += int(fL.size * 1.30) * max(1, len(wrap_tracked(d, wL, fL, lc * 0.94, 2.2)))
-    copyright_block(d, pad, ly, lc, ink, dim, artist, album, word)
+    # 版权区严格锁在封底局部坐标 (1.5, 31, 26, 5) mm；不参与封面构图运算。
+    # 三行文字在这个区域内贴底对齐，和右侧条码的底边保持同一视觉基线。
+    cr = SP.copyright_rect_px(w, h)
+    copy_h = copyright_height(d, cr["w"], artist, company, copyright_text, release_year)
+    copy_y = cr["y"] + max(0, cr["h"] - copy_h)
+    copyright_block(d, cr["x"], copy_y, cr["w"], ink, ink, artist, album,
+                    company, copyright_text, release_year)
 
     # 手写金句：压在右侧亮部的中下方（左上角留出照片的呼吸）
-    q = quote or pick_quote(None, D)
+    # 双列预设把整块横向空间交给两组曲目，避免金句压住第 06–10 首。
+    # 双列的左下英文概念区来自用户/Concept 数据，不再沿用 Golden Reference 示例句。
+    concept = (copy_settings or {}).get("conceptCopy") or {}
+    primary = str(concept.get("primaryChinese") or "").strip()
+    tag = str(concept.get("secondaryEnglish") or concept.get("shortEnglish") or "").strip()
+    # English editorial copy uses distinct safe zones for the two tracklist presets.
+    # It is always wrapped as a compact two-line block; never one long line over tracks/copyright.
+    if tag:
+        if layout == "single":
+            tag_x, tag_y, tag_w, tag_align = px(46.0), py(15.0), px(13.0), "right"
+        else:
+            tag_x, tag_y, tag_w, tag_align = px(3.7), py(26.3), px(18.0), "left"
+        ftag = _t("display", max(8, py(1.16)), tag)
+        tag_lines = wrap_tracked(d, tag.upper(), ftag, tag_w, 0.85)[:2]
+        # Fall back to a deliberate two-line split for long taglines if the font wrapper is unavailable.
+        if len(tag_lines) == 1 and len(tag.split()) > 2:
+            words = tag.upper().split()
+            mid = max(1, len(words) // 2)
+            tag_lines = [" ".join(words[:mid]), " ".join(words[mid:])]
+        for line_no, line in enumerate(tag_lines):
+            _angled_tag(base, (tag_x, tag_y + line_no * py(1.52)), line, max(8, py(1.16)),
+                        ink, tag_align, tag_w, angle=_copy_angle(copy_settings, D))
+        d = ImageDraw.Draw(base)
+    # Chinese primary copy is optional on the single-column back. Default leaves the right safe zone
+    # to the English editorial block above the barcode, matching the approved Golden Reference.
+    q = primary if (layout == "single" and bool((copy_settings or {}).get("showBackChineseCopy"))) else ""
     if q:
         qs = max(9, int(h * 0.058))
-        qw = int(w * 0.42)
+        # 单列曲目时，三栏列表固定占至 x=29mm；金句必须从约 33mm
+        # 才开始，不能借由自动换行侵入时长列。
+        qw = px(13.5)
         lines = _wrap_hand(d, q, qw, qs, 2)      # 限 2 行：多了会跟曲目栏抢视线
         step = int(qs * 1.34)
         y0 = int(h * 0.585) - len(lines) * step
         for i, ln in enumerate(lines):
             hand_text(base, (w - pad, y0 + i * step), ln, qs, ink, 1.2, "right",
-                      shadow=(0, 0, 0, 170))
+                      angle=_copy_angle(copy_settings, D), shadow=(0, 0, 0, 170))
         d = ImageDraw.Draw(base)
         fq = _t("sans", max(8, int(qs * 0.56)), artist)
         tracked(d, (w - pad, y0 + len(lines) * step + int(h * 0.014)),
-                "— %s" % (artist or album or ""), fq, dim, 1.0, "right")
+                "— %s" % (artist or album or ""), fq, ink, 1.0, "right")
 
-    # 条码：右下角白底（EAN 规范要求静区）—— 右下不压字，也符合真实封底
-    bw = int(w * 0.275)
-    bh = int(h * 0.175)
-    ean13(d, w - pad - bw, int(h * 0.685), bw, bh, make_ean(seed),
+    # 条码：由 Mini CD 规格真源以「封底 49×38mm」局部坐标固定定位。
+    # 不从整条 111.2mm 展开图推坐标，亦不允许 AI 或构图逻辑自行挪动。
+    rect = SP.barcode_rect_px(w, h)
+    bx, by, bw, bh = rect["x"], rect["y"], rect["w"], rect["h"]
+    code = "".join(c for c in str(barcode_code or "") if c.isdigit())
+    if len(code) >= 12:
+        code = code[:12] + ean13_check(code[:12])
+    else:
+        code = make_ean(seed)
+    ean13(d, bx, by, bw, bh, code,
           quiet=0.075, paper=(250, 250, 250))
 
-    # 分区细线（印刷上的一根白线，让「信息区/照片区」有分界但不硬切）
-    lay = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-    ImageDraw.Draw(lay).rectangle([int(w * 0.515), int(h * 0.065),
-                                   int(w * 0.515) + 1, int(h * 0.935)],
-                                  fill=(255, 255, 255, 52))
-    base = Image.alpha_composite(base.convert("RGBA"), lay).convert("RGB")
     return base
 
 
@@ -1182,7 +1312,57 @@ def _wrap_hand(d, text, box_w, size, max_lines=2):
     return kinsoku(lines[:max_lines])
 
 
-def design_disc2(cover, d_px, hole_px, D, album="", artist="", company=""):
+def _copy_text(copy_settings):
+    """Extract one coherent concept copy set. Artwork never draws these words."""
+    c = (copy_settings or {}).get("conceptCopy") or {}
+    return (str(c.get("primaryChinese") or "").strip(),
+            str(c.get("secondaryEnglish") or "").strip(),
+            str(c.get("shortEnglish") or "").strip())
+
+
+def _copy_preset(copy_settings):
+    mode = str((copy_settings or {}).get("resolvedLayout") or
+               (copy_settings or {}).get("copyLayout") or "editorial").lower()
+    return "minimal" if mode in ("minimal", "b", "copy-b") else "editorial"
+
+
+def _tag(draw, xy, text, size, color, align="left", width=None):
+    """Small program-rendered English copy. Empty text deliberately stays empty."""
+    if not text:
+        return
+    font, fitted = fit_tracked(draw, text.upper(), width or 99999, max(7, int(size)), "display", 1.15)
+    tracked(draw, xy, fitted, font, color, 1.15, align, width)
+
+
+def _copy_angle(copy_settings, D=None):
+    """Angle is a chosen editorial treatment, never a substitute for a typeface."""
+    setting = str((copy_settings or {}).get("copyAngle") or "upRight")
+    # Reference direction: left side lower, right side higher (counter-clockwise in Pillow).
+    if setting in ("upRight", "auto", "right"): return 3.0
+    if setting in ("downRight", "left"): return -3.0
+    return 0.0
+
+def _angled_tag(im, xy, text, size, color, align="left", width=None, angle=-3.0):
+    """Render English editorial copy with a real serif face and a small print-safe rotation."""
+    if not text:
+        return
+    d = ImageDraw.Draw(im)
+    font, fitted = fit_tracked(d, text.upper(), width or im.width, max(7, int(size)), "editorial", 1.05)
+    x, y = xy
+    # Measure on a disposable canvas: do not paint an upright copy before rotating it.
+    measure = ImageDraw.Draw(Image.new("L", (1, 1), 0))
+    measured = tracked(measure, (0, 0), fitted, font, 255, 1.05, "left", width)
+    left = x if align == "left" else (x - measured if align == "right" else x - measured / 2)
+    mask = Image.new("L", im.size, 0)
+    tracked(ImageDraw.Draw(mask), (left, y), fitted, font, 255, 1.05, "left", width)
+    mask = mask.rotate(angle, resample=Image.BICUBIC, center=(x, y))
+    fg = Image.new("RGBA", im.size, tuple(color[:3]) + (0,))
+    fg.putalpha(mask)
+    if im.mode == "RGBA": im.alpha_composite(fg)
+    else: im.paste(fg, (0, 0), fg)
+
+
+def design_disc2(cover, d_px, hole_px, D, album="", artist="", company="", copy_settings=None):
     """盘面（v2）：先做**亮度归一**再去糊 —— v1 最大的毛病就是盘面发灰发闷。
 
     实体盘面的观感 = 主图够亮够透 + 银色聚碳酸酯内环 + 细密勾槽 +
@@ -1262,6 +1442,11 @@ def design_disc2(cover, d_px, hole_px, D, album="", artist="", company=""):
             255, 1.2, "center", tw)
     tracked(dl, (d_px / 2.0, int(d_px * 0.785)), (company or artist or "")[:12],
             fL, 255, 1.4, "center", tw)
+    _primary, _secondary, _short = _copy_text(copy_settings)
+    # Copy Layout A uses the lower-right arc; B uses lower-left. Both avoid the hub.
+    _tag(dl, (int(d_px * (0.77 if _copy_preset(copy_settings) == "editorial" else 0.23)), int(d_px * 0.67)),
+         _short or _secondary, max(7, int(d_px * 0.030)), 255,
+         "right" if _copy_preset(copy_settings) == "editorial" else "left", int(d_px * 0.34))
     sh = Image.new("RGBA", out.size, (0, 0, 0, 0))
     sh.putalpha(lay.transform(out.size, Image.AFFINE, (1, 0, -1, 0, 1, -1))
                 .point(lambda v: int(v * 0.55)))
@@ -1279,7 +1464,7 @@ def design_disc2(cover, d_px, hole_px, D, album="", artist="", company=""):
     return out
 
 
-def design_inner2(cover, w, h, D, album="", artist="", tracks=None, quote=None):
+def design_inner2(cover, w, h, D, album="", artist="", tracks=None, quote=None, copy_settings=None):
     """内页左半（折进盒里的那一面）：整幅写真 + 手写金句 + 落款。
 
     v1 这里是「压暗的封面 + 一坨曲目」，等于把封面又印了一遍；
@@ -1297,20 +1482,28 @@ def design_inner2(cover, w, h, D, album="", artist="", tracks=None, quote=None):
     base = scrim(base, bottom=0.62, top=0.42, power=1.5)
     d = ImageDraw.Draw(base)
     pad = max(4, int(w * 0.075))
-    q = quote or pick_quote(None, D)
+    _primary, _secondary, _short = _copy_text(copy_settings)
+    q = _primary or quote or pick_quote(None, D)
     if q:
         qs = max(9, int(h * 0.070))
         lines = _wrap_hand(d, q, w - pad * 2, qs, 3)
         y0 = int(h * 0.66)
         for i, ln in enumerate(lines):
             hand_text(base, (pad, y0 + int(i * qs * 1.35)), ln, qs,
-                      (250, 250, 248), 1.2, "left", shadow=(0, 0, 0, 160))
+                      (250, 250, 248), 1.2, "left", angle=_copy_angle(copy_settings, D), shadow=(0, 0, 0, 160))
         d = ImageDraw.Draw(base)
         if artist:                       # 没填歌手就别印一根孤零零的「—」
             fs = max(8, int(h * 0.062))
             fm = _t("sans", fs, artist)
             tracked(d, (pad, y0 + int(len(lines) * qs * 1.35) + int(h * 0.035)),
                     "— %s" % artist, fm, (222, 224, 228), 1.0, "left")
+        # Editorial secondary copy is a separate true-font layer, never generated in artwork.
+        # Keep the English tag as a separate baseline layer. Rotating a full-size
+        # mask around this lower corner was pulling it up into the artist credit.
+        tag_size = max(7, int(h * 0.029))
+        tag_y = min(h - int(tag_size * 1.6), y0 + int(len(lines) * qs * 1.35) + int(h * 0.145))
+        _tag(d, (pad, tag_y), _secondary or _short, tag_size,
+             (224, 226, 230), "left", w - pad * 2)
 
     # 顶部极细标题（内页也要能被认出来是哪张）
     fs2, tt = fit_tracked(d, album or "", w - pad * 2, int(h * 0.072), "serif", 1.4)
@@ -1318,7 +1511,7 @@ def design_inner2(cover, w, h, D, album="", artist="", tracks=None, quote=None):
     return base
 
 
-def design_tray2(cover, w, h, D, album="", artist="", company=""):
+def design_tray2(cover, w, h, D, album="", artist="", company="", copy_settings=None):
     """内盘底（v2）：浅色纸面 + 居中衬线标题 + 底部照片条。
 
     托盘不该跟封面抢戏 —— v1 用深色渐变把整块压成一坨糊，摆进盒里像脏了。
@@ -1343,14 +1536,20 @@ def design_tray2(cover, w, h, D, album="", artist="", company=""):
     d = ImageDraw.Draw(base)
 
     pad = max(6, int(w * 0.09))
-    fs, tt = fit_tracked(d, album or "", w - pad * 2, int(h * 0.125), "serif", 1.6)
-    ty = int(h * 0.40)
-    tracked(d, (int(w * 0.5), ty), tt, fs, ink, 1.6, "center", w - pad * 2)
-    fs2, tt2 = fit_tracked(d, artist or "", w - pad * 2, int(h * 0.056), "sans", 1.4)
-    tracked(d, (int(w * 0.5), ty + int(fs.size * 1.30)), tt2, fs2, dim, 1.4,
-            "center", w - pad * 2)
-    hairline(d, int(w * 0.40), ty + int(fs.size * 1.30) + int(fs2.size * 2.1),
-             int(w * 0.60), ink, 1)
+    _primary, _secondary, _short = _copy_text(copy_settings)
+    # Inner tray is a concept-copy panel: title stays a small identifier, copy has the visual lead.
+    fs, tt = fit_tracked(d, album or "", w - pad * 2, int(h * 0.060), "serif", 1.4)
+    tracked(d, (int(w * 0.5), int(h * 0.12)), tt, fs, dim, 1.4, "center", w - pad * 2)
+    q = _primary or album or ""
+    qs = max(9, int(h * 0.075))
+    lines = _wrap_hand(d, q, int(w * 0.68), qs, 3)
+    y0 = int(h * 0.34)
+    for i, line in enumerate(lines):
+        hand_text(base, (int(w * 0.74), y0 + int(i * qs * 1.34)), line, qs, ink, 1.1, "right", angle=_copy_angle(copy_settings, D))
+    d = ImageDraw.Draw(base)
+    _angled_tag(base, (int(w * 0.84), int(h * 0.68)), _secondary or _short,
+                max(7, int(h * 0.032)), dim, "right", int(w * 0.42),
+                angle=_copy_angle(copy_settings, D))
     if company:
         fL = _t("num", max(6, int(h * 0.038)), company)
         tracked(d, (int(w * 0.5), ty + int(fs.size * 1.30) + int(fs2.size * 2.9)),
@@ -1513,7 +1712,7 @@ def design_postcard(cover, w, h, D, album="", artist="", quote=None):
     return base
 
 
-def design_spine2(w, h, D, album="", artist="", company=""):
+def design_spine2(w, h, D, album="", artist="", company="", copy_settings=None):
     """侧标 / 书脊（v2）：竖排 + 字距 + 底部厂牌块（真书脊的排法）。"""
     w, h = int(w), int(h)
     key = D.get("main", (120, 120, 120))
@@ -1544,4 +1743,16 @@ def design_spine2(w, h, D, album="", artist="", company=""):
     lab = (company or artist or "").strip()
     fL, lab = fit_tracked(d, lab, w * 0.82, max(7, int(w * 0.40)), "sans", 0.4)
     tracked(d, (w / 2.0, int(h * 0.925)), lab, fL, dim, 0.4, "center", w * 0.82)
+    # Narrow back-spine copy: compact, vertical and kept out of the product title area.
+    _primary, _secondary, _short = _copy_text(copy_settings)
+    tag = (_short or _secondary).upper()[:18]
+    if tag:
+        tf = _t("sans", max(6, int(w * 0.36)), tag)
+        ty = int(h * 0.69)
+        for ch in tag:
+            cw = d.textlength(ch, font=tf)
+            d.text(((w - cw) / 2, ty), ch, font=tf, fill=dim)
+            ty += max(6, int(tf.size * 1.03))
+            if ty > int(h * 0.88):
+                break
     return base

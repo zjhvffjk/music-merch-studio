@@ -75,7 +75,8 @@ def ruler50(d, x, y, f, col=INK, lbl=DIM):
     d.text((x + L + mm(4), y - f.size // 2), "50mm 校验尺（打印后实测）", font=f, fill=lbl)
 
 
-def build_sheet(cover, album, artist, D, tracks, company, out_path, dpi=DPI, png=False):
+def build_sheet(cover, album, artist, D, tracks, company, out_path, dpi=DPI, png=False,
+                rendered_parts=None):
     """画 1:1 实尺寸印刷版面总览（①②③ 三件 + 尺寸标注 + 裁切/折线 + 50mm 校验尺）。
 
     `cover` 为已打开的 PIL Image（RGB）；`D` 为 design_parts.read_design 结果；
@@ -83,6 +84,8 @@ def build_sheet(cover, album, artist, D, tracks, company, out_path, dpi=DPI, png
     被 design_service 复用，避免重复整套标注绘制。
     """
     parts = {"cover": (cover, False)}
+    if rendered_parts:
+        parts.update(rendered_parts)
     page, sets, prev = MC.build_page(parts, dpi, "a4l", 1, artist, album, D, tracks, 0, company)
     disc, fold, strip = prev["disc"], prev["cover"], prev["back"]
     print("部件尺寸:", disc.size, fold.size, strip.size)

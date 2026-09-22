@@ -27,6 +27,7 @@ import noproxy  # noqa: F401  必须在发请求之前：本地地址 + 国内�
 import argparse
 import json
 import os
+import re
 import sys
 import time
 import urllib.parse
@@ -52,7 +53,14 @@ def _get(url, timeout=20):
 
 
 def _json(url):
-    return json.loads(_get(url).decode("utf-8", "replace"))
+    raw = _get(url)
+    # 详情接口是规范 UTF-8；先让 json 直接解析 bytes，避免详情说明中的一个
+    # 异常字符触发整包 GB18030 重解码，从而把公司名解析成乱码。
+    try:
+        return json.loads(raw)
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        # 少量旧搜索接口仍会回 GB18030。
+        return json.loads(raw.decode("gb18030", "replace"))
 
 
 def musicu(payload):
@@ -127,6 +135,44 @@ def cover_url_q(album_mid, size=MAX_COVER):
         return ""
     size = min(size, MAX_COVER)
     return COVER.format(size=f"{size}x{size}", amid=album_mid)
+
+
+def album_detail_q(album_mid="", album_id=None):
+    """QQ 专辑详情：发行日期与唱片公司，匿名即可读取。"""
+    param = {"albumMId": str(album_mid)} if album_mid else {"albumId": int(album_id)}
+    payload = {
+        "comm": {"ct": 24, "cv": 4747474, "platform": "yqq.json", "uin": "0",
+                 "g_tk": 5381, "g_tk_new_20200303": 5381, "format": "json",
+                 "inCharset": "utf-8", "outCharset": "utf-8", "notice": 0,
+                 "need_new_code": 1},
+        "req_0": {"module": "music.musichallAlbum.AlbumInfoServer",
+                  "method": "GetAlbumDetail", "param": param},
+    }
+    data = (musicu(payload).get("req_0") or {}).get("data") or {}
+    basic = data.get("basicInfo") or {}
+    company = data.get("company") or {}
+    return {
+        "albumMid": basic.get("albumMid") or album_mid or "",
+        "date": basic.get("publishDate") or "",
+        "company": company.get("name") or "",
+    }
+
+
+def album_metadata_q(album_name, artist=""):
+    """按专辑名找 QQ 对应专辑，再取发行日期、发行公司；找不到返回空。"""
+    wanted = re.sub(r"\s+", "", str(album_name or "")).lower()
+    if not wanted:
+        return {}
+    for song in search_song((album_name + " " + artist).strip(), 20):
+        got = re.sub(r"\s+", "", str(song.get("albumname") or "")).lower()
+        singers = "/".join(x.get("name", "") for x in (song.get("singer") or []))
+        if got != wanted or (artist and artist not in singers):
+            continue
+        try:
+            return album_detail_q(song.get("albummid"), song.get("albumid"))
+        except Exception:
+            return {}
+    return {}
 
 
 def comment_total_q(song_id):

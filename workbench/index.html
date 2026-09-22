@@ -1543,12 +1543,26 @@ function closeStudio(){
 /* 单张专辑 → 设计页参数（与 design.html 的 query 契约保持一致） */
 function albumParams(a){
   const u = new URLSearchParams();
-  u.set('artist', ARTIST_Q || '');
+  // 以当前正在显示的资料页歌手为准，不能复用搜索框的旧 ARTIST_Q。
+  const activeArtist = ((LAST_ARTIST_DATA && LAST_ARTIST_DATA.artist && LAST_ARTIST_DATA.artist.name) || ARTIST_Q || '');
+  u.set('artist', activeArtist);
   u.set('album', (a && a.name) || '');
   if(a && a.id)      u.set('id', String(a.id));
   if(a && a.pic)     u.set('pic', a.pic);
   if(a && a.company) u.set('company', a.company || '');
   if(a && a.date)    u.set('date', a.date || '');
+  // 封底曲目直接继承本次「歌手搜索」页的热门前 10：排名、歌名、时长一并带进设计页。
+  // 不额外反查专辑，避免把不同来源/排序的曲目混进同一张生产件。
+  const searchSongs = ((LAST_ARTIST_DATA && LAST_ARTIST_DATA.songs)
+    || (ARTIST_FOUND && ARTIST_FOUND.songs) || []);
+  const hot = searchSongs.slice(0, 10).map((song, i) => ({
+    rank: i + 1, title: song.name || '', duration: song.dur || ''
+  })).filter(song => song.title);
+  // URL 负责当前页直达；sessionStorage 是 iframe/刷新场景的可靠兜底。
+  if(hot.length){
+    u.set('trackData', JSON.stringify(hot));
+    try{sessionStorage.setItem('minuet_design_hot_tracks', JSON.stringify({artist:activeArtist,tracks:hot}));}catch(e){}
+  }
   // 专辑入口的目的就是完成可打印实体；设计完成后直接落在“打印制作”模块。
   u.set('flow', 'print');
   return u;

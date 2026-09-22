@@ -26,6 +26,9 @@ h2{font-size:16px;margin:0}h3{font-size:12px;margin:0;letter-spacing:1px;color:v
 /* ---------- 三栏 ---------- */
 .studio{display:grid;grid-template-columns:236px minmax(0,1fr) 328px;gap:18px;align-items:start;
   max-width:1620px;margin:0 auto;padding:18px 3vw 70px}
+.mod#mod-design{display:grid;grid-template-columns:minmax(390px,1fr) minmax(430px,.94fr);gap:0 16px;align-items:start}
+#mod-design>#dataCard,#mod-design>#aiCard{grid-column:1}
+#mod-design>#resCard{grid-column:2;grid-row:1 / span 2;position:sticky;top:80px;margin-bottom:16px}
 .rail,.insp{position:sticky;top:80px;display:flex;flex-direction:column;gap:14px;min-width:0}
 .rblk,.card{background:var(--card);border:1px solid var(--line);border-radius:14px}
 .rblk{padding:14px}
@@ -73,6 +76,11 @@ label.field{display:block;margin:11px 0 0;font-size:12.5px;color:var(--muted)}
 .plain.sm,.btn.sm{padding:4px 10px;font-size:11.5px;border-radius:6px}
 .wide{width:100%;justify-content:center}
 .row2{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;align-items:center}
+.templateFields{margin-top:14px;padding:12px 14px 14px;border:1px solid var(--line);border-radius:10px;background:#fbfcf9}
+.templateFieldTitle{font-size:12.5px;font-weight:700;color:var(--brand)}
+.templateFieldTitle span{font-weight:400;color:var(--muted);font-size:11.5px;margin-left:7px}
+.templateFields .field{margin-top:10px}.fieldGrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.barcodeHint{display:block;margin-top:5px;font-size:11px;color:var(--brand);min-height:17px}
 .alert{border:1px solid #e3b7a5;background:#fbeee7;color:var(--warn);border-radius:10px;
   padding:10px 14px;margin:14px 3vw 0;max-width:1560px}
 /* 历史项目提示条（从首页项目库 ?jid= 进来时显示） */
@@ -106,6 +114,13 @@ label.field{display:block;margin:11px 0 0;font-size:12.5px;color:var(--muted)}
 .sw{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
 .sw input{width:14px;height:14px;accent-color:var(--brand);cursor:pointer}
 
+/* 封底排版预设：缩略图只说明程序信息布局，不模拟或替换专辑视觉。 */
+.backLayoutField{margin-top:12px}.backLayoutChoices{display:flex;gap:9px;flex-wrap:wrap;margin-top:7px}
+.backLayoutChoice{width:118px;min-height:76px;border:1px solid var(--line);background:#fff;border-radius:8px;padding:7px;cursor:pointer;text-align:left;font:inherit;color:var(--ink);transition:.14s}
+.backLayoutChoice:hover,.backLayoutChoice.on{border-color:var(--brand);box-shadow:0 0 0 2px rgba(200,16,46,.10)}
+.backLayoutChoice b{display:block;font-size:12px;margin-bottom:5px}.backLayoutChoice small{font-size:10.5px;color:var(--muted)}
+.backLayoutMini{height:31px;border:1px solid #c9cdca;background:#fafbf8;margin-bottom:5px;position:relative;overflow:hidden}
+.backLayoutMini i{position:absolute;height:2px;background:#4b5154;opacity:.65}.backLayoutMini .title{left:8px;top:5px;width:38px;height:3px}.backLayoutMini .n1{left:8px;top:13px;width:48px}.backLayoutMini .n2{left:8px;top:18px;width:48px}.backLayoutMini .n3{left:8px;top:23px;width:48px}.backLayoutMini.double .n1{left:8px;width:28px}.backLayoutMini.double .n2{left:8px;width:28px}.backLayoutMini.double .n3{left:8px;width:28px}.backLayoutMini.double .r1{left:58px;top:13px;width:28px}.backLayoutMini.double .r2{left:58px;top:18px;width:28px}.backLayoutMini.double .r3{left:58px;top:23px;width:28px}
 /* AI 槽 */
 .aiSlot{border:1px dashed var(--line);border-radius:10px;padding:12px;margin-top:10px;display:flex;gap:12px;align-items:center}
 .aiSlot img{width:74px;height:74px;object-fit:cover;border-radius:8px;border:1px solid var(--line);display:block}
@@ -117,7 +132,9 @@ label.field{display:block;margin:11px 0 0;font-size:12.5px;color:var(--muted)}
 .legend span{display:flex;align-items:center;gap:6px}
 .legend i{width:16px;height:0;border-top:2px dashed #999;display:block}
 .stage{background:#e9ece6;border:1px solid var(--line);border-radius:12px;padding:26px 22px;
-  overflow:auto;width:fit-content;max-width:100%}
+  overflow:hidden;width:100%;max-width:100%;box-sizing:border-box}
+.stageCanvas{width:max-content;zoom:.82}
+.stageRow{cursor:zoom-in}
 .stageRow{display:flex;gap:22px;align-items:center;margin-bottom:26px}
 .stageRow:last-child{margin-bottom:0}
 .slab{flex:none;width:150px;font-size:12px;color:var(--muted)}
@@ -126,6 +143,12 @@ label.field{display:block;margin:11px 0 0;font-size:12.5px;color:var(--muted)}
 .piece{position:relative;width:100%;height:100%;overflow:hidden;background:#fff;
   border:1px solid var(--g-cut);box-shadow:0 1px 5px rgba(20,25,40,.14)}
 .piece img{width:100%;height:100%;object-fit:cover;display:block}
+.zoomModal{position:fixed;inset:0;z-index:90;background:rgba(12,20,18,.58);padding:28px;display:flex;align-items:center;justify-content:center}
+.zoomDialog{width:min(930px,calc(100vw - 56px));max-height:calc(100vh - 56px);overflow:auto;background:#fff;border-radius:16px;box-shadow:0 24px 80px rgba(0,0,0,.28)}
+.zoomHead{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:14px 18px;border-bottom:1px solid var(--line);position:sticky;top:0;background:#fff;z-index:1}
+.zoomHead b{font-size:15px}.zoomBody{padding:20px;background:#eef0eb;min-width:max-content}
+.zoomBody .stage{width:max-content;min-width:100%;overflow:visible}.zoomBody .stageCanvas{zoom:1}
+.zoomPiece{background:#eef0eb;padding:24px;display:flex;align-items:center;justify-content:center}.zoomPiece img{display:block;max-width:min(820px,calc(100vw - 104px));max-height:calc(100vh - 180px);object-fit:contain;border:1px solid var(--line);box-shadow:0 6px 22px rgba(20,25,40,.16)}
 .swrap.disc .piece{border-radius:50%}
 .swrap.disc .g.bleed,.swrap.disc .g.safe,.swrap.disc .g.holeg{border-radius:50%}
 .g{position:absolute;pointer-events:none;display:none}
@@ -190,6 +213,10 @@ body.guides .g{display:block}
   .studio{grid-template-columns:minmax(0,1fr)}
   .rail,.insp{position:static;flex-direction:row;flex-wrap:wrap}
   .rail .rblk,.insp .card{flex:1 1 260px}
+  .mod#mod-design{display:block}
+  #mod-design>#resCard{position:static}
+  .stageCanvas{zoom:1}
+  .zoomModal{padding:14px}.zoomDialog{width:calc(100vw - 28px);max-height:calc(100vh - 28px)}
 }
 
 /* ---------- 内嵌模式（?embed=1）----------
@@ -225,6 +252,7 @@ body.embed .proj .t small{display:none}   /* 外层已有专辑名，这里不�
   body.embed .rail,body.embed .insp{position:static;flex-direction:row;flex-wrap:wrap}
   body.embed .rail .rblk,body.embed .insp .card{flex:1 1 240px}
 }
+@media(max-width:560px){.fieldGrid{grid-template-columns:1fr}}
 </style></head><body class="guides">
 <header class="top">
   <a href="/" class="brand">Minuet</a>
@@ -279,23 +307,46 @@ body.embed .proj .t small{display:none}   /* 外层已有专辑名，这里不�
           <label class="field">专辑名<input id="album" class="input"></label>
           <label class="field">歌手<input id="artist" class="input"></label>
           <label class="field">厂牌（可选）<input id="company" class="input" placeholder="留空则不出厂牌行"></label>
-          <label class="field">曲目（分号或换行分隔；留空则封底走金句版式）<textarea id="tracks" rows="4" placeholder="曲名1;曲名2;曲名3"></textarea></label>
+          <label class="field">曲目列表（一行一首；按 Enter 换到下一首）<textarea id="tracks" rows="5" placeholder="曲名 01&#10;曲名 02&#10;曲名 03"></textarea></label>
+          <div class="backLayoutField">
+            <div class="templateFieldTitle">封底排版 <span id="backLayoutHint">自动会按曲目数和歌名长度推荐</span></div>
+            <div class="backLayoutChoices" id="backLayoutChoices">
+              <button type="button" class="backLayoutChoice on" data-back-layout="auto"><b>自动推荐</b><small>固定规则，不随机</small></button>
+              <button type="button" class="backLayoutChoice" data-back-layout="single"><div class="backLayoutMini"><i class="title"></i><i class="n1"></i><i class="n2"></i><i class="n3"></i></div><b>○ 单列版</b><small>01–10 纵向排列</small></button>
+              <button type="button" class="backLayoutChoice" data-back-layout="double"><div class="backLayoutMini double"><i class="title"></i><i class="n1"></i><i class="n2"></i><i class="n3"></i><i class="r1"></i><i class="r2"></i><i class="r3"></i></div><b>○ 双列版</b><small>01–05｜06–10</small></button>
+            </div>
+          </div>
+          <details class="adv templateFields">
+            <summary>文案、字体与条码（自动生成，可选修改）</summary>
+            <div class="advancedBody">
+            <div class="templateFieldTitle">固定模板内容 <span>这些字段会实时套入对应部件</span></div>
+            <label class="field">内页文案（出现在 ② 左页）<textarea id="innerCopy" rows="2" maxlength="80" placeholder="例如：把平凡的日子，过成喜欢的样子。"></textarea></label>
+            <div class="templateFieldTitle">文案与字体 <span>程序叠字，不写入 Artwork</span></div>
+            <label class="field">文案布局<select id="copyLayout" class="input"><option value="auto">自动推荐</option><option value="editorial">A · Editorial / 丰富型</option><option value="minimal">B · Minimal / 克制型</option></select></label><div class="fieldGrid"><label class="field">字体方案<select id="typographyStyle" class="input"><option value="auto">自动匹配原封面</option><option value="writing">书写感：楷体 + 斜体衬线</option><option value="classic">优雅：宋体 + 斜体衬线</option><option value="modern">现代：无衬线</option></select></label><label class="field">文案倾斜<select id="copyAngle" class="input"><option value="upRight">向右上 3°</option><option value="none">不倾斜</option><option value="downRight">向右下 3°</option></select></label></div><small class="muted">倾斜只作用于中文/英文概念文案；曲目、时长、版权与条码始终保持规整。</small>
+            <label class="field">中文主文案<textarea id="primaryCopy" rows="2" maxlength="52" placeholder="自动生成，也可手动修改"></textarea><small class="muted"><label><input id="showBackChineseCopy" type="checkbox"> 同时显示在单列封底右侧</label>（默认保留给英文副文案）</small></label>
+            <div class="fieldGrid"><label class="field">英文概念副文案<input id="secondaryCopy" class="input" maxlength="64" placeholder="例如：STAY TRUE TO THE FEELING."><small class="muted">单列显示在右侧条码上方；双列固定拆成两行显示在左下、版权上方</small></label><label class="field">短英文标签<input id="shortTag" class="input" maxlength="36" placeholder="例如：A QUIET PLACE"></label></div>
+            <div class="fieldGrid">
+              <label class="field">条码编号（12 位数字，可选）<input id="barcode" class="input" inputmode="numeric" maxlength="13" placeholder="留空自动生成 EAN-13"><small id="barcodeHint" class="barcodeHint">留空时由程序自动生成 EAN-13</small></label>
+              <label class="field">封底版权区<small class="muted">自动生成“© 年份 + 厂牌/公司名”及固定两行权利声明</small><input id="copyright" class="input" hidden></label>
+            </div>
+            </div>
+          </details>
           <details class="adv"><summary>高级：取景可用带 safeBands</summary>
             <p class="muted" style="margin:8px 0;font-size:12px">封面自带标题占了顶部 30% 时填 <code>0.30,1.0</code> —— 补件取景只落在下方可用区，根治「字压两遍」。留空 = 整幅取景。</p>
             <input id="safeBands" class="input" placeholder="例如 0.30,1.0">
           </details>
           <div class="row2">
             <button id="btnRead" class="plain">读取设计语言</button>
-            <button id="btnBuild" class="btn" disabled>生成三件套</button>
+            <button id="btnBuild" class="btn">生成三件套</button>
             <span id="buildState" class="muted"></span>
           </div>
         </div>
       </section>
 
       <section class="card" id="aiCard">
-        <div class="head"><h2><em>③</em> AI 增强（可选，不上传则全部程序衍生）</h2></div>
+        <div class="head"><h2><em>③</em> 自定义底图（可选）</h2></div>
         <div class="body">
-          <p class="muted" style="margin:0;font-size:12.5px">想用 AI 生成的底图替换某一件时在此上传；未上传的件仍由程序按封面衍生，保证三件成套。</p>
+          <p class="muted" style="margin:0;font-size:12.5px">默认使用封面衍生的稳定生产版。你也可以上传已确认的底图，替换对应部件。</p>
           <div class="aiSlot" data-key="aiDisc"><input type="file" accept="image/*" hidden><img class="pv" hidden><div class="t"><b>① 盘面（Ø40mm 方形底图）</b><small class="st">未上传</small></div><button class="plain sm up">上传</button><button class="plain sm clr" hidden>清除</button></div>
           <div class="aiSlot" data-key="aiFold"><input type="file" accept="image/*" hidden><img class="pv" hidden><div class="t"><b>② 封面折件（82×41 展开图）</b><small class="st">未上传</small></div><button class="plain sm up">上传</button><button class="plain sm clr" hidden>清除</button></div>
           <div class="aiSlot" data-key="aiStrip"><input type="file" accept="image/*" hidden><img class="pv" hidden><div class="t"><b>③ 封底条（111.2×38 展开图）</b><small class="st">未上传</small></div><button class="plain sm up">上传</button><button class="plain sm clr" hidden>清除</button></div>
@@ -303,7 +354,9 @@ body.embed .proj .t small{display:none}   /* 外层已有专辑名，这里不�
       </section>
 
       <section class="card" id="resCard" hidden>
-        <div class="head"><h2><em>④</em> 实尺寸画布</h2>
+        <div class="head"><h2><em>④</em> 三件套实时预览</h2>
+          <span id="previewState" class="muted" style="font-size:12px">当前封面正在套入部件…</span>
+          <button id="btnZoomPreview" class="plain sm" type="button">放大查看</button>
           <label class="sw"><input type="checkbox" id="cbGuides" checked> 印刷辅助线</label>
         </div>
         <div class="body">
@@ -385,6 +438,13 @@ body.embed .proj .t small{display:none}   /* 外层已有专辑名，这里不�
   </aside>
 </div>
 
+<div class="zoomModal" id="previewModal" hidden role="dialog" aria-modal="true" aria-label="放大预览">
+  <div class="zoomDialog">
+    <div class="zoomHead"><b id="zoomTitle">三件套放大预览</b><button id="btnCloseZoom" class="plain sm" type="button">关闭</button></div>
+    <div class="zoomBody" id="zoomBody"></div>
+  </div>
+</div>
+
 <script>
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -393,7 +453,49 @@ let ai={aiDisc:'',aiFold:'',aiStrip:''},building=false,read=false;
 let SPEC=null,LAST=null;
 function err(s){$('#error').hidden=!s;$('#error').textContent=s||''}
 function jparse(u){return fetch(u,{cache:'no-store'}).then(async r=>{const d=await r.json();if(!r.ok)throw Error(d.error||('HTTP '+r.status));return d})}
-function normTracks(){return $('#tracks').value.replace(/[\n\r，；]+/g,';').split(';').map(t=>t.trim()).filter(Boolean)}
+let SEARCH_TRACKS=[];
+let SEARCH_TRACKS_ARTIST='';
+function normTracks(){return $('#tracks').value.split(/[\r\n;；]+/).map(t=>t.trim()).filter(Boolean).slice(0,10)}
+function currentTrackData(){
+  return normTracks().map((title,i)=>{const src=SEARCH_TRACKS[i]||{};return {rank:Number(src.rank)||i+1,title,duration:String(src.duration||src.dur||'')};});
+}
+let TITLE_ASSET_ID="";
+function currentCopySettings(){const titleMode=$('#titleMode'),titleProvider=$('#titleProvider');return {copyLayout:$('#copyLayout').value||'auto',typographyStyle:$('#typographyStyle').value||'auto',copyAngle:$('#copyAngle').value||'upRight',conceptCopy:{primaryChinese:$('#primaryCopy').value.trim(),secondaryEnglish:$('#secondaryCopy').value.trim(),shortEnglish:$('#shortTag').value.trim()},showBackChineseCopy:$('#showBackChineseCopy').checked,typography:{display:'auto',artist:'auto',chineseCopy:'auto',englishCopy:'auto',metadata:'auto',spine:'auto'},titleMode:titleMode?titleMode.value:'cover-follow',titleProvider:titleProvider?titleProvider.value:'unavailable',selectedTitleAssetId:TITLE_ASSET_ID}}
+function recommendedBackLayout(){
+  const rows=currentTrackData(), n=rows.length, longest=Math.max(0,...rows.map(x=>x.title.length));
+  return (n>=8||longest>=12)?'双列':'单列';
+}
+let BACK_LAYOUT='auto';
+function setBackLayout(value){
+  BACK_LAYOUT=['auto','single','double'].includes(value)?value:'auto';
+  document.querySelectorAll('[data-back-layout]').forEach(b=>b.classList.toggle('on',b.dataset.backLayout===BACK_LAYOUT));
+  const hint=$('#backLayoutHint'); if(hint)hint.textContent=BACK_LAYOUT==='auto'?'自动推荐：当前为 '+recommendedBackLayout()+'（固定规则）':(BACK_LAYOUT==='single'?'已锁定单列排版':'已锁定双列排版');
+  queuePreview();
+}
+$('#backLayoutChoices').onclick=e=>{const b=e.target.closest('[data-back-layout]');if(b)setBackLayout(b.dataset.backLayout)};
+
+/* 条码图形与数字都由程序生成。输入 12 位主体码时，实时显示将叠加到封底右下角的完整 EAN-13。 */
+function barcodePreviewText(value){
+  const digits=String(value||'').replace(/\D/g,'').slice(0,12);
+  if(!digits)return '留空时由程序自动生成 EAN-13';
+  if(digits.length<12)return '还差 '+(12-digits.length)+' 位；当前输入会在预览中自动补齐';
+  const sum=[...digits].reduce((total,char,index)=>total+Number(char)*(index%2?3:1),0);
+  return '将印出 EAN-13：'+digits+((10-sum%10)%10)+'（封底右下角）';
+}
+function syncBarcodeHint(){
+  const hint=$('#barcodeHint');
+  if(hint)hint.textContent=barcodePreviewText($('#barcode').value);
+}
+
+/* 内嵌工作台里外层曾会吃掉 Enter；在这里显式插入换行，保证“一行一首”。 */
+$('#tracks').addEventListener('keydown',e=>{
+  if(e.key!=='Enter' || e.isComposing)return;
+  e.preventDefault();e.stopPropagation();
+  const el=e.currentTarget,start=el.selectionStart,end=el.selectionEnd;
+  el.value=el.value.slice(0,start)+'\n'+el.value.slice(end);
+  el.selectionStart=el.selectionEnd=start+1;
+  el.dispatchEvent(new Event('input',{bubbles:true}));
+});
 
 /* ---------------- 三模块切换 ---------------- */
 function showMod(name){
@@ -447,7 +549,7 @@ function stageHTML(){
   const folds=P.sleeve.folds||[];
   const wrap=(cls,w,h,inner)=>`<div class="swrap ${cls}" style="--w:${w}mm;--h:${h}mm;--bl:${bl}mm">
       <i class="g bleed"></i><i class="g safe"></i>${inner}</div>`;
-  return `
+  return `<div class="stageCanvas">
   <div class="stageRow" data-part="disc">
     <div class="slab"><b>① 盘面</b>Ø${P.disc.w}mm · 内孔 Ø${P.disc.hole}mm</div>
     ${wrap('disc',P.disc.w,P.disc.h,`<div class="piece"><img id="imDisc" alt="">
@@ -462,7 +564,7 @@ function stageHTML(){
     <div class="slab"><b>③ 封底条</b>${P.sleeve.w}×${P.sleeve.h}mm · ${folds.length} 道折线</div>
     ${wrap('',P.sleeve.w,P.sleeve.h,`<div class="piece"><img id="imStrip" alt="">
       ${folds.map(x=>`<i class="g fold" style="left:${x}mm"></i>`).join('')}</div>`)}
-  </div>`;
+  </div></div>`;
 }
 
 (async()=>{
@@ -470,11 +572,77 @@ function stageHTML(){
   catch(e){ SPEC=FALLBACK_SPEC; err('规格接口不可用（工作台需要重启），画布用内置兜底尺寸。'); }
   const bl=renderRail();
   $('#stage').innerHTML=stageHTML();
-  $('#stageNote').textContent='画布按 1:1 实际尺寸渲染（'+SPEC.parts.sleeve.w+'×'+SPEC.parts.sleeve.h+'mm 的封底条即实物大小）。'
+  $('#stageNote').textContent='编辑页为完整查看而自动缩放；打印制作页仍按 1:1 实际尺寸输出。'
     +'出血 '+bl+'mm、安全区 '+(SPEC.print&&SPEC.print.safeMm||3)+'mm；灰色虚线圆为 Ø'+SPEC.parts.disc.hole+'mm 打穿孔。';
+  queuePreview();
 })();
 
 $('#cbGuides').onchange=e=>document.body.classList.toggle('guides', e.target.checked);
+
+/* 编辑页默认保持三件套总览；需要核对细节时，可看整套或直接点其中一件单独放大。 */
+function openPreviewZoom(part){
+  const modal=$('#previewModal'), body=$('#zoomBody');
+  const names={disc:'① 盘面放大预览',booklet:'② 封面折件放大预览',sleeve:'③ 封底条放大预览'};
+  if(part){
+    const row=document.querySelector('.stageRow[data-part="'+part+'"]');
+    const img=row&&row.querySelector('img');
+    if(!img||!img.src)return;
+    $('#zoomTitle').textContent=names[part];
+    body.innerHTML='<div class="zoomPiece"><img src="'+esc(img.src)+'" alt="'+esc(names[part])+'"></div>';
+  }else{
+    $('#zoomTitle').textContent='三件套放大预览';
+    body.innerHTML='<div class="stage">'+$('#stage').innerHTML+'</div>';
+  }
+  modal.hidden=false;
+}
+function closePreviewZoom(){$('#previewModal').hidden=true;$('#zoomBody').innerHTML=''}
+$('#btnZoomPreview').onclick=()=>openPreviewZoom();
+$('#btnCloseZoom').onclick=closePreviewZoom;
+$('#previewModal').onclick=e=>{if(e.target===$('#previewModal'))closePreviewZoom()};
+$('#stage').onclick=e=>{const row=e.target.closest('.stageRow');if(row)openPreviewZoom(row.dataset.part)};
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('#previewModal').hidden)closePreviewZoom()});
+
+/* ---------------- 预览：先套入当前封面，正式生成才落盘 ----------------
+   预览与正式出件调用同一套 build_parts，只把分辨率降到屏幕预览大小；
+   因此盘面、对折封面、封底条的构图和用户上传的覆盖图会在生成前如实呈现。 */
+let previewTimer=0, previewSeq=0;
+function queuePreview(){
+  clearTimeout(previewTimer);
+  previewTimer=setTimeout(refreshPreview, 220);
+}
+async function refreshPreview(){
+  if(!PIC || !SPEC || BATCH)return;
+  const seq=++previewSeq;
+  const album=$('#album').value.trim(), artist=$('#artist').value.trim();
+  $('#resCard').hidden=false;
+  $('#previewState').innerHTML='<span class="spin dk"></span>正在套入当前封面…';
+  try{
+  const body={artist,album,pic:PIC,company:$('#company').value.trim(),
+      tracks:normTracks().join(';'),trackData:currentTrackData(),backLayout:BACK_LAYOUT,innerCopy:$('#innerCopy').value.trim(),
+      barcode:$('#barcode').value.replace(/\D/g,'').slice(0,12),
+      copyright:$('#copyright').value.trim(),safeBands:$('#safeBands').value.trim(),
+      id:q.get('id')||'',date:q.get('date')||'',...currentCopySettings(),...ai};
+    const r=await fetch('/api/design/preview',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const d=await r.json(); if(!r.ok)throw Error(d.error||('HTTP '+r.status));
+    if(d.copySettings && d.copySettings.conceptCopy){
+      const c=d.copySettings.conceptCopy;
+      if(!$('#primaryCopy').value)$('#primaryCopy').value=c.primaryChinese||'';
+      if(!$('#secondaryCopy').value)$('#secondaryCopy').value=c.secondaryEnglish||'';
+      if(!$('#shortTag').value)$('#shortTag').value=c.shortEnglish||'';
+    }
+    if(seq!==previewSeq)return;
+    const bust='&v='+Date.now();
+    $('#imDisc').src=d.parts['disc.png']+bust;
+    $('#imCover').src=d.parts['cover.png']+bust;
+    $('#imStrip').src=d.parts['strip.png']+bust;
+    $('#previewState').textContent='当前封面自动套入 · 未保存';
+    $('#stageNote').textContent='这是当前封面套入的三件套实时预览；可继续修改资料或上传自己的部件图。确认后点击「生成三件套」才会保存正式生产文件。';
+  }catch(e){
+    if(seq!==previewSeq)return;
+    $('#previewState').textContent='预览未能生成';
+    err('实时预览失败：'+e.message);
+  }
+}
 
 /* ---------------- 初始化：URL 参数回填 ---------------- */
 const q=new URLSearchParams(location.search);
@@ -501,6 +669,39 @@ if(EMBED){
 $('#album').value=q.get('album')||'';
 $('#artist').value=q.get('artist')||'';
 $('#company').value=q.get('company')||'';
+try{
+  // URL 曲目只属于当前打开的专辑；缓存则必须同时带歌手名，旧的匿名缓存
+  // 一律丢弃，避免上一位歌手的热门曲目串到下一张专辑。
+  const fromUrl=q.get('trackData');
+  if(fromUrl){ SEARCH_TRACKS=JSON.parse(fromUrl); SEARCH_TRACKS_ARTIST=q.get('artist')||''; }
+  else {
+    const cached=JSON.parse(sessionStorage.getItem('minuet_design_hot_tracks')||'null');
+    if(cached && Array.isArray(cached.tracks) && String(cached.artist||'')===String(q.get('artist')||'')){
+      SEARCH_TRACKS=cached.tracks; SEARCH_TRACKS_ARTIST=cached.artist||'';
+    }
+  }
+  if(!Array.isArray(SEARCH_TRACKS))SEARCH_TRACKS=[];
+}catch(e){SEARCH_TRACKS=[];SEARCH_TRACKS_ARTIST='';}
+if(SEARCH_TRACKS.length)$('#tracks').value=SEARCH_TRACKS.slice(0,10).map(t=>String(t.title||t.name||'').trim()).filter(Boolean).join('\n');
+setBackLayout(q.get('backLayout')||'auto');
+async function ensureHotTracks(){
+  const currentArtist=$('#artist').value.trim();
+  if(!currentArtist) return currentTrackData();
+  // 只有曲目明确属于当前歌手时才能沿用。不同歌手立即重取，不能因为文本框
+  // 非空就跳过校验。
+  if(currentTrackData().length && SEARCH_TRACKS_ARTIST===currentArtist) return currentTrackData();
+  try{
+    const d=await jparse('/api/artist?name='+encodeURIComponent(currentArtist)+'&source=auto');
+    SEARCH_TRACKS=(d.songs||[]).slice(0,10).map((song,i)=>({rank:i+1,title:song.name||'',duration:song.dur||''})).filter(song=>song.title);
+    SEARCH_TRACKS_ARTIST=currentArtist;
+    if(SEARCH_TRACKS.length){
+      $('#tracks').value=SEARCH_TRACKS.map(song=>song.title).join('\n');
+      try{sessionStorage.setItem('minuet_design_hot_tracks',JSON.stringify({artist:currentArtist,tracks:SEARCH_TRACKS}));}catch(e){}
+      if(BACK_LAYOUT==='auto')setBackLayout('auto');
+    }
+  }catch(e){}
+  return currentTrackData();
+}
 /* 🔴 let 而不是 const：从项目库 ?jid= 进来时要回填留档里的封面（有封面才能重跑） */
 let PIC=q.get('pic')||'';
 if(PIC){
@@ -512,10 +713,24 @@ function syncRail(){
   $('#railAlbum').textContent=a;$('#railArtist').textContent=s;
   if(PIC){$('#railCover').src=PIC;$('#railCover').hidden=false;}
 }
+function syncBuildEnabled(){
+  const ready=Boolean($('#album').value.trim() && $('#artist').value.trim() && PIC);
+  $('#btnBuild').disabled=building || !ready;
+}
 syncRail();
-$('#album').addEventListener('input',syncRail);
-$('#artist').addEventListener('input',syncRail);
-if(q.get('album')&&PIC) readDesign();
+syncBuildEnabled();
+$('#album').addEventListener('input',()=>{syncRail();syncBuildEnabled();});
+$('#artist').addEventListener('input',()=>{syncRail();syncBuildEnabled();});
+['album','artist','company','tracks','innerCopy','barcode','copyright','safeBands','primaryCopy','secondaryCopy','shortTag','showBackChineseCopy','copyLayout','typographyStyle','copyAngle','titleMode','titleProvider'].forEach(id=>{
+  const el=$('#'+id); if(!el)return;
+  el.addEventListener('input',queuePreview);
+  el.addEventListener('change',queuePreview);
+});
+$('#tracks').addEventListener('input',()=>{ if(BACK_LAYOUT==='auto')setBackLayout('auto'); });
+$('#barcode').addEventListener('input',syncBarcodeHint);
+$('#barcode').addEventListener('change',syncBarcodeHint);
+syncBarcodeHint();
+if(q.get('album')&&PIC){ ensureHotTracks().then(()=>{queuePreview();readDesign();}); }
 
 /* ---------------- ② 视觉 DNA ---------------- */
 async function readDesign(){
@@ -524,15 +739,27 @@ async function readDesign(){
   $('#tagMood').textContent='分析中…';
   try{
     const u='/api/design/album?'+new URLSearchParams({artist:$('#artist').value,album:$('#album').value,
-      pic:PIC,company:$('#company').value,tracks:normTracks().join(';'),safeBands:$('#safeBands').value.trim()});
+      pic:PIC,company:$('#company').value,tracks:normTracks().join(';'),trackData:currentTrackData(),backLayout:BACK_LAYOUT,safeBands:$('#safeBands').value.trim()});
     const d=await jparse(u);
     $('#tagMood').textContent='调性 · '+d.design.mood;$('#tagStyle').textContent='风格 · '+d.design.style;
     $('#swatches').innerHTML=(d.design.palette||[]).map(c=>`<i style="background:rgb(${c[0]},${c[1]},${c[2]})" title="${c.join(',')}"></i>`).join('');
     $('#notes').innerHTML=(d.notes||[]).map(t=>`<li>${esc(t)}</li>`).join('');
-    read=true;$('#btnBuild').disabled=building;
+    read=true;syncBuildEnabled();
   }catch(e){err(e.message);$('#dnaEmpty').hidden=false;$('#dnaBody').hidden=true;}
 }
 $('#btnRead').onclick=readDesign;
+
+/* 艺术字控件在真实生成接入前不显示；保留兼容判断，不能阻断三件套生成。 */
+const titleAssetFile=$('#titleAssetFile');
+if(titleAssetFile){
+  const titleAssetState=$('#titleAssetState');
+  const titleMode=$('#titleMode'), titleProvider=$('#titleProvider');
+  const titleUpload=$('#btnTitleUpload'), titleGenerate=$('#btnTitleGenerate');
+  if(titleGenerate) titleGenerate.onclick=()=>{if(titleAssetState)titleAssetState.textContent='尚未配置真实 AI Provider；请上传透明 PNG/SVG，或使用原封面标题。'};
+  if(titleUpload) titleUpload.onclick=()=>titleAssetFile.click();
+  titleAssetFile.onchange=async()=>{const f=titleAssetFile.files[0];if(!f)return;try{if(titleAssetState)titleAssetState.textContent='上传中…';const up=await fetch('/api/upload?name='+encodeURIComponent(f.name),{method:'POST',body:await f.arrayBuffer()});const u=await up.json();if(!up.ok)throw Error(u.error||'上传失败');const r=await fetch('/api/design/title-assets',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({upload:u.upload,album:$('#album').value})});const d=await r.json();if(!r.ok)throw Error(d.error||'标题资产保存失败');TITLE_ASSET_ID=d.asset.id;if(titleMode)titleMode.value='artistic';if(titleProvider)titleProvider.value='local-upload';if(titleAssetState)titleAssetState.textContent='已选标题资产：'+f.name;queuePreview()}catch(e){if(titleAssetState)titleAssetState.textContent='上传失败：'+e.message}};
+}
+
 
 /* ---------------- ③ AI 槽位 ---------------- */
 document.querySelectorAll('.aiSlot').forEach(slot=>{
@@ -548,11 +775,13 @@ document.querySelectorAll('.aiSlot').forEach(slot=>{
       const d=await r.json();if(!r.ok)throw Error(d.error||'上传失败');
       ai[key]=d.upload;slot.querySelector('.st').textContent='已上传 '+d.size+'（生成时替换程序衍生件）';
       slot.querySelector('.clr').hidden=false;
+      queuePreview();
     }catch(e){slot.querySelector('.st').textContent='上传失败：'+e.message;slot.querySelector('.pv').hidden=true;}
   };
   slot.querySelector('.clr').onclick=()=>{
     ai[key]='';file.value='';slot.querySelector('.pv').hidden=true;
     slot.querySelector('.st').textContent='未上传';slot.querySelector('.clr').hidden=true;
+    queuePreview();
   };
 });
 
@@ -563,10 +792,14 @@ $('#btnBuild').onclick=async()=>{
   if(!album||!artist)return err('专辑名与歌手都要填');
   if(!PIC)return err('缺少封面（从专辑列表进入会自动带上）');
   building=true;$('#btnBuild').disabled=true;err('');
+  await ensureHotTracks();
   $('#buildState').innerHTML='<span class="spin dk"></span>衍生三件套中，约几秒…';
   try{
     const body={artist,album,pic:PIC,company:$('#company').value.trim(),
-      tracks:normTracks().join(';'),safeBands:$('#safeBands').value.trim(),id:q.get('id')||'',...ai};
+      tracks:normTracks().join(';'),trackData:currentTrackData(),backLayout:BACK_LAYOUT,innerCopy:$('#innerCopy').value.trim(),
+      barcode:$('#barcode').value.replace(/\D/g,'').slice(0,12),
+      copyright:$('#copyright').value.trim(),safeBands:$('#safeBands').value.trim(),
+      id:q.get('id')||'',date:q.get('date')||'',...currentCopySettings(),...ai};
     const r=await fetch('/api/design/build',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
     const d=await r.json();if(!r.ok)throw Error(d.error||('HTTP '+r.status));
     const fu=(n)=>'/api/design/file?jid='+encodeURIComponent(d.jid)+'&name='+encodeURIComponent(n);
@@ -579,11 +812,12 @@ $('#btnBuild').onclick=async()=>{
     renderDownloads();
     $('#resCard').hidden=false;$('#printBody').hidden=false;$('#printEmpty').hidden=true;
     $('#printCard').hidden=false;$('#batchRes').hidden=true;
+    $('#previewState').textContent='正式三件套已保存 · 任务 '+d.jid;
     $('#buildState').textContent='完成 ✓（任务 '+d.jid+'）';
     showMod(q.get('flow') === 'print' ? 'print' : 'design');
     $('#resCard').scrollIntoView({behavior:'smooth',block:'start'});
   }catch(e){err(e.message);$('#buildState').textContent='';}
-  finally{building=false;$('#btnBuild').disabled=false;}
+  finally{building=false;syncBuildEnabled();}
 };
 
 /* ---------------- 导出清单 ---------------- */
@@ -740,14 +974,19 @@ async function loadProject(jid){
   if(m.album)   $('#album').value = m.album;
   if(m.artist)  $('#artist').value = m.artist;
   if(m.company) $('#company').value = m.company;
-  if(Array.isArray(m.tracks) && m.tracks.length) $('#tracks').value = m.tracks.join(';');
+  if(Array.isArray(m.tracks) && m.tracks.length){ SEARCH_TRACKS=m.tracks; SEARCH_TRACKS_ARTIST=m.artist||''; $('#tracks').value=m.tracks.map(t=>typeof t==='object'?(t.title||t.name||''):t).join('\n'); }
+  if(m.innerCopy) $('#innerCopy').value = m.innerCopy;
+  if(m.barcode) $('#barcode').value = m.barcode;
+  if(m.copyright) $('#copyright').value = m.copyright;
   if(m.safeBands) $('#safeBands').value = m.safeBands;
+  setBackLayout(m.backLayout||'auto');
   if(m.pic && !PIC){
     PIC = m.pic;
     $('#cover').src = PIC; $('#cover').hidden = false; $('#coverBlank').hidden = true;
     $('#picNote').textContent = '来自项目留档（可直接重跑）';
   }
   syncRail();
+  syncBuildEnabled();
 
   const fu = n => '/api/design/file?jid=' + encodeURIComponent(jid)
                 + '&name=' + encodeURIComponent(n);
