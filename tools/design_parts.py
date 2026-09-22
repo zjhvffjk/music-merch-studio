@@ -1235,13 +1235,7 @@ def design_back2(cover, w, h, D, album="", artist="", tracks=None, seed=0,
             tag_x, tag_y, tag_w, tag_align = px(46.0), py(15.0), px(13.0), "right"
         else:
             tag_x, tag_y, tag_w, tag_align = px(3.7), py(26.3), px(18.0), "left"
-        ftag = _t("display", max(8, py(1.16)), tag)
-        tag_lines = wrap_tracked(d, tag.upper(), ftag, tag_w, 0.85)[:2]
-        # Fall back to a deliberate two-line split for long taglines if the font wrapper is unavailable.
-        if len(tag_lines) == 1 and len(tag.split()) > 2:
-            words = tag.upper().split()
-            mid = max(1, len(words) // 2)
-            tag_lines = [" ".join(words[:mid]), " ".join(words[mid:])]
+        tag_lines = editorial_tag_lines(d, tag, tag_w, max(8, py(1.16)))
         for line_no, line in enumerate(tag_lines):
             _angled_tag(base, (tag_x, tag_y + line_no * py(1.52)), line, max(8, py(1.16)),
                         ink, tag_align, tag_w, angle=_copy_angle(copy_settings, D))
@@ -1336,11 +1330,44 @@ def _tag(draw, xy, text, size, color, align="left", width=None):
 
 def _copy_angle(copy_settings, D=None):
     """Angle is a chosen editorial treatment, never a substitute for a typeface."""
-    setting = str((copy_settings or {}).get("copyAngle") or "upRight")
+    setting = str((copy_settings or {}).get("copyAngle") or "none")
     # Reference direction: left side lower, right side higher (counter-clockwise in Pillow).
     if setting in ("upRight", "auto", "right"): return 3.0
     if setting in ("downRight", "left"): return -3.0
     return 0.0
+
+
+def editorial_tag_lines(draw, text, width, size, max_lines=2):
+    """将英文概念文案保持为参考版式中的紧凑两行 Editorial block。"""
+    text = str(text or "").strip().upper()
+    if not text:
+        return []
+    words = text.split()
+    # 不能让 "KEEP MOVING WITH THE LIGHT" 这样的概念文案变成一根横条；
+    # 优先按词数均衡拆分，画面比按剩余像素挤成 "...WITH THE / LIGHT" 更稳定。
+    if len(words) > 2:
+        mid = max(1, len(words) // 2)
+        return [" ".join(words[:mid]), " ".join(words[mid:])]
+    face = _t("editorial", max(7, int(size)), text)
+    return wrap_tracked(draw, text, face, int(width), 0.85)[:max_lines]
+
+
+def disc_tag_lines(draw, text, preset, width, size):
+    """CD 盘面英文文案：A 是右下两行，B 是左下的窄列多行。"""
+    text = str(text or "").strip().upper()
+    if not text:
+        return []
+    words = text.split()
+    if preset == "minimal" and len(words) > 2:
+        # B 的英文是窄列标语，不允许变成一根横线。按 4 行以内均衡拆词。
+        groups = min(4, len(words))
+        base, rem = divmod(len(words), groups)
+        lines, at = [], 0
+        for i in range(groups):
+            take = base + (1 if i < rem else 0)
+            lines.append(" ".join(words[at:at + take])); at += take
+        return lines
+    return editorial_tag_lines(draw, text, width, size, max_lines=2)
 
 def _angled_tag(im, xy, text, size, color, align="left", width=None, angle=-3.0):
     """Render English editorial copy with a real serif face and a small print-safe rotation."""
@@ -1369,98 +1396,72 @@ def design_disc2(cover, d_px, hole_px, D, album="", artist="", company="", copy_
     一道窄扇形高光 + 外沿暗边。缺了「银色内环」就会像贴纸；
     内环画得**太大太白**又会变成「白甜甜圈」（实测踩过）。
     """
+    # 盘面沿用原封面的干净白底画面：不再人为加入磨砂、凹槽、高光或塑料膜效果。
+    # 只裁到花与花瓶上半部，避开原封面下方已经烘焙的标题。
     ss = 3
     big = max(240, int(d_px) * ss)
-    g = _key_grade(D, span=1.12)
-    art = safe_crop(cover, big, big, D, fx=0.5, fy=0.55, zoom=1.12)
-    art = grade(art, sat=g["sat"] * 1.06, bright=1.0, contrast=1.04,
-                blur=big / 420.0)              # 先轻微模糊，压住勾槽的摩尔纹
-    art = normalize_gamma(art, target=0.60, sat=1.09)
-
-    cc = np.arange(big) - big / 2.0 + 0.5
-    yy, xx = np.meshgrid(cc, cc, indexing="ij")
-    rr = np.sqrt(xx ** 2 + yy ** 2)
-    ang = np.arctan2(yy, xx)
-    r0 = rr / (big / 2.0)
-
-    arr = np.asarray(art).astype(np.float32) / 255.0
-    rnd = np.random.default_rng(abs(int(D.get("bright", 0.5) * 1000)) % 9973)
-
-    # 1) 勾槽：乘性暗环（密而淡）。亮底封面要**更淡**，否则出现彩色摩尔纹。
-    gstr = 0.075 * float(np.clip(1.25 - D.get("bright", 0.5) * 1.2, 0.30, 1.0))
-    gro = 0.5 + 0.5 * np.cos(2.0 * np.pi * r0 * 36.0)
-    gmask = ((r0 > 0.235) & (r0 < 0.955)).astype(np.float32)
-    arr *= (1.0 - gstr * gro * gmask)[..., None]
-
-    # 1b) 磨砂噪点（盘面不是镜面）
-    arr += rnd.normal(0, 0.005, arr.shape).astype(np.float32)
-
-    # 2) 一道窄扇形高光（cos^8）；宽扇区会把整盘糊白
-    fan = np.cos(2.0 * (ang - 0.95)) ** 8
-    band = np.exp(-((r0 - 0.60) ** 2) / (2 * 0.24 ** 2))
-    arr = arr + (1.0 - arr) * (fan * band * 0.36)[..., None]
-
-    # 3) 外沿暗边
-    rim = np.exp(-((r0 - 0.968) ** 2) / (2 * 0.020 ** 2))
-    arr *= (1.0 - 0.42 * rim)[..., None]
-
-    # 4) 内环：银色聚碳酸酯（径向金属渐变 + 方向性光泽），
-    #    范围收到 r0∈[0.125, 0.215]（= 孔径 5mm 到约 8.6mm），太大就成白甜甜圈。
-    edge = np.clip((0.215 - r0) / 0.030, 0, 1)
-    t = np.clip((0.215 - r0) / 0.090, 0, 1)
-    met = 0.86 - 0.26 * t
-    gloss = 0.14 * (0.5 + 0.5 * np.cos(ang - 0.9)) ** 2
-    hub = np.clip(met + gloss, 0, 1)[..., None] * np.array([0.975, 0.985, 1.0], np.float32)
-    arr = arr * (1 - edge[..., None]) + np.broadcast_to(hub, (big, big, 3)) * edge[..., None]
-
-    # 5) 叠盘环（真盘才有的那圈细亮线）
-    stk = np.exp(-((r0 - 0.232) ** 2) / (2 * 0.0055 ** 2))
-    arr = arr + (1.0 - arr) * (stk * 0.32)[..., None]
-    arr = np.clip(arr, 0, 1)
-
-    im = Image.fromarray((arr * 255).astype(np.uint8), "RGB")
+    preset = _copy_preset(copy_settings)
+    # 两套模板只改变主视觉的左右位置，纵向取景一致。
+    art = safe_crop(cover, big, big, D,
+                    fx=(0.66 if preset == "editorial" else 0.34), fy=0.45, zoom=1.75)
     m = Image.new("L", (big, big), 0)
     ImageDraw.Draw(m).ellipse([0, 0, big - 1, big - 1], fill=255)
-    im.putalpha(m)
-    im = im.resize((int(d_px), int(d_px)), Image.LANCZOS)
+    art.putalpha(m)
     out = Image.new("RGB", (int(d_px), int(d_px)), (255, 255, 255))
-    out.paste(im, (0, 0), im)
+    art = art.resize((int(d_px), int(d_px)), Image.LANCZOS)
+    out.paste(art, (0, 0), art)
 
-    # 盘面文字：标题在上半区、厂牌在下半区（真盘都这么排）。
-    # 文字压在照片上 → 一律带投影，深浅底都读得出来。
-    tw = int(d_px * 0.52)
-    ink = white_ink = (250, 250, 250)
-    fs, tt = fit_tracked(ImageDraw.Draw(out), album or "", tw,
-                         max(7, int(d_px * 0.078)), "serif", 1.2)
-    fs2, tt2 = fit_tracked(ImageDraw.Draw(out), artist or "", tw,
-                           max(6, int(d_px * 0.044)), "sans", 1.2)
-    fL = _t("num", max(6, int(d_px * 0.032)), company or artist)
-    lay = Image.new("L", (int(d_px), int(d_px)), 0)
-    dl = ImageDraw.Draw(lay)
-    tracked(dl, (d_px / 2.0, int(d_px * 0.135)), tt, fs, 255, 1.2, "center", tw)
-    tracked(dl, (d_px / 2.0, int(d_px * 0.135) + int(fs.size * 1.22)), tt2, fs2,
-            255, 1.2, "center", tw)
-    tracked(dl, (d_px / 2.0, int(d_px * 0.785)), (company or artist or "")[:12],
-            fL, 255, 1.4, "center", tw)
-    _primary, _secondary, _short = _copy_text(copy_settings)
-    # Copy Layout A uses the lower-right arc; B uses lower-left. Both avoid the hub.
-    _tag(dl, (int(d_px * (0.77 if _copy_preset(copy_settings) == "editorial" else 0.23)), int(d_px * 0.67)),
-         _short or _secondary, max(7, int(d_px * 0.030)), 255,
-         "right" if _copy_preset(copy_settings) == "editorial" else "left", int(d_px * 0.34))
-    sh = Image.new("RGBA", out.size, (0, 0, 0, 0))
-    sh.putalpha(lay.transform(out.size, Image.AFFINE, (1, 0, -1, 0, 1, -1))
-                .point(lambda v: int(v * 0.55)))
-    fg = Image.new("RGBA", out.size, white_ink + (0,))
-    fg.putalpha(lay)
-    out = out.convert("RGBA")
-    out.alpha_composite(sh)
-    out.alpha_composite(fg)
-    out = out.convert("RGB")
+    # 两个盘面模板只固定构图位置；字体则分别读取工作台的标题、中文、英文选择。
+    # A / Editorial：花材左、标题右、英文右下（两行以内）。
+    # B / Minimal：花材右、标题左、英文左下（窄列多行）。
+    preset = _copy_preset(copy_settings)
+    dtext = ImageDraw.Draw(out)
+    if preset == "editorial":
+        title_x, title_y, title_w, title_align = int(d_px * 0.655), int(d_px * 0.405), int(d_px * 0.285), "left"
+        tag_x, tag_y, tag_w, tag_align = int(d_px * 0.645), int(d_px * 0.715), int(d_px * 0.270), "left"
+        artist_gap = 1.38
+        tag = _copy_text(copy_settings)[2] or _copy_text(copy_settings)[1]
+    else:
+        title_x, title_y, title_w, title_align = int(d_px * 0.135), int(d_px * 0.395), int(d_px * 0.285), "left"
+        # B 的窄英文列靠左但上移，保证每一行都留在圆盘安全区内。
+        tag_x, tag_y, tag_w, tag_align = int(d_px * 0.100), int(d_px * 0.600), int(d_px * 0.205), "left"
+        artist_gap = 1.38
+        tag = _copy_text(copy_settings)[1] or _copy_text(copy_settings)[2]
+
+    ink = (36, 33, 30)
+    # serif -> 专辑标题选择；artist -> 歌手名字体选择；editorial -> 英文文案选择。
+    fs, tt = fit_tracked(dtext, album or "", title_w, max(10, int(d_px * 0.095)),
+                         "serif", 0.88, min_s=max(10, int(d_px * 0.050)))
+    fs2, tt2 = fit_tracked(dtext, artist or "", title_w, max(8, int(d_px * 0.055)),
+                           "artist", 0.45, min_s=max(8, int(d_px * 0.031)))
+    tracked(dtext, (title_x, title_y), tt, fs, ink, 0.88, title_align, title_w)
+    tracked(dtext, (title_x, title_y + int(fs.size * artist_gap)), tt2, fs2, ink, 0.45, title_align, title_w)
+
+    tag_size = max(7, int(d_px * 0.030))
+    for i, line in enumerate(disc_tag_lines(dtext, tag, preset, tag_w, tag_size)):
+        ftag, fitted = fit_tracked(dtext, line, tag_w, tag_size, "editorial", 0.80,
+                                   min_s=max(6, int(d_px * 0.020)))
+        tracked(dtext, (tag_x, tag_y + i * int(tag_size * 1.34)), fitted, ftag, ink,
+                0.80, tag_align, tag_w)
+
+    # CD 格式标识固定在中心孔下方；它使用功能字体，不参与标题/文案字体选择。
+    mark = "COMPACT\nDISC"
+    mark_font = _t("num", max(6, int(d_px * 0.025)), mark)
+    mark_y = int(d_px * 0.805)
+    for i, line in enumerate(mark.splitlines()):
+        tracked(dtext, (d_px / 2.0, mark_y + i * int(mark_font.size * 1.04)), line,
+                mark_font, ink, 0.45, "center", int(d_px * 0.18))
 
     # 中心孔（Ø5mm，打穿）
     c = d_px / 2.0
-    ImageDraw.Draw(out).ellipse([c - hole_px / 2, c - hole_px / 2,
-                                 c + hole_px / 2, c + hole_px / 2], fill=(255, 255, 255))
+    ring = max(1, int(d_px * 0.010))
+    line = max(1, int(d_px * 0.0035))
+    dout = ImageDraw.Draw(out)
+    dout.ellipse([line, line, d_px - line - 1, d_px - line - 1], outline=(88, 84, 78), width=line)
+    dout.ellipse([c - hole_px / 2 - ring, c - hole_px / 2 - ring,
+                  c + hole_px / 2 + ring, c + hole_px / 2 + ring], outline=(105, 100, 94), width=line)
+    dout.ellipse([c - hole_px / 2, c - hole_px / 2,
+                  c + hole_px / 2, c + hole_px / 2], fill=(255, 255, 255), outline=(105, 100, 94), width=line)
     return out
 
 
@@ -1471,7 +1472,9 @@ def design_inner2(cover, w, h, D, album="", artist="", tracks=None, quote=None, 
     真唱片内页放的是**同一次拍摄的另一张照片**，所以这里改用高倍裁切。
     """
     g = _key_grade(D)
-    base = grade(safe_crop(cover, w, h, D, fx=0.38, zoom=1.40),
+    # 内页有自己独立的主文案。取景上移并收紧，避开原封面下沿自带标题，
+    # 防止源图文字和程序排出的文案重叠。
+    base = grade(safe_crop(cover, w, h, D, fx=0.38, fy=0.31, zoom=1.72),
                  sat=g["sat"] * 0.86, bright=g["bright"] * 0.96,
                  contrast=g["contrast"] * 1.04,
                  tint=tuple(int(c * 0.55 + 26) for c in D.get("main", (90, 90, 90))),
@@ -1487,7 +1490,7 @@ def design_inner2(cover, w, h, D, album="", artist="", tracks=None, quote=None, 
     if q:
         qs = max(9, int(h * 0.070))
         lines = _wrap_hand(d, q, w - pad * 2, qs, 3)
-        y0 = int(h * 0.66)
+        y0 = int(h * 0.48)
         for i, ln in enumerate(lines):
             hand_text(base, (pad, y0 + int(i * qs * 1.35)), ln, qs,
                       (250, 250, 248), 1.2, "left", angle=_copy_angle(copy_settings, D), shadow=(0, 0, 0, 160))
@@ -1501,9 +1504,12 @@ def design_inner2(cover, w, h, D, album="", artist="", tracks=None, quote=None, 
         # Keep the English tag as a separate baseline layer. Rotating a full-size
         # mask around this lower corner was pulling it up into the artist credit.
         tag_size = max(7, int(h * 0.029))
-        tag_y = min(h - int(tag_size * 1.6), y0 + int(len(lines) * qs * 1.35) + int(h * 0.145))
-        _tag(d, (pad, tag_y), _secondary or _short, tag_size,
-             (224, 226, 230), "left", w - pad * 2)
+        tag_y = min(h - int(tag_size * 3.5), y0 + int(len(lines) * qs * 1.35) + int(h * 0.12))
+        for i, line in enumerate(editorial_tag_lines(d, _secondary or _short, w - pad * 2, tag_size)):
+            _angled_tag(base, (pad, tag_y + i * int(tag_size * 1.48)), line, tag_size,
+                        (224, 226, 230), "left", w - pad * 2,
+                        angle=_copy_angle(copy_settings, D))
+        d = ImageDraw.Draw(base)
 
     # 顶部极细标题（内页也要能被认出来是哪张）
     fs2, tt = fit_tracked(d, album or "", w - pad * 2, int(h * 0.072), "serif", 1.4)
@@ -1547,9 +1553,12 @@ def design_tray2(cover, w, h, D, album="", artist="", company="", copy_settings=
     for i, line in enumerate(lines):
         hand_text(base, (int(w * 0.74), y0 + int(i * qs * 1.34)), line, qs, ink, 1.1, "right", angle=_copy_angle(copy_settings, D))
     d = ImageDraw.Draw(base)
-    _angled_tag(base, (int(w * 0.84), int(h * 0.68)), _secondary or _short,
-                max(7, int(h * 0.032)), dim, "right", int(w * 0.42),
-                angle=_copy_angle(copy_settings, D))
+    tag_size = max(7, int(h * 0.032))
+    tag_x, tag_y, tag_w = int(w * 0.84), int(h * 0.67), int(w * 0.42)
+    for i, line in enumerate(editorial_tag_lines(d, _secondary or _short, tag_w, tag_size)):
+        _angled_tag(base, (tag_x, tag_y + i * int(tag_size * 1.48)), line,
+                    tag_size, dim, "right", tag_w, angle=_copy_angle(copy_settings, D))
+    d = ImageDraw.Draw(base)
     if company:
         fL = _t("num", max(6, int(h * 0.038)), company)
         tracked(d, (int(w * 0.5), ty + int(fs.size * 1.30) + int(fs2.size * 2.9)),

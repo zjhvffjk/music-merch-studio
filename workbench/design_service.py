@@ -1113,6 +1113,16 @@ def handle(handler, path, query, method):
             return True
 
         # ---------------- GET ----------------
+        if path == "/api/design/fonts":
+            # 统一字体库：常用推荐 + 这台电脑实际安装、后端能实际渲染的字体文件。
+            # UI 中所有文字角色共用这个接口；选择值只落到各自的 typography slot。
+            fonts = TYPO.font_catalog()
+            for row in fonts:
+                if row.get("private"):
+                    row["assetUrl"] = "/private-font-library/" + quote(str(row["filename"]))
+            handler._json({"ok": True, "fonts": fonts, "count": len(fonts),
+                           "privateFontDirectory": str(TYPO.private_font_dir())})
+            return True
         if path == "/api/design/spec":
             # 尺寸 / 分段语义 / 印刷规格快照（唯一真源 spec_minicd）
             # 前端实尺寸画布与「生产规格 JSON」导出共用同一份，杜绝尺寸写死后漂移

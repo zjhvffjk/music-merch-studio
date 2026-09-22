@@ -1,0 +1,10 @@
+{
+  "description": "本机个人字体登记。字体文件仅供当前用户自用，目录已被 Git 忽略。",
+  "fonts": [
+    {"file":"fz_kuangcao.ttf","displayName":"方正狂草简体","language":"zh-Hans","category":"handwriting"},
+    {"file":"hy_xuejun.ttf","displayName":"汉仪雪君体简","language":"zh-Hans","category":"handwriting"},
+    {"file":"ygy_jifeng.ttf","displayName":"叶根友疾风草书","language":"zh-Hans","category":"handwriting"},
+    {"file":"cjs_yingbi.ttf","displayName":"陈继世硬笔行书","language":"zh-Hans","category":"handwriting"},
+    {"file":"ygy_qianming.ttf","displayName":"叶根友签名体","language":"zh-Hans","category":"handwriting"}
+  ]
+}

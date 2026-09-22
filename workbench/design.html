@@ -2,6 +2,17 @@
 :root{--bg:#f4f2ec;--card:#fffefa;--ink:#202924;--muted:#68736c;--line:#d7ddd5;
   --brand:#1f5a43;--brand2:#2c7a5b;--warn:#a3542c;--soft:#eef2ec;
   --g-bleed:#ff00ff;--g-cut:#111111;--g-fold:#006ee6;--g-safe:#00965a}
+/* 内置字库也供浏览器加载：字体选择器里显示的样字必须就是实际出图所用的字，
+   不能只在后端换了、前端预览却仍显示系统回退字。 */
+@font-face{font-family:"Noto Sans SC";src:url("/font-library/chinese/NotoSansSC-wght.ttf") format("truetype");font-style:normal;font-weight:100 900;font-display:swap}
+@font-face{font-family:"Noto Serif SC";src:url("/font-library/chinese/NotoSerifSC-wght.ttf") format("truetype");font-style:normal;font-weight:200 900;font-display:swap}
+@font-face{font-family:"Ma Shan Zheng";src:url("/font-library/handwriting/MaShanZheng-Regular.ttf") format("truetype");font-style:normal;font-weight:400;font-display:swap}
+@font-face{font-family:"Zhi Mang Xing";src:url("/font-library/handwriting/ZhiMangXing-Regular.ttf") format("truetype");font-style:normal;font-weight:400;font-display:swap}
+@font-face{font-family:"Liu Jian Mao Cao";src:url("/font-library/handwriting/LiuJianMaoCao-Regular.ttf") format("truetype");font-style:normal;font-weight:400;font-display:swap}
+@font-face{font-family:"Long Cang";src:url("/font-library/handwriting/LongCang-Regular.ttf") format("truetype");font-style:normal;font-weight:400;font-display:swap}
+@font-face{font-family:"Cormorant Garamond";src:url("/font-library/english/CormorantGaramond-wght.ttf") format("truetype");font-style:normal;font-weight:300 700;font-display:swap}
+@font-face{font-family:"DM Sans";src:url("/font-library/english/DMSans-opsz-wght.ttf") format("truetype");font-style:normal;font-weight:100 1000;font-display:swap}
+@font-face{font-family:"Caveat";src:url("/font-library/handwriting/Caveat-wght.ttf") format("truetype");font-style:normal;font-weight:400 700;font-display:swap}
 *{box-sizing:border-box}
 /* 🔴 hidden 属性会被作者样式里的 display:flex/grid 覆盖（UA 的 [hidden] 优先级更低），
    必须显式兜底，否则「等待封面…」这类占位在图片出来后仍然显示。 */
@@ -80,6 +91,7 @@ label.field{display:block;margin:11px 0 0;font-size:12.5px;color:var(--muted)}
 .templateFieldTitle{font-size:12.5px;font-weight:700;color:var(--brand)}
 .templateFieldTitle span{font-weight:400;color:var(--muted);font-size:11.5px;margin-left:7px}
 .templateFields .field{margin-top:10px}.fieldGrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.fontRole label{display:block;margin:10px 0 5px;font-size:12px;color:var(--muted)}.fontSelect{width:100%;min-height:42px;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink);cursor:pointer;text-align:left}.fontSelect:hover{border-color:var(--brand)}.fontSelect .sample{font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.fontSelect svg{width:14px;height:14px;flex:none}.fontPicker{position:fixed;z-index:120;width:min(520px,calc(100vw - 28px));max-height:min(560px,calc(100vh - 40px));background:#fff;border:1px solid #d9ddda;border-radius:12px;box-shadow:0 18px 52px rgba(16,24,20,.22);overflow:hidden}.fontPickerHead{padding:12px;border-bottom:1px solid var(--line);display:flex;gap:8px;align-items:center;flex-wrap:wrap}.fontPickerCount{font-size:11px;color:var(--muted);white-space:nowrap}.fontPickerHead input{flex:1;border:1px solid var(--line);border-radius:7px;padding:8px 10px;font:inherit}.fontPickerClose{border:0;background:transparent;font-size:20px;cursor:pointer;color:var(--muted)}.fontPickerFilters{display:flex;gap:6px;overflow-x:auto;padding:8px 12px;border-bottom:1px solid var(--line);background:#fafbf9}.fontFilter{border:1px solid #dfe4df;background:#fff;color:var(--muted);border-radius:999px;padding:4px 9px;white-space:nowrap;font-size:11px;cursor:pointer}.fontFilter.on{border-color:var(--brand);background:#edf7ef;color:var(--brand);font-weight:700}.fontPickerList{max-height:420px;overflow:auto;padding:8px 0}.fontGroup{padding:7px 12px 3px;font-size:11px;color:var(--muted);font-weight:700}.fontOption{width:100%;border:0;background:#fff;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 14px;cursor:pointer;text-align:left}.fontOption:hover,.fontOption.on{background:#f5f7f4}.fontOption:disabled{opacity:.46;cursor:not-allowed}.fontOption .name{font-size:16px}.fontOption .preview{font-size:14px;color:#36413c;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.fontOption .meta{font-size:11px;color:var(--muted);text-align:right;white-space:nowrap}.fontOption .meta.incompatible{color:var(--warn);font-weight:650}
 .barcodeHint{display:block;margin-top:5px;font-size:11px;color:var(--brand);min-height:17px}
 .alert{border:1px solid #e3b7a5;background:#fbeee7;color:var(--warn);border-radius:10px;
   padding:10px 14px;margin:14px 3vw 0;max-width:1560px}
@@ -323,14 +335,16 @@ body.embed .proj .t small{display:none}   /* 外层已有专辑名，这里不�
             <label class="field">内页文案（出现在 ② 左页）<textarea id="innerCopy" rows="2" maxlength="80" placeholder="例如：把平凡的日子，过成喜欢的样子。"></textarea></label>
             <div class="templateFieldTitle">字体 <span>选择后立即套入预览与正式出件</span></div>
             <div class="fieldGrid">
-              <label class="field">专辑标题<select id="fontDisplay" class="input"><option value="auto">自动跟随封面</option><option value="noto-serif-sc">思源宋体</option><option value="kaiti">楷体</option><option value="microsoft-yahei-bold">微软雅黑粗体</option></select></label>
-              <label class="field">中文文案<select id="fontChineseCopy" class="input"><option value="auto">自动</option><option value="noto-serif-sc">思源宋体</option><option value="kaiti">楷体</option><option value="microsoft-yahei">微软雅黑</option></select></label>
-              <label class="field">英文文案<select id="fontEnglishCopy" class="input"><option value="auto">自动</option><option value="georgia">Georgia Serif</option><option value="gabriola">Gabriola 手写</option></select></label>
-              <label class="field">曲目与信息<select id="fontMetadata" class="input"><option value="auto">自动</option><option value="noto-sans-sc">思源黑体</option><option value="microsoft-yahei">微软雅黑</option><option value="bahnschrift">Bahnschrift（仅拉丁数字）</option></select></label>
+              <div class="fontRole"><label>专辑标题</label><input id="fontDisplay" type="hidden" value="auto"><button class="fontSelect" type="button" data-font-for="fontDisplay"><span class="sample">自动跟随封面</span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3 6 5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button></div>
+              <div class="fontRole"><label>歌手名字</label><input id="fontArtist" type="hidden" value="auto"><button class="fontSelect" type="button" data-font-for="fontArtist"><span class="sample">自动</span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3 6 5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button></div>
+              <div class="fontRole"><label>中文文案</label><input id="fontChineseCopy" type="hidden" value="auto"><button class="fontSelect" type="button" data-font-for="fontChineseCopy"><span class="sample">自动</span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3 6 5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button></div>
+              <div class="fontRole"><label>英文文案</label><input id="fontEnglishCopy" type="hidden" value="auto"><button class="fontSelect" type="button" data-font-for="fontEnglishCopy"><span class="sample">自动</span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3 6 5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button></div>
+              <div class="fontRole"><label>曲目与信息</label><input id="fontMetadata" type="hidden" value="auto"><button class="fontSelect" type="button" data-font-for="fontMetadata"><span class="sample">自动</span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3 6 5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button></div>
             </div>
+            <div id="fontPicker" class="fontPicker" hidden><div class="fontPickerHead"><input id="fontSearch" placeholder="搜索字体名称"><span id="fontPickerCount" class="fontPickerCount"></span><button id="fontPickerClose" class="fontPickerClose" type="button" aria-label="关闭字体库">×</button></div><div id="fontPickerFilters" class="fontPickerFilters"></div><div id="fontPickerList" class="fontPickerList"></div></div>
             <small class="muted">中文内容不会错误套用只支持英文的字体；曲目、时长、版权仍保持清晰可读。</small>
             <div class="templateFieldTitle">文案布局 <span>程序叠字，不写入 Artwork</span></div>
-            <label class="field">文案布局<select id="copyLayout" class="input"><option value="auto">自动推荐</option><option value="editorial">A · Editorial / 丰富型</option><option value="minimal">B · Minimal / 克制型</option></select></label><label class="field">文案倾斜<select id="copyAngle" class="input"><option value="upRight">向右上 3°</option><option value="none">不倾斜</option><option value="downRight">向右下 3°</option></select></label><small class="muted">倾斜只作用于中文/英文概念文案；曲目、时长、版权与条码始终保持规整。</small>
+            <label class="field">文案布局<select id="copyLayout" class="input"><option value="auto">自动推荐</option><option value="editorial">A · Editorial / 丰富型</option><option value="minimal">B · Minimal / 克制型</option></select></label><label class="field">文案倾斜<select id="copyAngle" class="input"><option value="none" selected>不倾斜</option><option value="upRight">向右上 3°</option><option value="downRight">向右下 3°</option></select></label><small class="muted">倾斜只作用于中文/英文概念文案；曲目、时长、版权与条码始终保持规整。</small>
             <label class="field">中文主文案<textarea id="primaryCopy" rows="2" maxlength="52" placeholder="自动生成，也可手动修改"></textarea><small class="muted"><label><input id="showBackChineseCopy" type="checkbox"> 同时显示在单列封底右侧</label>（默认保留给英文副文案）</small></label>
             <div class="fieldGrid"><label class="field">英文概念副文案<input id="secondaryCopy" class="input" maxlength="64" placeholder="例如：STAY TRUE TO THE FEELING."><small class="muted">单列显示在右侧条码上方；双列固定拆成两行显示在左下、版权上方</small></label><label class="field">短英文标签<input id="shortTag" class="input" maxlength="36" placeholder="例如：A QUIET PLACE"></label></div>
             <div class="fieldGrid">
@@ -468,7 +482,71 @@ function currentTrackData(){
   return normTracks().map((title,i)=>{const src=SEARCH_TRACKS[i]||{};return {rank:Number(src.rank)||i+1,title,duration:String(src.duration||src.dur||'')};});
 }
 let TITLE_ASSET_ID="";
-function currentCopySettings(){const titleMode=$('#titleMode'),titleProvider=$('#titleProvider'),fontValue=id=>{const el=$('#'+id);return el?el.value:'auto'};return {copyLayout:$('#copyLayout').value||'auto',typographyStyle:($('#typographyStyle')?$('#typographyStyle').value:'auto'),copyAngle:$('#copyAngle').value||'upRight',conceptCopy:{primaryChinese:$('#primaryCopy').value.trim(),secondaryEnglish:$('#secondaryCopy').value.trim(),shortEnglish:$('#shortTag').value.trim()},showBackChineseCopy:$('#showBackChineseCopy').checked,typography:{display:fontValue('fontDisplay'),artist:'auto',chineseCopy:fontValue('fontChineseCopy'),englishCopy:fontValue('fontEnglishCopy'),metadata:fontValue('fontMetadata'),spine:'auto'},titleMode:titleMode?titleMode.value:'cover-follow',titleProvider:titleProvider?titleProvider.value:'unavailable',selectedTitleAssetId:TITLE_ASSET_ID}}
+function currentCopySettings(){const titleMode=$('#titleMode'),titleProvider=$('#titleProvider'),fontValue=id=>{const el=$('#'+id);return el?el.value:'auto'};return {copyLayout:$('#copyLayout').value||'auto',typographyStyle:($('#typographyStyle')?$('#typographyStyle').value:'auto'),copyAngle:$('#copyAngle').value||'none',conceptCopy:{primaryChinese:$('#primaryCopy').value.trim(),secondaryEnglish:$('#secondaryCopy').value.trim(),shortEnglish:$('#shortTag').value.trim()},showBackChineseCopy:$('#showBackChineseCopy').checked,typography:{display:fontValue('fontDisplay'),artist:fontValue('fontArtist'),chineseCopy:fontValue('fontChineseCopy'),englishCopy:fontValue('fontEnglishCopy'),metadata:fontValue('fontMetadata'),spine:'auto'},titleMode:titleMode?titleMode.value:'cover-follow',titleProvider:titleProvider?titleProvider.value:'unavailable',selectedTitleAssetId:TITLE_ASSET_ID}}
+
+let FONT_LIBRARY=[
+  {id:'auto',name:'自动跟随封面',group:'自动',face:'inherit',meta:'按当前专辑自动匹配'},
+  {id:'noto-serif-sc',name:'思源宋体',group:'中文常用',face:'"Noto Serif SC", SimSun, serif',meta:'开源 · 衬线'},
+  {id:'noto-sans-sc',name:'思源黑体',group:'中文常用',face:'"Noto Sans SC", "Microsoft YaHei", sans-serif',meta:'开源 · 清晰'},
+  {id:'kaiti',name:'楷体',group:'中文常用',face:'KaiTi, STKaiti, serif',meta:'书写感'},
+  {id:'fangsong',name:'仿宋',group:'中文常用',face:'FangSong, STFangsong, serif',meta:'轻文艺'},
+  {id:'simsun',name:'宋体',group:'中文常用',face:'SimSun, serif',meta:'经典衬线'},
+  {id:'simhei',name:'黑体',group:'中文常用',face:'SimHei, sans-serif',meta:'醒目'},
+  {id:'deng',name:'等线',group:'中文常用',face:'DengXian, sans-serif',meta:'现代'},
+  {id:'deng-light',name:'等线 Light',group:'中文常用',face:'DengXian, sans-serif',meta:'轻量'},
+  {id:'microsoft-yahei',name:'微软雅黑',group:'中文常用',face:'"Microsoft YaHei", sans-serif',meta:'稳定易读'},
+  {id:'microsoft-yahei-bold',name:'微软雅黑粗体',group:'中文常用',face:'"Microsoft YaHei", sans-serif',meta:'强对比'},
+  {id:'georgia',name:'Georgia',group:'英文风格',face:'Georgia, serif',meta:'Elegant Serif'},
+  {id:'cambria',name:'Cambria',group:'英文风格',face:'Cambria, serif',meta:'Editorial Serif'},
+  {id:'times-new-roman',name:'Times New Roman',group:'英文风格',face:'"Times New Roman", serif',meta:'Classic Serif'},
+  {id:'gabriola',name:'Gabriola',group:'英文风格',face:'Gabriola, cursive',meta:'Calligraphic'},
+  {id:'ink-free',name:'Ink Free',group:'英文风格',face:'"Ink Free", cursive',meta:'Handwriting'},
+  {id:'segoe-print',name:'Segoe Print',group:'英文风格',face:'"Segoe Print", cursive',meta:'Handwritten'},
+  {id:'arial',name:'Arial',group:'英文风格',face:'Arial, sans-serif',meta:'Neutral Sans'},
+  {id:'bahnschrift',name:'Bahnschrift',group:'英文风格',face:'Bahnschrift, sans-serif',meta:'Condensed / Numbers'}
+];
+// 页面先带一份基础清单，接口返回后会补全本机字体。基础清单也必须声明字形覆盖，
+// 否则「中文位置只允许中文字体」会误把这里的楷体、宋体等当成英文。
+const BUILTIN_PICKER_CJK_IDS=new Set(['noto-serif-sc','noto-sans-sc','kaiti','fangsong','simsun','simhei','deng','deng-light','microsoft-yahei','microsoft-yahei-bold']);
+FONT_LIBRARY.forEach(x=>{if(BUILTIN_PICKER_CJK_IDS.has(x.id))x.language='CJK';else if(x.id!=='auto')x.language='Latin';});
+let FONT_TARGET='';
+let FONT_FILTER='all';
+const FONT_ROLE_SAMPLE={fontDisplay:'如果呢  WHAT IF',fontArtist:'郑润泽',fontChineseCopy:'把平凡的日子，过成喜欢的样子。',fontEnglishCopy:'SAME STORIES, DIFFERENT DAYS.',fontMetadata:'01 如果呢  03:48'};
+const CJK_FONT_TARGETS=new Set(['fontDisplay','fontArtist','fontChineseCopy']);
+function fontItem(id){return FONT_LIBRARY.find(x=>x.id===id)||FONT_LIBRARY[0]}
+function fontCategory(x){if(x.category)return x.category;const text=((x.name||'')+' '+(x.meta||'')).toLowerCase();if(/kaiti|kai|hand|script|ink|gabriola|caveat/.test(text))return 'handwriting';if(/serif|song|ming|fang|georgia|cambria|times|palatino/.test(text))return 'serif';if(/impact|bahnschrift|black|condensed/.test(text))return 'display';return 'sans';}
+function fontSource(x){if(x.private||(x.id&&x.id.startsWith('private:')))return 'private';return x.id&&x.id.startsWith('builtin:')?'builtin':(x.language==='CJK'?'chinese':'latin');}
+function setFontButton(inputId){const input=$('#'+inputId),button=document.querySelector('[data-font-for="'+inputId+'"]');if(!input||!button)return;const item=fontItem(input.value),sample=button.querySelector('.sample');sample.textContent=item.name;sample.style.fontFamily=item.face;}
+async function loadFontLibrary(){
+  try{
+    const data=await jparse('/api/design/fonts');
+    const installed=(data.fonts||[]).filter(x=>x&&x.id&&x.name).map(x=>({...x,face:x.face||'sans-serif',meta:x.meta||'已安装'}));
+    await Promise.all(installed.filter(x=>x.private&&x.assetUrl).map(async x=>{try{const family='Minuet Private '+x.id.replace(/[^a-z0-9]+/gi,'_');const face=new FontFace(family,'url('+JSON.stringify(x.assetUrl)+')');await face.load();document.fonts.add(face);x.face='"'+family+'", sans-serif';}catch(e){console.warn('private font preview unavailable',x.name,e)}}));
+    const known=new Set(FONT_LIBRARY.map(x=>x.id));
+    FONT_LIBRARY=FONT_LIBRARY.concat(installed.filter(x=>!known.has(x.id)));
+    document.querySelectorAll('[data-font-for]').forEach(b=>setFontButton(b.dataset.fontFor));
+  }catch(e){console.warn('font library unavailable',e);}
+}
+function renderFontPicker(){
+  const q=($('#fontSearch').value||'').trim().toLowerCase(),current=fontItem($('#'+FONT_TARGET).value).id;
+  const requiresCjk=CJK_FONT_TARGETS.has(FONT_TARGET);
+  const categories=[['all','全部'],['private','个人字体'],['builtin','内置开源'],['chinese','中文'],['latin','英文'],['handwriting','手写'],['serif','衬线'],['sans','无衬线'],['display','展示字']];
+  $('#fontPickerFilters').innerHTML=categories.map(([id,label])=>'<button type="button" class="fontFilter '+(FONT_FILTER===id?'on':'')+'" data-font-filter="'+id+'">'+label+'</button>').join('');
+  const rows=FONT_LIBRARY.filter(x=>{const matches=(x.name+' '+(x.style||'')+' '+(x.meta||'')+' '+(x.group||'')+' '+(x.filename||'')).toLowerCase().includes(q);const source=fontSource(x);const category=fontCategory(x);const allowed=FONT_FILTER==='all'||FONT_FILTER===source||FONT_FILTER===category;return matches&&allowed;})
+    .sort((a,b)=>(a.group||'').localeCompare(b.group||'')||(a.name||'').localeCompare(b.name||''));
+  const count=$('#fontPickerCount');if(count)count.textContent=requiresCjk?'中文文字：只可选择支持中文的字体':'共 '+(FONT_LIBRARY.length-1)+' 种可用字体';
+  let last='';$('#fontPickerList').innerHTML=rows.map(x=>{const h=x.group===last?'':('<div class="fontGroup">'+esc(x.group)+'</div>');last=x.group;const preview=FONT_ROLE_SAMPLE[FONT_TARGET]||'如果呢 · Album Design';const incompatible=requiresCjk&&x.id!=='auto'&&x.language!=='CJK';const meta=incompatible?'不支持中文':(x.meta||'已安装');return h+'<button class="fontOption '+(x.id===current?'on':'')+'" type="button" data-font-id="'+esc(x.id)+'"'+(incompatible?' disabled title="此字体不含中文，不能用于当前文字"':'')+'><span><span class="name" style="font-family:'+esc(x.face)+'">'+esc(x.name)+'</span><span class="preview" style="font-family:'+esc(x.face)+'">'+esc(preview)+'</span></span><span class="meta '+(incompatible?'incompatible':'')+'">'+esc(meta)+'</span></button>';}).join('')||'<p class="muted" style="padding:14px">没有找到这个字体</p>';
+}
+function openFontPicker(inputId,button){FONT_TARGET=inputId;const r=button.getBoundingClientRect(),panel=$('#fontPicker');panel.hidden=false;panel.style.left=Math.max(14,Math.min(r.left,innerWidth-534))+'px';panel.style.top=Math.min(r.bottom+6,innerHeight-570)+'px';$('#fontSearch').value='';renderFontPicker();$('#fontSearch').focus();}
+function closeFontPicker(){$('#fontPicker').hidden=true;FONT_TARGET='';}
+document.querySelectorAll('[data-font-for]').forEach(b=>{setFontButton(b.dataset.fontFor);b.onclick=()=>openFontPicker(b.dataset.fontFor,b)});
+$('#fontSearch').oninput=renderFontPicker;
+$('#fontPickerClose').onclick=closeFontPicker;
+$('#fontPickerFilters').onclick=e=>{const b=e.target.closest('[data-font-filter]');if(!b)return;FONT_FILTER=b.dataset.fontFilter;renderFontPicker();};
+$('#fontPickerList').onclick=e=>{const row=e.target.closest('[data-font-id]');if(!row||!FONT_TARGET)return;const input=$('#'+FONT_TARGET);input.value=row.dataset.fontId;setFontButton(FONT_TARGET);input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));closeFontPicker();};
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('#fontPicker').hidden)closeFontPicker()});
+loadFontLibrary();
+
 function recommendedBackLayout(){
   const rows=currentTrackData(), n=rows.length, longest=Math.max(0,...rows.map(x=>x.title.length));
   return (n>=8||longest>=12)?'双列':'单列';
@@ -729,7 +807,7 @@ syncRail();
 syncBuildEnabled();
 $('#album').addEventListener('input',()=>{syncRail();syncBuildEnabled();});
 $('#artist').addEventListener('input',()=>{syncRail();syncBuildEnabled();});
-['album','artist','company','tracks','innerCopy','barcode','copyright','safeBands','primaryCopy','secondaryCopy','shortTag','showBackChineseCopy','copyLayout','typographyStyle','copyAngle','fontDisplay','fontChineseCopy','fontEnglishCopy','fontMetadata','titleMode','titleProvider'].forEach(id=>{
+['album','artist','company','tracks','innerCopy','barcode','copyright','safeBands','primaryCopy','secondaryCopy','shortTag','showBackChineseCopy','copyLayout','typographyStyle','copyAngle','fontDisplay','fontArtist','fontChineseCopy','fontEnglishCopy','fontMetadata','titleMode','titleProvider'].forEach(id=>{
   const el=$('#'+id); if(!el)return;
   el.addEventListener('input',queuePreview);
   el.addEventListener('change',queuePreview);

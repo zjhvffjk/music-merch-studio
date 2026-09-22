@@ -25,6 +25,9 @@ from __future__ import annotations
 
 import os
 import sys
+import json
+from functools import lru_cache
+from pathlib import Path
 from contextvars import ContextVar
 
 from PIL import ImageDraw, ImageFont
@@ -70,7 +73,7 @@ def _candidates(role: str) -> list[str]:
                 ("msyh.ttc", "Deng.ttf", "NotoSansSC-VF.ttf", "simhei.ttf")] + [
                 "/System/Library/Fonts/PingFang.ttc",
                 "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"]
-    if role == "hand":                        # 手写：中文用楷体（有书法味且字库全）
+    if role in ("artist", "hand"):              # 歌手名/手写文案：中文用楷体（有书法味且字库全）
         return [os.path.join(win, x) for x in
                 ("simkai.ttf", "STKAITI.TTF", "Inkfree.ttf", "segoepr.ttf")] + [
                 "/System/Library/Fonts/Kaiti.ttc", "/System/Library/Fonts/Supplemental/Kaiti.ttf"]
@@ -95,19 +98,235 @@ _FONT_PRESETS = {
     "noto-serif-sc": {"path": "NotoSerifSC-VF.ttf", "language": "CJK"},
     "noto-sans-sc": {"path": "NotoSansSC-VF.ttf", "language": "CJK"},
     "kaiti": {"path": "simkai.ttf", "language": "CJK"},
+    "fangsong": {"path": "simfang.ttf", "language": "CJK"},
     "simsun": {"path": "simsun.ttc", "language": "CJK"},
+    "simhei": {"path": "simhei.ttf", "language": "CJK"},
+    "deng": {"path": "Deng.ttf", "language": "CJK"},
+    "deng-light": {"path": "Dengl.ttf", "language": "CJK"},
     "microsoft-yahei": {"path": "msyh.ttc", "language": "CJK"},
     "microsoft-yahei-bold": {"path": "msyhbd.ttc", "language": "CJK"},
     "georgia": {"path": "georgia.ttf", "language": "Latin"},
+    "cambria": {"path": "cambria.ttc", "language": "Latin"},
+    "times-new-roman": {"path": "times.ttf", "language": "Latin"},
     "gabriola": {"path": "Gabriola.ttf", "language": "Latin"},
+    "ink-free": {"path": "Inkfree.ttf", "language": "Latin"},
+    "segoe-print": {"path": "segoepr.ttf", "language": "Latin"},
+    "arial": {"path": "arial.ttf", "language": "Latin"},
     "bahnschrift": {"path": "bahnschrift.ttf", "language": "Latin"},
 }
+
+
+# 本机字体不是写死的清单。工作台读取 Windows Fonts 目录，让用户能在一套共享
+# 字体库中搜索这台电脑真正安装的每个字体文件（包括不同粗细、窄体等变体）。
+# `system:<文件名>` 只允许解析 Windows Fonts 目录下的 basename，不能借此读取
+# 任意文件路径。
+_FONT_SUFFIXES = {".ttf", ".ttc", ".otf"}
+_CJK_FILE_HINTS = (
+    "sim", "msyh", "deng", "fang", "ming", "kai", "song", "hei", "hy",
+    "fz", "st", "yahei", "noto", "sourcehan", "hanyi",
+)
+_PROJECT_ROOT = Path(_HERE).parent
+_FONT_LIBRARY_JSON = _PROJECT_ROOT / "assets" / "font-library.json"
+# 用户当前决定此工作台只在本机自用，因此个人授权字体也统一收在项目内。
+# 若未来重新开源，.gitignore 会阻止 personal 目录进入版本库。
+_PRIVATE_FONT_DIR = Path(os.environ.get("MINUET_PRIVATE_FONTS_DIR") or
+                         (_PROJECT_ROOT / "assets" / "fonts" / "personal"))
+_PRIVATE_FONT_LIBRARY_JSON = _PRIVATE_FONT_DIR / "font-library.json"
+
+
+def private_font_dir() -> Path:
+    """返回个人字体目录；Git 会忽略其中的授权字体文件。"""
+    _PRIVATE_FONT_DIR.mkdir(parents=True, exist_ok=True)
+    return _PRIVATE_FONT_DIR
+
+
+def _private_font_metadata() -> dict[str, dict]:
+    """用户为个人字体登记显示名与字形覆盖；文件可仍保持原来的英文名。"""
+    try:
+        data = json.loads(_PRIVATE_FONT_LIBRARY_JSON.read_text(encoding="utf-8-sig"))
+    except (OSError, ValueError):
+        data = {}
+    return {str(item.get("file")): item for item in (data.get("fonts") or [])
+            if isinstance(item, dict) and item.get("file")}
+
+
+@lru_cache(maxsize=1)
+def builtin_font_catalog() -> tuple[dict, ...]:
+    """读取随项目分发、许可证已记录的字体；不依赖部署者电脑。"""
+    try:
+        data = json.loads(_FONT_LIBRARY_JSON.read_text(encoding="utf-8-sig"))
+    except (OSError, ValueError):
+        data = {}
+    rows = []
+    for item in data.get("fonts") or []:
+        if not isinstance(item, dict):
+            continue
+        rel = str(item.get("file") or "")
+        path = _PROJECT_ROOT / "assets" / rel
+        if not path.is_file() or path.suffix.lower() not in _FONT_SUFFIXES:
+            continue
+        try:
+            ImageFont.truetype(str(path), 16)
+        except Exception:
+            continue
+        family = str(item.get("family") or path.stem)
+        language = str(item.get("language") or "")
+        rows.append({
+            "id": str(item.get("id") or ""),
+            "name": str(item.get("displayName") or family),
+            "style": str(item.get("style") or "normal"),
+            "filename": rel,
+            "group": "内置开源字体",
+            "language": "CJK" if language.startswith("zh") else "Latin",
+            "category": str(item.get("category") or "sans"),
+            "face": '"%s", sans-serif' % family.replace('"', ""),
+            "meta": "%s · 可随项目分发" % str(item.get("category") or "font"),
+        })
+    return tuple(row for row in rows if row["id"])
+
+
+def _builtin_font_file(font_id: str | None) -> tuple[str | None, str | None]:
+    for item in builtin_font_catalog():
+        if item["id"] == str(font_id or ""):
+            path = _PROJECT_ROOT / "assets" / item["filename"]
+            return str(path), item["language"]
+    return None, None
+
+
+def _system_font_file(font_id: str | None) -> str | None:
+    raw = str(font_id or "")
+    if not raw.startswith("system:"):
+        return None
+    name = os.path.basename(raw.split(":", 1)[1])
+    if not name or Path(name).suffix.lower() not in _FONT_SUFFIXES:
+        return None
+    path = os.path.join(_win_fonts(), name)
+    if not os.path.isfile(path):
+        return None
+    try:
+        ImageFont.truetype(path, 16)
+    except Exception:
+        return None
+    return path
+
+
+def _private_font_file(font_id: str | None) -> str | None:
+    raw = str(font_id or "")
+    if not raw.startswith("private:"):
+        return None
+    name = os.path.basename(raw.split(":", 1)[1])
+    if not name or Path(name).suffix.lower() not in _FONT_SUFFIXES:
+        return None
+    base = private_font_dir().resolve()
+    path = (base / name).resolve()
+    if not str(path).startswith(str(base) + os.sep) or not path.is_file():
+        return None
+    try:
+        ImageFont.truetype(str(path), 16)
+    except Exception:
+        return None
+    return str(path)
+
+
+def _probably_cjk_font(name: str, filename: str) -> bool:
+    text = (name + " " + filename).lower()
+    return any("\u3400" <= ch <= "\u9fff" for ch in text) or text.startswith(_CJK_FILE_HINTS)
+
+
+def _font_category(name: str, filename: str, cjk: bool) -> str:
+    text = (name + " " + filename).lower()
+    if any(x in text for x in ("kaiti", "kai", "hand", "script", "ink", "gabriola", "caveat", "boli")):
+        return "handwriting"
+    if any(x in text for x in ("impact", "bahnschrift", "black", "condensed")):
+        return "display"
+    if any(x in text for x in ("serif", "song", "ming", "fang", "georgia", "cambria", "times", "palatino", "constantia", "sitka", "cormorant")):
+        return "serif"
+    return "sans" if not cjk or any(x in text for x in ("hei", "yahei", "deng", "sans")) else "serif"
+
+
+@lru_cache(maxsize=1)
+def system_font_catalog() -> tuple[dict, ...]:
+    """返回当前机器可实际渲染的字体目录；每项均可安全传回给前端选择。"""
+    base = Path(_win_fonts())
+    rows = []
+    try:
+        paths = sorted(base.iterdir(), key=lambda p: p.name.lower())
+    except OSError:
+        paths = []
+    for path in paths:
+        if not path.is_file() or path.suffix.lower() not in _FONT_SUFFIXES:
+            continue
+        try:
+            face = ImageFont.truetype(str(path), 16)
+            family, style = face.getname()
+        except Exception:
+            continue
+        family = str(family or path.stem).strip() or path.stem
+        style = str(style or "Regular").strip() or "Regular"
+        cjk = _probably_cjk_font(family, path.name)
+        rows.append({
+            "id": "system:" + path.name,
+            "name": family,
+            "style": style,
+            "filename": path.name,
+            "group": "本机中文字体" if cjk else "本机字体",
+            "language": "CJK" if cjk else "Unknown",
+            "category": _font_category(family, path.name, cjk),
+            # 浏览器和出图后端都在同一台电脑；浏览器用 family 预览，后端按文件精确出图。
+            "face": '"%s", sans-serif' % family.replace('"', ""),
+            "meta": "%s · 已安装" % style,
+        })
+    return tuple(rows)
+
+
+def private_font_catalog() -> tuple[dict, ...]:
+    """读取用户自行放入本机个人字体库的文件，不把文件送进项目或 Git。"""
+    base = private_font_dir()
+    metadata = _private_font_metadata()
+    rows = []
+    try:
+        paths = sorted(base.iterdir(), key=lambda p: p.name.lower())
+    except OSError:
+        paths = []
+    for path in paths:
+        if not path.is_file() or path.suffix.lower() not in _FONT_SUFFIXES:
+            continue
+        try:
+            face = ImageFont.truetype(str(path), 16)
+            family, style = face.getname()
+        except Exception:
+            continue
+        family = str(family or path.stem).strip() or path.stem
+        style = str(style or "Regular").strip() or "Regular"
+        info = metadata.get(path.name) or {}
+        language = str(info.get("language") or "")
+        cjk = language.startswith("zh") or _probably_cjk_font(family, path.name)
+        rows.append({
+            "id": "private:" + path.name,
+            "name": str(info.get("displayName") or family),
+            "style": str(info.get("style") or style),
+            "filename": path.name,
+            "group": "个人字体库（不上传）",
+            "language": "CJK" if cjk else "Unknown",
+            "category": str(info.get("category") or _font_category(family, path.name, cjk)),
+            "face": '"%s", sans-serif' % family.replace('"', ''),
+            "meta": "%s · 仅此电脑" % style,
+            "private": True,
+        })
+    return tuple(rows)
+
+
+def font_catalog() -> list[dict]:
+    """共享字体库：随项目分发的开源字体优先，其次为部署者本机字体。"""
+    return ([dict(row) for row in builtin_font_catalog()] +
+            [dict(row) for row in private_font_catalog()] +
+            [dict(row) for row in system_font_catalog()])
 
 # ContextVar 让并行的预览/正式出图互不串字体。
 _FONT_OVERRIDES: ContextVar[dict] = ContextVar("minuet_font_overrides", default={})
 _ROLE_SLOT = {
     "serif": "display", "heavy": "display",
-    "hand": "chineseCopy",
+    "artist": "artist", "hand": "chineseCopy",
     "display": "englishCopy", "editorial": "englishCopy", "hand_latin": "englishCopy",
     "sans": "metadata", "num": "metadata",
 }
@@ -125,6 +344,24 @@ def reset_font_overrides(token):
 
 
 def _preset_path(font_id: str | None, text: str | None = None) -> str | None:
+    builtin_path, builtin_language = _builtin_font_file(font_id)
+    if builtin_path:
+        if text and _has_cjk(text) and builtin_language != "CJK":
+            return None
+        return builtin_path
+    private_path = _private_font_file(font_id)
+    if private_path:
+        row = next((x for x in private_font_catalog() if x["id"] == str(font_id)), None)
+        if text and _has_cjk(text) and row and row["language"] != "CJK":
+            return None
+        return private_path
+    system_path = _system_font_file(font_id)
+    if system_path:
+        # 对无法确认字库覆盖范围的本机字体，中文仍由角色回退处理，避免输出豆腐块。
+        row = next((x for x in system_font_catalog() if x["id"] == str(font_id)), None)
+        if text and _has_cjk(text) and row and row["language"] != "CJK":
+            return None
+        return system_path
     preset = _FONT_PRESETS.get(str(font_id or ""))
     if not preset:
         return None

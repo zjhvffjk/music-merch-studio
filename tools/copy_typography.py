@@ -16,7 +16,7 @@ def normalize_copy_settings(raw):
             "conceptCopy": {k: str(concept.get(k) or "").strip() for k in ("primaryChinese", "secondaryEnglish", "shortEnglish")},
             "showBackChineseCopy": bool(raw.get("showBackChineseCopy", False)),
             "typographyStyle": str(raw.get("typographyStyle") or "auto"),
-            "copyAngle": str(raw.get("copyAngle") or "upRight"),
+            "copyAngle": str(raw.get("copyAngle") or "none"),
             "typography": {k: str(typo.get(k) or "auto") for k in ROLES}}
 
 def recommend_copy_layout(settings, design):

@@ -173,10 +173,14 @@ def make_cover_fold(inner_im, cover_im, w_px, h_px, D=None, copy_settings=None):
             d = ImageDraw.Draw(out)
             preset = DP._copy_preset(copy_settings)
             x = int(w_px * (0.94 if preset == "editorial" else 0.93))
-            y = int(h_px * (0.88 if preset == "editorial" else 0.11))
-            # true type, on the front panel only; A lower-right / B upper-right
-            DP._angled_tag(out, (x, y), tag, max(7, int(h_px * 0.027)), (55,55,55),
-                            "right", int(half * 0.46), angle=DP._copy_angle(copy_settings, D))
+            # Golden Reference: A（Editorial）在右上角呼应标题，B（Minimal）才落到底部留白。
+            # 之前把两者写反，会让 A 的英文压到原封面下沿标题上。
+            y = int(h_px * (0.11 if preset == "editorial" else 0.88))
+            tag_size, tag_w = max(7, int(h_px * 0.027)), int(half * 0.46)
+            # 长英文副文案在封面角落保持两行，绝不横跨进主体或折线。
+            for i, line in enumerate(DP.editorial_tag_lines(d, tag, tag_w, tag_size)):
+                DP._angled_tag(out, (x, y + i * int(tag_size * 1.48)), line, tag_size, (55,55,55),
+                                "right", tag_w, angle=DP._copy_angle(copy_settings, D))
     return out
 
 

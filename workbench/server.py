@@ -227,6 +227,8 @@ MIME = {
     ".zip": "application/zip",
     ".pdf": "application/pdf",
     ".ico": "image/x-icon",
+    ".ttf": "font/ttf",
+    ".otf": "font/otf",
 }
 
 
@@ -1920,6 +1922,26 @@ class Handler(BaseHTTPRequestHandler):
                 return self._file(os.path.join(HERE, "index.html"))
             if p == "/favicon.ico":
                 return self._json({}, 404)
+
+            # 工作台内置的开源字体也供浏览器字体选择器使用；只允许访问
+            # assets/fonts 目录，不能借 URL 读取项目中的其他文件。
+            if p.startswith("/font-library/"):
+                rel = unquote(p[len("/font-library/"):])
+                base = os.path.realpath(os.path.join(ROOT, "assets", "fonts"))
+                target = os.path.realpath(os.path.join(base, rel))
+                if not target.startswith(base + os.sep) or not os.path.isfile(target):
+                    return self._json({"error": "not found"}, 404)
+                return self._file(target)
+
+            # 用户的个人授权字体只存在于当前 Windows 用户目录，供本机预览和出图；
+            # 目录不在仓库中，也不会进入任何导出或上传流程。
+            if p.startswith("/private-font-library/"):
+                rel = unquote(p[len("/private-font-library/"):])
+                base = os.path.realpath(str(DSDESIGN.TYPO.private_font_dir()))
+                target = os.path.realpath(os.path.join(base, rel))
+                if not target.startswith(base + os.sep) or not os.path.isfile(target):
+                    return self._json({"error": "not found"}, 404)
+                return self._file(target)
 
             if p.startswith("/assets/"):
                 rest = unquote(p[len("/assets/"):])

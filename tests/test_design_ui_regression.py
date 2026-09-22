@@ -11,6 +11,12 @@ class DesignUiRegressionTests(unittest.TestCase):
         self.assertIn("const el=$('#'+id); if(!el)return;", html)
         self.assertIn("syncRail();\n  syncBuildEnabled();\n\n  const fu", html)
         self.assertIn('<button id="btnBuild" class="btn">生成三件套</button>', html)
+        self.assertIn('id="fontArtist"', html)
+        self.assertIn("artist:fontValue('fontArtist')", html)
+        self.assertIn('const CJK_FONT_TARGETS', html)
+        self.assertIn('不支持中文', html)
+        self.assertIn('@font-face{font-family:"Ma Shan Zheng"', html)
+        self.assertIn("['private','个人字体']", html)
 
 if __name__ == '__main__':
     unittest.main()
