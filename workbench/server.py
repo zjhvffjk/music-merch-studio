@@ -1542,6 +1542,7 @@ def pick_source(artist, mode, want):
     直接出图就是错的。
     """
     src_used, ar, pool, notes = None, None, [], []
+    fallback_ar, fallback_pool = None, []
     if mode not in ("auto", "163", "qq"):
         mode = "auto"
 
@@ -1564,21 +1565,29 @@ def pick_source(artist, mode, want):
                 src_used = "163"
             else:
                 notes.append(f"⚠ 低于 {LEAD_MIN:.0%} —— 该歌手版权不在网易云"
-                             f"（榜单混入他人作品 / Live 合唱），自动改用 QQ音乐")
+                             f"（榜单混入他人作品 / Live 合唱），尝试 QQ音乐补全")
+                # QQ 临时不可用时，仍可返回网易云的可用结果，不能让搜索变成 500。
+                fallback_ar, fallback_pool = ar, pool
                 ar, pool = None, []
         else:
             notes.append("网易云没有这位歌手")
             ar = None
 
     if not pool and mode in ("auto", "qq"):
-        qmid, qname = search_singer_mid(artist)
-        if qmid:
-            ar = {"id": qmid, "name": qname}
-            pool = hot_songs_q(qmid, want)
-            if pool:
-                src_used = "qq"
-        if not pool:
-            notes.append("QQ音乐也没找到可用歌曲")
+        try:
+            qmid, qname = search_singer_mid(artist)
+            if qmid:
+                ar = {"id": qmid, "name": qname}
+                pool = hot_songs_q(qmid, want)
+                if pool:
+                    src_used = "qq"
+            if not pool:
+                notes.append("QQ音乐也没找到可用歌曲")
+        except Exception as e:
+            notes.append(f"⚠ QQ音乐接口异常：{type(e).__name__}: {e}")
+            if mode == "auto" and fallback_pool:
+                ar, pool, src_used = fallback_ar, fallback_pool, "163"
+                notes.append("已暂用网易云结果；QQ音乐恢复后会自动优先使用 QQ 数据")
 
     return src_used, ar, pool or [], notes
 

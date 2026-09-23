@@ -64,6 +64,14 @@ class FontLibraryTests(unittest.TestCase):
             typo.reset_font_overrides(token)
         self.assertEqual('MaShanZheng-Regular.ttf', Path(path).name)
 
+    def test_selected_spine_font_resolves_to_real_file(self):
+        token = typo.set_font_overrides({'spine': 'builtin:zhi-mang-xing'})
+        try:
+            path = typo.resolved_font_path('spine', '如果呢')
+        finally:
+            typo.reset_font_overrides(token)
+        self.assertEqual('ZhiMangXing-Regular.ttf', Path(path).name)
+
     def test_selected_system_font_resolves_to_the_same_installed_file(self):
         catalog = typo.system_font_catalog()
         selected = next(x for x in catalog if x['filename'].lower() == 'arial.ttf')
@@ -74,11 +82,14 @@ class FontLibraryTests(unittest.TestCase):
             typo.reset_font_overrides(token)
         self.assertEqual('arial.ttf', Path(path).name.lower())
 
-    def test_private_font_directory_is_project_local_but_gitignored(self):
+    def test_private_font_directory_is_project_local_and_deployable(self):
         private_dir = typo.private_font_dir().resolve()
         self.assertEqual((ROOT / 'assets' / 'fonts' / 'personal').resolve(), private_dir)
         ignore = (ROOT / '.gitignore').read_text(encoding='utf-8')
-        self.assertIn('/assets/fonts/personal/', ignore)
+        # 用户决定此工作台在另一台电脑也要带上同一套字体，因此个人字体目录
+        # 是私有仓库的一部分，不能再被 .gitignore 排除。
+        self.assertNotIn('/assets/fonts/personal/', ignore)
+        self.assertGreaterEqual(len(typo.private_font_catalog()), 5)
 
 
 if __name__ == '__main__':

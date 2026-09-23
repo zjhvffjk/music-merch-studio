@@ -68,7 +68,7 @@ def _candidates(role: str) -> list[str]:
                 ("msyhbd.ttc", "HYZhongHeiTi-197.ttf", "simhei.ttf", "Dengb.ttf")] + [
                 "/System/Library/Fonts/PingFang.ttc",
                 "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc"]
-    if role == "sans":                        # 中文常规黑
+    if role in ("sans", "spine"):             # 中文常规黑 / 侧封自定义文字
         return [os.path.join(win, x) for x in
                 ("msyh.ttc", "Deng.ttf", "NotoSansSC-VF.ttf", "simhei.ttf")] + [
                 "/System/Library/Fonts/PingFang.ttc",
@@ -127,15 +127,15 @@ _CJK_FILE_HINTS = (
 )
 _PROJECT_ROOT = Path(_HERE).parent
 _FONT_LIBRARY_JSON = _PROJECT_ROOT / "assets" / "font-library.json"
-# 用户当前决定此工作台只在本机自用，因此个人授权字体也统一收在项目内。
-# 若未来重新开源，.gitignore 会阻止 personal 目录进入版本库。
+# 用户当前决定工作台通过私有仓库部署到个人电脑，因此个人字体也随项目保存。
+# 若未来改为公开发布，须先逐款复核授权后再决定是否保留这些文件。
 _PRIVATE_FONT_DIR = Path(os.environ.get("MINUET_PRIVATE_FONTS_DIR") or
                          (_PROJECT_ROOT / "assets" / "fonts" / "personal"))
 _PRIVATE_FONT_LIBRARY_JSON = _PRIVATE_FONT_DIR / "font-library.json"
 
 
 def private_font_dir() -> Path:
-    """返回个人字体目录；Git 会忽略其中的授权字体文件。"""
+    """返回项目内的个人字体目录，供私有部署的电脑共享使用。"""
     _PRIVATE_FONT_DIR.mkdir(parents=True, exist_ok=True)
     return _PRIVATE_FONT_DIR
 
@@ -280,7 +280,7 @@ def system_font_catalog() -> tuple[dict, ...]:
 
 
 def private_font_catalog() -> tuple[dict, ...]:
-    """读取用户自行放入本机个人字体库的文件，不把文件送进项目或 Git。"""
+    """读取用户自行放入项目内个人字体库的文件。"""
     base = private_font_dir()
     metadata = _private_font_metadata()
     rows = []
@@ -306,7 +306,7 @@ def private_font_catalog() -> tuple[dict, ...]:
             "name": str(info.get("displayName") or family),
             "style": str(info.get("style") or style),
             "filename": path.name,
-            "group": "个人字体库（不上传）",
+            "group": "个人字体",
             "language": "CJK" if cjk else "Unknown",
             "category": str(info.get("category") or _font_category(family, path.name, cjk)),
             "face": '"%s", sans-serif' % family.replace('"', ''),
@@ -328,7 +328,7 @@ _ROLE_SLOT = {
     "serif": "display", "heavy": "display",
     "artist": "artist", "hand": "chineseCopy",
     "display": "englishCopy", "editorial": "englishCopy", "hand_latin": "englishCopy",
-    "sans": "metadata", "num": "metadata",
+    "sans": "metadata", "num": "metadata", "spine": "spine",
 }
 
 
@@ -402,6 +402,21 @@ def font(role: str, size: int, text: str | None = None):
     if got is not None:
         return got
     f = _load(role, size, path)
+    _cache[key] = f
+    return f
+
+
+def font_from_id(font_id: str | None, size: int, text: str | None = None, fallback_role: str = "spine"):
+    """直接按字体库 id 取字形，供同一张图中的独立文字编辑区使用。"""
+    size = max(6, int(size))
+    path = _preset_path(font_id, text)
+    if not path:
+        return font(fallback_role, size, text)
+    key = (fallback_role, size, bool(text and _has_cjk(text)), path)
+    got = _cache.get(key)
+    if got is not None:
+        return got
+    f = _load(fallback_role, size, path)
     _cache[key] = f
     return f
 

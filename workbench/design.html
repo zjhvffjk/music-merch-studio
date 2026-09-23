@@ -14,6 +14,7 @@
 @font-face{font-family:"DM Sans";src:url("/font-library/english/DMSans-opsz-wght.ttf") format("truetype");font-style:normal;font-weight:100 1000;font-display:swap}
 @font-face{font-family:"Caveat";src:url("/font-library/handwriting/Caveat-wght.ttf") format("truetype");font-style:normal;font-weight:400 700;font-display:swap}
 *{box-sizing:border-box}
+.srOnly{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 /* 🔴 hidden 属性会被作者样式里的 display:flex/grid 覆盖（UA 的 [hidden] 优先级更低），
    必须显式兜底，否则「等待封面…」这类占位在图片出来后仍然显示。 */
 [hidden]{display:none !important}
@@ -31,7 +32,9 @@ h2{font-size:16px;margin:0}h3{font-size:12px;margin:0;letter-spacing:1px;color:v
   font-weight:600;transition:.15s}
 .mods button:hover{color:var(--ink)}
 .mods button.on{background:var(--card);color:var(--brand);box-shadow:0 1px 3px rgba(20,25,40,.10)}
-.top .sp{flex:1}
+.top .sp{flex:1}.editorRibbon{flex:1 1 680px;min-width:0;display:flex;align-items:center}
+.editorRibbon #spineEditorDock{width:100%;display:flex;align-items:center;gap:8px;min-width:0}.editorRibbon .spineEditorTabs{margin:0;flex:none}.editorRibbon .spineEditorTab{padding:6px 9px;font-size:11px}.editorRibbon .field{margin:0;flex:0 1 210px}.editorRibbon .field>input{margin:0;min-height:36px}.editorRibbon .spineToolbar{margin:0;padding:0;border:0;background:transparent;position:static;flex:1;min-width:360px;flex-wrap:nowrap}.editorRibbon .spineToolbar .fontSelect{min-width:128px}.editorRibbon .spineFormatBtn,.editorRibbon .spineColorBtn{width:31px;height:31px}.editorRibbon .spineCustomColorButton{width:38px;height:31px}.editorRibbon .spineColorBtn[data-spine-color="auto"]{width:46px;font-size:10px}
+.editorRibbon{display:flex;align-items:stretch;gap:0;flex-wrap:wrap;border:1px solid var(--line);border-radius:10px;background:#fff;overflow:hidden}.editorRibbon .ribbonDock,.editorRibbon #spineEditorDock{padding:7px 10px;border-right:1px solid var(--line);min-width:0}.editorRibbon .ribbonDock>b{display:block;font-size:10px;color:var(--muted);letter-spacing:.35px;margin-bottom:4px}.ribbonObjectButtons,.ribbonView{display:flex;align-items:center;gap:5px}.ribbonObjectButtons button,.ribbonView button{border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink);padding:5px 7px;font:600 11px inherit;white-space:nowrap}.ribbonObjectButtons button:hover,.ribbonObjectButtons button.on,.ribbonView button:hover{border-color:var(--brand);color:var(--brand);background:#f4faf5}.ribbonView{flex-wrap:wrap}.ribbonView label{font-size:11px;color:var(--muted);white-space:nowrap}.editorRibbon #backLayoutDock{width:305px}.editorRibbon #backLayoutDock .templateFieldTitle,.editorRibbon #spineTemplateDock .templateFieldTitle,.editorRibbon #fontDock .templateFieldTitle{font-size:10px;color:var(--muted);margin:0}.editorRibbon #backLayoutDock .templateFieldTitle span,.editorRibbon #spineTemplateDock .templateFieldTitle span,.editorRibbon #fontDock .templateFieldTitle span{display:none}.editorRibbon #backLayoutDock .backLayoutChoices{gap:4px;margin-top:4px;flex-wrap:nowrap}.editorRibbon #backLayoutDock .backLayoutChoice{width:92px;min-height:45px;padding:4px}.editorRibbon #backLayoutDock .backLayoutChoice b{font-size:10px;margin:0}.editorRibbon #backLayoutDock .backLayoutChoice small,.editorRibbon #backLayoutDock .backLayoutMini{display:none}.editorRibbon #spineTemplateDock{width:360px}.editorRibbon #spineTemplateDock .spineTemplateRows{gap:5px;margin-top:4px}.editorRibbon #spineTemplateDock .spineTemplateGroup>strong{font-size:10px;margin-bottom:2px}.editorRibbon #spineTemplateDock .spineTemplateGroup>small{display:none}.editorRibbon #spineTemplateDock .spineSelect{min-height:31px;margin-top:0;padding:0 5px;font-size:10.5px}.editorRibbon #fontDock{width:min(100%,1000px)}.editorRibbon #fontDock .fieldGrid{grid-template-columns:repeat(8,minmax(88px,1fr));gap:5px}.editorRibbon #fontDock .fontRole label{font-size:10px;margin:0 0 3px}.editorRibbon #fontDock .fontSelect{min-height:31px;padding:4px 6px}.editorRibbon #fontDock .fontSelect .sample{font-size:12px}.editorRibbon #fontDock .muted{display:none}.editorRibbon #spineEditorDock{width:100%;background:#fbfcfb;border-right:0}.editorRibbon #spineEditorDock .field{flex:0 1 200px}.editorRibbon #spineEditorDock .field>input{font-size:12px}.editorRibbon #spineEditorDock .spineToolbar{background:transparent}@media(max-width:1180px){.editorRibbon{margin-top:4px}.editorRibbon #fontDock{width:100%}.editorRibbon #spineEditorDock{flex-wrap:wrap}.editorRibbon #spineEditorDock .spineToolbar{flex-wrap:wrap}}
 .top .back{font-size:12.5px;color:var(--muted);white-space:nowrap}
 
 /* ---------- 三栏 ---------- */
@@ -39,7 +42,8 @@ h2{font-size:16px;margin:0}h3{font-size:12px;margin:0;letter-spacing:1px;color:v
   max-width:1620px;margin:0 auto;padding:18px 3vw 70px}
 .mod#mod-design{display:grid;grid-template-columns:minmax(390px,1fr) minmax(430px,.94fr);gap:0 16px;align-items:start}
 #mod-design>#dataCard,#mod-design>#aiCard{grid-column:1}
-#mod-design>#resCard{grid-column:2;grid-row:1 / span 2;position:sticky;top:80px;margin-bottom:16px}
+#mod-design>#resCard{grid-column:1 / -1;grid-row:1;position:static;margin-bottom:16px}
+#mod-design>#dataCard{grid-row:2}#mod-design>#aiCard{grid-row:3}
 .rail,.insp{position:sticky;top:80px;display:flex;flex-direction:column;gap:14px;min-width:0}
 .rblk,.card{background:var(--card);border:1px solid var(--line);border-radius:14px}
 .rblk{padding:14px}
@@ -133,6 +137,8 @@ label.field{display:block;margin:11px 0 0;font-size:12.5px;color:var(--muted)}
 .backLayoutChoice b{display:block;font-size:12px;margin-bottom:5px}.backLayoutChoice small{font-size:10.5px;color:var(--muted)}
 .backLayoutMini{height:31px;border:1px solid #c9cdca;background:#fafbf8;margin-bottom:5px;position:relative;overflow:hidden}
 .backLayoutMini i{position:absolute;height:2px;background:#4b5154;opacity:.65}.backLayoutMini .title{left:8px;top:5px;width:38px;height:3px}.backLayoutMini .n1{left:8px;top:13px;width:48px}.backLayoutMini .n2{left:8px;top:18px;width:48px}.backLayoutMini .n3{left:8px;top:23px;width:48px}.backLayoutMini.double .n1{left:8px;width:28px}.backLayoutMini.double .n2{left:8px;width:28px}.backLayoutMini.double .n3{left:8px;width:28px}.backLayoutMini.double .r1{left:58px;top:13px;width:28px}.backLayoutMini.double .r2{left:58px;top:18px;width:28px}.backLayoutMini.double .r3{left:58px;top:23px;width:28px}
+/* 三条窄封固定模板：缩略图只表达文字职责，实际底图仍由相邻面板延展。 */
+.spineTemplateField{margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}.spineTemplateRows{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:8px}.spineTemplateGroup{min-width:0}.spineTemplateGroup>strong{display:block;font-size:12px;margin:0 0 6px}.spineTemplateGroup>small{display:block;color:var(--muted);font-size:10.5px;min-height:29px}.spineSelect{width:100%;margin-top:7px;min-height:40px;border:1px solid var(--line);border-radius:8px;background:#fff;padding:0 9px;color:var(--ink);font:inherit;font-size:12px}.spineSelect:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 2px rgba(200,16,46,.10)}.spineEditorTabs{display:flex;gap:6px;margin:8px 0}.spineEditorTab{border:1px solid var(--line);border-radius:7px;background:#fff;padding:7px 11px;font:inherit;font-size:12px;cursor:pointer}.spineEditorTab.on{border-color:var(--brand);color:var(--brand);background:#fff7f8}.spineToolbar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:8px;padding:9px;border:1px solid var(--line);border-radius:9px;background:#fbfcfb;position:sticky;top:8px;z-index:4}.spineToolbar .fontSelect{min-width:150px;flex:1}.spineSize{width:82px;min-height:36px;border:1px solid var(--line);border-radius:6px;padding:0 7px;background:#fff;color:var(--ink);font:inherit;cursor:pointer}.spineFormatBtn,.spineColorBtn{width:36px;height:36px;border:1px solid var(--line);border-radius:6px;background:#fff;cursor:pointer;font:700 16px Georgia,serif}.spineFormatBtn.on,.spineColorBtn.on{border-color:var(--brand);box-shadow:0 0 0 2px rgba(200,16,46,.12)}.spineColorBtn{font-size:0}.spineColorBtn[data-spine-color="auto"]{font:600 11px inherit;width:52px}.spineCustomColorButton{position:relative;width:42px;height:36px;display:grid;place-items:center;border:1px solid var(--line);border-radius:6px;background:linear-gradient(135deg,#fff 0 44%,#e8d7bd 44% 58%,#c8102e 58% 73%,#111 73%);color:#1d2721;font:600 10px inherit;cursor:pointer;overflow:hidden}.spineCustomColorButton span{position:relative;padding:1px 3px;border-radius:3px;background:rgba(255,255,255,.86)}.spineCustomColorButton input{position:absolute;inline-size:1px;block-size:1px;opacity:0}.spineWorkspace{margin-top:10px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#e9eeea}.spineWorkspaceHead{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 12px;background:#fff;border-bottom:1px solid var(--line);font-size:12px}.spineWorkspaceHead b{font-size:13px}.spineWorkspaceHead small{color:var(--muted)}.spineLargeCanvas{height:min(68vh,720px);min-height:520px;display:flex;align-items:center;justify-content:center;padding:22px;overflow:hidden;background:radial-gradient(circle at 50% 38%,#fff 0,#f0f3ef 62%,#e1e7e1 100%)}.spineCanvasCrop{height:calc(min(68vh,720px) - 50px);min-height:470px;position:relative;overflow:hidden;background:#fff;border:1px solid #9ba39c;box-shadow:0 12px 28px rgba(32,42,36,.20)}.spineCanvasCrop img{position:absolute;top:0;max-width:none;display:block;image-rendering:auto}.spineCanvasEmpty{font-size:13px;color:var(--muted)}@media(max-width:780px){.spineTemplateRows{grid-template-columns:1fr}.spineLargeCanvas{height:540px;min-height:420px}.spineCanvasCrop{height:390px;min-height:390px}}
 /* AI 槽 */
 .aiSlot{border:1px dashed var(--line);border-radius:10px;padding:12px;margin-top:10px;display:flex;gap:12px;align-items:center}
 .aiSlot img{width:74px;height:74px;object-fit:cover;border-radius:8px;border:1px solid var(--line);display:block}
@@ -143,9 +149,9 @@ label.field{display:block;margin:11px 0 0;font-size:12.5px;color:var(--muted)}
 .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--muted);margin-bottom:12px}
 .legend span{display:flex;align-items:center;gap:6px}
 .legend i{width:16px;height:0;border-top:2px dashed #999;display:block}
-.stage{background:#e9ece6;border:1px solid var(--line);border-radius:12px;padding:26px 22px;
-  overflow:hidden;width:100%;max-width:100%;box-sizing:border-box}
-.stageCanvas{width:max-content;zoom:.82}
+.stage{background:#e9ece6;border:1px solid var(--line);border-radius:12px;padding:34px 30px;
+  overflow:auto;width:100%;max-width:100%;box-sizing:border-box;min-height:700px}
+.stageCanvas{width:max-content;zoom:1.35}
 .stageRow{cursor:zoom-in}
 .stageRow{display:flex;gap:22px;align-items:center;margin-bottom:26px}
 .stageRow:last-child{margin-bottom:0}
@@ -265,7 +271,24 @@ body.embed .proj .t small{display:none}   /* 外层已有专辑名，这里不�
   body.embed .rail .rblk,body.embed .insp .card{flex:1 1 240px}
 }
 @media(max-width:560px){.fieldGrid{grid-template-columns:1fr}}
-</style></head><body class="guides">
+/* 紧凑分页工具栏：一次只呈现一组工具，给下方三件套预览让出空间。 */
+.top{padding:0 3vw 5px;min-height:0;gap:0 14px;flex-wrap:wrap;background:var(--card)}
+.top .brand,.top .mods,.top .back{margin-top:7px;margin-bottom:5px}.top .back{margin-left:auto}
+.top .sp{display:none}
+.editorRibbon{order:3;flex:0 0 100%;width:100%;min-width:0;height:112px;display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:28px minmax(0,1fr);align-items:stretch;overflow:hidden;border:0;border-radius:0;background:transparent}
+.ribbonTabs{display:flex;flex-direction:row;align-items:center;gap:2px;padding:3px 2px;background:transparent;border-bottom:1px solid var(--line)}
+.ribbonTabs button{align-self:stretch;border:0;border-radius:5px;background:transparent;color:var(--muted);font:600 12px inherit;padding:3px 13px;white-space:nowrap;cursor:pointer}
+.ribbonTabs button:hover{background:#f1f5f1;color:var(--brand)}.ribbonTabs button.on{background:#eaf4ec;color:var(--brand)}
+.ribbonPanel{display:none;align-items:flex-start;gap:0;min-width:0;padding:7px 2px;overflow-x:auto;overflow-y:hidden;background:transparent}.ribbonPanel.on{display:flex}
+.ribbonPanel::-webkit-scrollbar{height:4px}.ribbonPanel::-webkit-scrollbar-thumb{background:#d6ddd6;border-radius:4px}
+.editorRibbon .ribbonDock,.editorRibbon #spineEditorDock{align-self:stretch;flex:none;min-width:0;margin:0;padding:0 10px;border:0;border-right:1px solid #e2e6e1;background:transparent}
+.editorRibbon .ribbonDock:last-child{border-right:0}.editorRibbon #backLayoutDock{width:280px}.editorRibbon #spineTemplateDock{width:340px}.editorRibbon #fontDock{width:min(100%,1000px)}.editorRibbon #fontDock .fieldGrid{grid-template-columns:repeat(8,minmax(0,1fr));gap:4px}.editorRibbon #spineEditorDock{width:max-content;display:flex;align-items:center;gap:7px;border-right:0}
+.editorRibbon #backLayoutDock .backLayoutChoices{margin-top:3px}.editorRibbon #backLayoutDock .backLayoutChoice{width:84px;min-height:42px}.editorRibbon #spineTemplateDock .spineTemplateRows{margin-top:3px}.editorRibbon #fontDock .fieldGrid{grid-template-columns:repeat(8,minmax(0,1fr));gap:4px}
+.editorRibbon #spineEditorDock .spineToolbar{flex:0 0 auto;min-width:0}.editorRibbon #spineEditorDock .field{flex:0 1 220px}.editorRibbon #spineEditorDock .spineEditorTabs{margin:0}.editorRibbon #spineEditorDock .spineEditorTab{padding:6px 8px}
+.editorRibbon #spineEditorDock .spineEditorTabs,.editorRibbon #spineEditorDock .field{padding-right:10px;border-right:1px solid #e2e6e1}.editorRibbon #spineEditorDock .spineToolbar{padding-left:2px}
+.editorRibbon #spineEditorDock #spineTemplateDock{width:178px;display:flex;align-items:center;padding:0 10px;border-right:1px solid #e2e6e1}.spineTemplateCurrent{display:block;width:100%}.editorRibbon .spineTemplateCurrent>.input{display:block;width:100%;min-height:36px;margin:0;padding:0 7px;border-radius:6px;font-size:11px}
+@media(max-width:1180px){.top{flex-wrap:wrap}.editorRibbon{order:3;flex-basis:100%}.ribbonPanel{padding:6px}.editorRibbon #fontDock{width:100%}}
+.formatTooltip{position:fixed;z-index:1000;max-width:220px;padding:9px 11px;border:1px solid #bdc6be;border-radius:7px;background:#fff;box-shadow:0 8px 20px rgba(23,35,28,.18);color:var(--ink);font-size:12px;line-height:1.45;pointer-events:none}.formatTooltip[hidden]{display:none}.formatTooltip b{display:block;margin-bottom:2px;font-size:12px}.formatTooltip span{display:block;color:var(--muted);font-size:11px}.spineColorMenu{position:relative}.spineColorMenuButton{--spine-color:#111;display:flex;align-items:center;gap:4px;width:43px;height:31px;padding:0 5px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink);cursor:pointer;font:700 17px Georgia,serif}.spineColorMenuButton:hover,.spineColorMenuButton[aria-expanded="true"]{border-color:var(--brand)}.spineColorMenuButton i{width:15px;height:4px;margin-top:12px;margin-left:-15px;background:var(--spine-color);border-radius:1px}.spineColorMenuButton svg{width:10px;height:10px;margin-left:auto;font:400 12px inherit}.spineColorPopover{position:fixed;z-index:1001;width:242px;padding:8px;border:1px solid #cdd5ce;border-radius:8px;background:#fff;box-shadow:0 12px 26px rgba(23,35,28,.20)}.spineColorPopover[hidden]{display:none}.spineColorAuto,.spineMoreColor{width:100%;display:flex;align-items:center;gap:8px;border:0;border-radius:5px;background:transparent;padding:7px 8px;color:var(--ink);font:600 12px inherit;text-align:left;cursor:pointer}.spineColorAuto:hover,.spineMoreColor:hover{background:#f0f5f0}.spineColorAuto i{width:14px;height:14px;border:1px solid #d7ddd8;background:linear-gradient(135deg,#111 0 50%,#fff 50%)}.spineColorPopover>b{display:block;margin:5px 0 6px;padding:5px 8px;background:#f2f4f2;color:var(--muted);font-size:11px}.spineColorGrid{display:grid;grid-template-columns:repeat(6,1fr);gap:5px;padding:2px 8px 8px}.spineColorGrid button{width:25px;height:22px;border:1px solid #d8ded9;border-radius:2px;background:var(--swatch);cursor:pointer}.spineColorGrid button:hover,.spineColorGrid button.on,.spineColorAuto.on{outline:2px solid var(--brand);outline-offset:1px}.spineCustomDialog{position:fixed;z-index:1010;inset:0;display:grid;place-items:center;padding:18px;background:rgba(20,30,24,.28)}.spineCustomDialog[hidden]{display:none}.spineCustomCard{width:min(330px,calc(100vw - 36px));padding:16px;border:1px solid #cdd5ce;border-radius:10px;background:#fff;box-shadow:0 18px 44px rgba(16,28,20,.28)}.spineCustomCard h3{margin:0 0 12px;color:var(--ink);font-size:14px;letter-spacing:0}.spineCustomCard p{margin:0 0 12px;color:var(--muted);font-size:12px}.spineCustomSwatches{display:grid;grid-template-columns:repeat(8,1fr);gap:7px;margin-bottom:14px}.spineCustomSwatches button{width:29px;height:27px;border:1px solid #d8ded9;border-radius:4px;background:var(--swatch);cursor:pointer}.spineCustomSwatches button:hover,.spineCustomSwatches button.on{outline:2px solid var(--brand);outline-offset:1px}.spineHexRow{display:flex;align-items:center;gap:8px;margin-bottom:14px}.spineHexPreview{width:30px;height:30px;flex:none;border:1px solid var(--line);border-radius:5px;background:#111}.spineHexRow input{min-width:0;flex:1;height:32px;border:1px solid var(--line);border-radius:6px;padding:0 9px;font:600 13px ui-monospace,Consolas,monospace;text-transform:uppercase}.spineHexRow input:focus{outline:0;border-color:var(--brand);box-shadow:0 0 0 2px rgba(31,90,67,.13)}.spineCustomActions{display:flex;justify-content:flex-end;gap:7px}.spineCustomActions button{height:32px;padding:0 12px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink);font:600 12px inherit}.spineCustomActions button:last-child{border-color:var(--brand);background:var(--brand);color:#fff}</style></head><body class="guides">
 <header class="top">
   <a href="/" class="brand">Minuet</a>
   <nav class="mods" id="mods">
@@ -273,6 +296,14 @@ body.embed .proj .t small{display:none}   /* 外层已有专辑名，这里不�
     <button data-mod="print">打印制作</button>
     <button data-mod="export">导出</button>
   </nav>
+  <div class="editorRibbon" id="editorRibbon" aria-label="设计工具栏">
+    <div class="ribbonTabs" role="tablist"><button type="button" class="on" data-ribbon-tab="side">侧封</button><button type="button" data-ribbon-tab="layout">排版</button><button type="button" data-ribbon-tab="font">字体</button><button type="button" data-ribbon-tab="object">对象</button><button type="button" data-ribbon-tab="view">预览</button></div>
+    <div class="ribbonPanel" data-ribbon-panel="object"><div class="ribbonDock ribbonObjects"><b>编辑对象</b><div class="ribbonObjectButtons"><button type="button" data-canvas-part="disc">① 盘面</button><button type="button" data-canvas-part="booklet">② 封面</button><button type="button" data-canvas-part="sleeve">③ 封底条</button></div></div></div>
+    <div class="ribbonPanel" data-ribbon-panel="layout"></div>
+    <div class="ribbonPanel" data-ribbon-panel="font"></div>
+    <div class="ribbonPanel on" data-ribbon-panel="side"></div>
+    <div class="ribbonPanel" data-ribbon-panel="view"><div class="ribbonDock ribbonView"><b>预览</b><button id="btnRibbonZoom" type="button">放大画布</button><label><input type="checkbox" id="cbRibbonGuides" checked> 辅助线</label><button id="btnRibbonDetails" type="button">资料与曲目</button></div></div>
+  </div>
   <span class="sp"></span>
   <a href="/" class="back" id="backLnk">← 音乐卡片工坊</a>
 </header>
@@ -318,9 +349,9 @@ body.embed .proj .t small{display:none}   /* 外层已有专辑名，这里不�
         <div class="body">
           <label class="field">专辑名<input id="album" class="input"></label>
           <label class="field">歌手<input id="artist" class="input"></label>
-          <label class="field">厂牌（可选）<input id="company" class="input" placeholder="留空则不出厂牌行"></label>
+          <label class="field">厂牌<input id="company" class="input" placeholder="抓取不到时自动填入 Good Life Music Co., Ltd."></label>
           <label class="field">曲目列表（一行一首；按 Enter 换到下一首）<textarea id="tracks" rows="5" placeholder="曲名 01&#10;曲名 02&#10;曲名 03"></textarea></label>
-          <div class="backLayoutField">
+          <div class="backLayoutField ribbonDock" id="backLayoutDock">
             <div class="templateFieldTitle">封底排版 <span id="backLayoutHint">自动会按曲目数和歌名长度推荐</span></div>
             <div class="backLayoutChoices" id="backLayoutChoices">
               <button type="button" class="backLayoutChoice on" data-back-layout="auto"><b>自动推荐</b><small>固定规则，不随机</small></button>
@@ -328,21 +359,44 @@ body.embed .proj .t small{display:none}   /* 外层已有专辑名，这里不�
               <button type="button" class="backLayoutChoice" data-back-layout="double"><div class="backLayoutMini double"><i class="title"></i><i class="n1"></i><i class="n2"></i><i class="n3"></i><i class="r1"></i><i class="r2"></i><i class="r3"></i></div><b>○ 双列版</b><small>01–05｜06–10</small></button>
             </div>
           </div>
+          <div class="ribbonDock" id="spineTemplateDock"><label class="spineTemplateCurrent"><span class="srOnly">当前侧封模板文字</span><input id="spineTextEditor" class="input" maxlength="14" placeholder="点击修改当前模板文字" data-tooltip-title="当前侧封文字" data-tooltip-detail="修改所选侧封上显示的专辑名、歌手名或自定义内容。"></label></div>
           <details class="adv templateFields">
             <summary>文案、字体与条码（自动生成，可选修改）</summary>
             <div class="advancedBody">
             <div class="templateFieldTitle">固定模板内容 <span>这些字段会实时套入对应部件</span></div>
             <label class="field">内页文案（出现在 ② 左页）<textarea id="innerCopy" rows="2" maxlength="80" placeholder="例如：把平凡的日子，过成喜欢的样子。"></textarea></label>
-            <div class="templateFieldTitle">字体 <span>选择后立即套入预览与正式出件</span></div>
+            <div class="ribbonDock" id="fontDock"><span class="srOnly">字体设置</span>
             <div class="fieldGrid">
-              <div class="fontRole"><label>专辑标题</label><input id="fontDisplay" type="hidden" value="auto"><button class="fontSelect" type="button" data-font-for="fontDisplay"><span class="sample">自动跟随封面</span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3 6 5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button></div>
+              <div class="fontRole"><label>专辑标题</label><input id="fontDisplay" type="hidden" value="auto"><button class="fontSelect" type="button" data-font-for="fontDisplay"><span class="sample">自动</span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3 6 5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button></div>
               <div class="fontRole"><label>歌手名字</label><input id="fontArtist" type="hidden" value="auto"><button class="fontSelect" type="button" data-font-for="fontArtist"><span class="sample">自动</span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3 6 5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button></div>
               <div class="fontRole"><label>中文文案</label><input id="fontChineseCopy" type="hidden" value="auto"><button class="fontSelect" type="button" data-font-for="fontChineseCopy"><span class="sample">自动</span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3 6 5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button></div>
               <div class="fontRole"><label>英文文案</label><input id="fontEnglishCopy" type="hidden" value="auto"><button class="fontSelect" type="button" data-font-for="fontEnglishCopy"><span class="sample">自动</span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3 6 5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button></div>
               <div class="fontRole"><label>曲目与信息</label><input id="fontMetadata" type="hidden" value="auto"><button class="fontSelect" type="button" data-font-for="fontMetadata"><span class="sample">自动</span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3 6 5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button></div>
+              <div class="fontRole"><label>右侧封</label><input id="fontSpineRight" type="hidden" value="auto"><button class="fontSelect" type="button" data-font-for="fontSpineRight"><span class="sample">默认侧封字体</span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3 6 5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button></div>
+              <div class="fontRole"><label>左侧封</label><input id="fontSpineLeft" type="hidden" value="auto"><button class="fontSelect" type="button" data-font-for="fontSpineLeft"><span class="sample">默认侧封字体</span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3 6 5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button></div>
+              <div class="fontRole"><label>左侧封背面</label><input id="fontSpineLeftBack" type="hidden" value="auto"><button class="fontSelect" type="button" data-font-for="fontSpineLeftBack"><span class="sample">默认侧封字体</span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3 6 5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button></div>
             </div>
             <div id="fontPicker" class="fontPicker" hidden><div class="fontPickerHead"><input id="fontSearch" placeholder="搜索字体名称"><span id="fontPickerCount" class="fontPickerCount"></span><button id="fontPickerClose" class="fontPickerClose" type="button" aria-label="关闭字体库">×</button></div><div id="fontPickerFilters" class="fontPickerFilters"></div><div id="fontPickerList" class="fontPickerList"></div></div>
-            <small class="muted">中文内容不会错误套用只支持英文的字体；曲目、时长、版权仍保持清晰可读。</small>
+            <small class="muted">中文内容不会错误套用只支持英文的字体；曲目、时长、版权仍保持清晰可读。</small></div>
+            <div id="spineEditorDock">
+            <div class="spineEditorTabs" id="spineEditorTabs"><button type="button" class="spineEditorTab on" data-spine-editor="right">右侧封</button><button type="button" class="spineEditorTab" data-spine-editor="left">左侧封</button><button type="button" class="spineEditorTab" data-spine-editor="leftBack">左侧封背面</button></div>
+            <input id="spineTextRight" type="hidden"><input id="spineTextLeft" type="hidden"><input id="spineTextLeftBack" type="hidden">
+            <div class="spineToolbar" aria-label="侧封文字格式">
+              <label data-tooltip-title="成品字号" data-tooltip-detail="展开列表后直接选择实际成品字号，范围为 0.8–2.6 毫米。"><select id="spineSizeMm" class="spineSize" aria-label="字号（毫米）"><option value="0.8">0.8 mm</option><option value="1.0">1.0 mm</option><option value="1.2">1.2 mm</option><option value="1.4">1.4 mm</option><option value="1.6">1.6 mm</option><option value="1.7" selected>1.7 mm</option><option value="1.8">1.8 mm</option><option value="2.0">2.0 mm</option><option value="2.2">2.2 mm</option><option value="2.4">2.4 mm</option><option value="2.6">2.6 mm</option></select></label>
+              <button type="button" class="spineFormatBtn" id="spineBold" data-tooltip-title="加粗" data-tooltip-detail="使当前侧封文字更醒目。">B</button><button type="button" class="spineFormatBtn" id="spineItalic" data-tooltip-title="斜体" data-tooltip-detail="为当前侧封文字加入倾斜效果。"><i>I</i></button>
+              <div class="spineColorMenu">
+                <button type="button" id="spineColorMenuButton" class="spineColorMenuButton" data-tooltip-title="字体颜色" data-tooltip-detail="打开颜色面板，选择自动色、主题色或更多字体颜色。" aria-expanded="false"><span>A</span><i></i><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3 6 5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
+                <div id="spineColorPopover" class="spineColorPopover" hidden>
+                  <button type="button" class="spineColorAuto on" data-spine-color="auto"><i></i>自动</button>
+                  <b>主题颜色</b>
+                  <div class="spineColorGrid">
+                    <button type="button" data-spine-color="#111111" style="--swatch:#111111" aria-label="黑色"></button><button type="button" data-spine-color="#ffffff" style="--swatch:#ffffff" aria-label="白色"></button><button type="button" data-spine-color="#72777b" style="--swatch:#72777b" aria-label="深灰"></button><button type="button" data-spine-color="#cfd4d7" style="--swatch:#cfd4d7" aria-label="浅灰"></button><button type="button" data-spine-color="#e8d7bd" style="--swatch:#e8d7bd" aria-label="暖金"></button><button type="button" data-spine-color="#c8102e" style="--swatch:#c8102e" aria-label="红色"></button><button type="button" data-spine-color="#ff9500" style="--swatch:#ff9500" aria-label="橙色"></button><button type="button" data-spine-color="#ffd400" style="--swatch:#ffd400" aria-label="黄色"></button><button type="button" data-spine-color="#2ead6f" style="--swatch:#2ead6f" aria-label="绿色"></button><button type="button" data-spine-color="#08a6a6" style="--swatch:#08a6a6" aria-label="青色"></button><button type="button" data-spine-color="#2f80ed" style="--swatch:#2f80ed" aria-label="蓝色"></button><button type="button" data-spine-color="#7c3aed" style="--swatch:#7c3aed" aria-label="紫色"></button>
+                  </div>
+                  <button type="button" id="spineCustomColorButton" class="spineMoreColor">◉ 更多字体颜色</button><input id="spineCustomColor" type="hidden" value="#111111">
+                </div>
+              </div>
+            </div>
+            </div>
             <div class="templateFieldTitle">文案布局 <span>程序叠字，不写入 Artwork</span></div>
             <label class="field">文案布局<select id="copyLayout" class="input"><option value="auto">自动推荐</option><option value="editorial">A · Editorial / 丰富型</option><option value="minimal">B · Minimal / 克制型</option></select></label><label class="field">文案倾斜<select id="copyAngle" class="input"><option value="none" selected>不倾斜</option><option value="upRight">向右上 3°</option><option value="downRight">向右下 3°</option></select></label><small class="muted">倾斜只作用于中文/英文概念文案；曲目、时长、版权与条码始终保持规整。</small>
             <label class="field">中文主文案<textarea id="primaryCopy" rows="2" maxlength="52" placeholder="自动生成，也可手动修改"></textarea><small class="muted"><label><input id="showBackChineseCopy" type="checkbox"> 同时显示在单列封底右侧</label>（默认保留给英文副文案）</small></label>
@@ -467,6 +521,17 @@ body.embed .proj .t small{display:none}   /* 外层已有专辑名，这里不�
   </div>
 </div>
 
+<div id="formatTooltip" class="formatTooltip" role="tooltip" hidden><b></b><span></span></div>
+<div id="spineCustomColorDialog" class="spineCustomDialog" role="dialog" aria-modal="true" aria-labelledby="spineCustomColorTitle" hidden>
+  <div class="spineCustomCard">
+    <h3 id="spineCustomColorTitle">更多字体颜色</h3><p>输入十六进制颜色，或从常用色中选择。</p>
+    <div class="spineCustomSwatches" aria-label="常用字体颜色">
+      <button type="button" data-custom-color="#111111" style="--swatch:#111111" aria-label="黑色"></button><button type="button" data-custom-color="#FFFFFF" style="--swatch:#FFFFFF" aria-label="白色"></button><button type="button" data-custom-color="#50555A" style="--swatch:#50555A" aria-label="深灰"></button><button type="button" data-custom-color="#A25C3C" style="--swatch:#A25C3C" aria-label="棕色"></button><button type="button" data-custom-color="#C8102E" style="--swatch:#C8102E" aria-label="红色"></button><button type="button" data-custom-color="#F59E0B" style="--swatch:#F59E0B" aria-label="橙色"></button><button type="button" data-custom-color="#EAB308" style="--swatch:#EAB308" aria-label="黄色"></button><button type="button" data-custom-color="#22A06B" style="--swatch:#22A06B" aria-label="绿色"></button><button type="button" data-custom-color="#0EA5A6" style="--swatch:#0EA5A6" aria-label="青色"></button><button type="button" data-custom-color="#2563EB" style="--swatch:#2563EB" aria-label="蓝色"></button><button type="button" data-custom-color="#7C3AED" style="--swatch:#7C3AED" aria-label="紫色"></button><button type="button" data-custom-color="#DB2777" style="--swatch:#DB2777" aria-label="粉色"></button><button type="button" data-custom-color="#9333EA" style="--swatch:#9333EA" aria-label="深紫"></button><button type="button" data-custom-color="#0891B2" style="--swatch:#0891B2" aria-label="湖蓝"></button><button type="button" data-custom-color="#65A30D" style="--swatch:#65A30D" aria-label="草绿"></button><button type="button" data-custom-color="#BE123C" style="--swatch:#BE123C" aria-label="酒红"></button>
+    </div>
+    <div class="spineHexRow"><i id="spineHexPreview" class="spineHexPreview"></i><input id="spineCustomColorHex" type="text" value="#111111" maxlength="7" spellcheck="false" aria-label="十六进制颜色"></div>
+    <div class="spineCustomActions"><button type="button" id="spineCustomColorCancel">取消</button><button type="button" id="spineCustomColorApply">确定</button></div>
+  </div>
+</div>
 <script>
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -482,10 +547,27 @@ function currentTrackData(){
   return normTracks().map((title,i)=>{const src=SEARCH_TRACKS[i]||{};return {rank:Number(src.rank)||i+1,title,duration:String(src.duration||src.dur||'')};});
 }
 let TITLE_ASSET_ID="";
-function currentCopySettings(){const titleMode=$('#titleMode'),titleProvider=$('#titleProvider'),fontValue=id=>{const el=$('#'+id);return el?el.value:'auto'};return {copyLayout:$('#copyLayout').value||'auto',typographyStyle:($('#typographyStyle')?$('#typographyStyle').value:'auto'),copyAngle:$('#copyAngle').value||'none',conceptCopy:{primaryChinese:$('#primaryCopy').value.trim(),secondaryEnglish:$('#secondaryCopy').value.trim(),shortEnglish:$('#shortTag').value.trim()},showBackChineseCopy:$('#showBackChineseCopy').checked,typography:{display:fontValue('fontDisplay'),artist:fontValue('fontArtist'),chineseCopy:fontValue('fontChineseCopy'),englishCopy:fontValue('fontEnglishCopy'),metadata:fontValue('fontMetadata'),spine:'auto'},titleMode:titleMode?titleMode.value:'cover-follow',titleProvider:titleProvider?titleProvider.value:'unavailable',selectedTitleAssetId:TITLE_ASSET_ID}}
+let SPINE_TEMPLATES={right:'title-artist-classic',left:'title-artist-classic',leftBack:'title-artist-classic'};
+function setSpineTemplate(zone,template){if(!Object.prototype.hasOwnProperty.call(SPINE_TEMPLATES,zone))return;SPINE_TEMPLATES[zone]=template;queuePreview();}
+let SPINE_EDITOR_ZONE='right';
+let SPINE_APPEARANCE={right:{font:'auto',sizeMm:1.7,style:'normal',color:'auto'},left:{font:'auto',sizeMm:1.7,style:'normal',color:'auto'},leftBack:{font:'auto',sizeMm:1.7,style:'normal',color:'auto'}};
+const SPINE_INPUT={right:'spineTextRight',left:'spineTextLeft',leftBack:'spineTextLeftBack'};
+const SPINE_FONT_INPUT={right:'fontSpineRight',left:'fontSpineLeft',leftBack:'fontSpineLeftBack'};
+const SPINE_MM_X={right:0,left:53.4,leftBack:57.8};
+const SPINE_NAME={right:'右侧封',left:'左侧封',leftBack:'左侧封背面'};
+function dockSpineEditor(){const tabs={backLayoutDock:'layout',fontDock:'font',spineEditorDock:'side'};Object.entries(tabs).forEach(([id,tab])=>{const dock=$('#'+id),slot=document.querySelector('[data-ribbon-panel="'+tab+'"]');if(dock&&slot&&dock.parentElement!==slot)slot.append(dock);});const editor=$('#spineEditorDock'),template=$('#spineTemplateDock');if(editor&&template&&template.parentElement!==editor)editor.insertBefore(template,editor.querySelector('.spineToolbar'));}
+function setRibbonTab(tab){const target=document.querySelector('[data-ribbon-panel="'+tab+'"]');if(!target)return;document.querySelectorAll('[data-ribbon-tab]').forEach(button=>button.classList.toggle('on',button.dataset.ribbonTab===tab));document.querySelectorAll('[data-ribbon-panel]').forEach(panel=>panel.classList.toggle('on',panel===target));}
+function layoutSpineCanvas(){const image=$('#spineLargeImage'),crop=$('#spineCanvasCrop');if(!image||!crop||!image.naturalWidth||!image.naturalHeight||!crop.clientHeight)return;const fullW=image.naturalWidth*crop.clientHeight/image.naturalHeight,cropW=fullW*4.4/111.2;crop.style.width=Math.max(70,cropW)+'px';image.style.width=fullW+'px';image.style.height=crop.clientHeight+'px';image.style.left=-(fullW*SPINE_MM_X[SPINE_EDITOR_ZONE]/111.2)+'px';}
+function updateSpineCanvas(){const source=$('#imStrip');const image=$('#spineLargeImage'),empty=$('#spineCanvasEmpty'),meta=$('#spineCanvasMeta');if(!image||!empty)return;if(meta)meta.textContent='当前编辑：'+SPINE_NAME[SPINE_EDITOR_ZONE]+' · 约 4× 放大';if(!source||!source.src)return;if(image.src!==source.src){image.onload=()=>layoutSpineCanvas();image.src=source.src;}empty.hidden=true;image.hidden=false;layoutSpineCanvas();}
+function spineStyleHas(kind){const style=SPINE_APPEARANCE[SPINE_EDITOR_ZONE].style;return kind==='bold'?style==='bold'||style==='boldItalic':style==='italic'||style==='boldItalic'}
+function defaultSpineText(){return [$('#album').value.trim(),$('#artist').value.trim()].filter(Boolean).join('｜');}
+function syncSpineEditor(){const zone=SPINE_EDITOR_ZONE,appearance=SPINE_APPEARANCE[zone],fontId=SPINE_FONT_INPUT[zone],textEditor=$('#spineTextEditor'),saved=$('#'+SPINE_INPUT[zone]).value.trim();textEditor.value=saved||defaultSpineText();textEditor.placeholder='点击修改'+SPINE_NAME[zone]+'模板文字';$('#spineSizeMm').value=appearance.sizeMm;$('#'+fontId).value=appearance.font||'auto';setFontButton(fontId);$('#spineBold').classList.toggle('on',spineStyleHas('bold'));$('#spineItalic').classList.toggle('on',spineStyleHas('italic'));document.querySelectorAll('[data-spine-color]').forEach(b=>b.classList.toggle('on',b.dataset.spineColor===appearance.color));const colorButton=$('#spineColorMenuButton');if(colorButton)colorButton.style.setProperty('--spine-color',appearance.color==='auto'||!appearance.color?'#111111':appearance.color);if(appearance.color&&appearance.color!=='auto')$('#spineCustomColor').value=appearance.color;document.querySelectorAll('[data-spine-editor]').forEach(b=>b.classList.toggle('on',b.dataset.spineEditor===zone));updateSpineCanvas();}
+function setSpineEditorZone(zone){if(!Object.prototype.hasOwnProperty.call(SPINE_APPEARANCE,zone))return;SPINE_EDITOR_ZONE=zone;syncSpineEditor();}
+function toggleSpineStyle(kind){const appearance=SPINE_APPEARANCE[SPINE_EDITOR_ZONE];let bold=spineStyleHas('bold'),italic=spineStyleHas('italic');if(kind==='bold')bold=!bold;else italic=!italic;appearance.style=bold&&italic?'boldItalic':(bold?'bold':(italic?'italic':'normal'));syncSpineEditor();queuePreview();}
+function currentCopySettings(){const titleMode=$('#titleMode'),titleProvider=$('#titleProvider'),fontValue=id=>{const el=$('#'+id);return el?el.value:'auto'};Object.entries(SPINE_FONT_INPUT).forEach(([zone,id])=>SPINE_APPEARANCE[zone].font=fontValue(id));return {copyLayout:$('#copyLayout').value||'auto',typographyStyle:($('#typographyStyle')?$('#typographyStyle').value:'auto'),copyAngle:$('#copyAngle').value||'none',spineTemplates:{...SPINE_TEMPLATES},spineText:{right:$('#spineTextRight').value.trim(),left:$('#spineTextLeft').value.trim(),leftBack:$('#spineTextLeftBack').value.trim()},spineAppearance:SPINE_APPEARANCE,conceptCopy:{primaryChinese:$('#primaryCopy').value.trim(),secondaryEnglish:$('#secondaryCopy').value.trim(),shortEnglish:$('#shortTag').value.trim()},showBackChineseCopy:$('#showBackChineseCopy').checked,typography:{display:fontValue('fontDisplay'),artist:fontValue('fontArtist'),chineseCopy:fontValue('fontChineseCopy'),englishCopy:fontValue('fontEnglishCopy'),metadata:fontValue('fontMetadata'),spine:'auto'},titleMode:titleMode?titleMode.value:'cover-follow',titleProvider:titleProvider?titleProvider.value:'unavailable',selectedTitleAssetId:TITLE_ASSET_ID}}
 
 let FONT_LIBRARY=[
-  {id:'auto',name:'自动跟随封面',group:'自动',face:'inherit',meta:'按当前专辑自动匹配'},
+  {id:'auto',name:'默认侧封字体',group:'默认',face:'inherit',meta:'使用侧封预设字体'},
   {id:'noto-serif-sc',name:'思源宋体',group:'中文常用',face:'"Noto Serif SC", SimSun, serif',meta:'开源 · 衬线'},
   {id:'noto-sans-sc',name:'思源黑体',group:'中文常用',face:'"Noto Sans SC", "Microsoft YaHei", sans-serif',meta:'开源 · 清晰'},
   {id:'kaiti',name:'楷体',group:'中文常用',face:'KaiTi, STKaiti, serif',meta:'书写感'},
@@ -511,8 +593,8 @@ const BUILTIN_PICKER_CJK_IDS=new Set(['noto-serif-sc','noto-sans-sc','kaiti','fa
 FONT_LIBRARY.forEach(x=>{if(BUILTIN_PICKER_CJK_IDS.has(x.id))x.language='CJK';else if(x.id!=='auto')x.language='Latin';});
 let FONT_TARGET='';
 let FONT_FILTER='all';
-const FONT_ROLE_SAMPLE={fontDisplay:'如果呢  WHAT IF',fontArtist:'郑润泽',fontChineseCopy:'把平凡的日子，过成喜欢的样子。',fontEnglishCopy:'SAME STORIES, DIFFERENT DAYS.',fontMetadata:'01 如果呢  03:48'};
-const CJK_FONT_TARGETS=new Set(['fontDisplay','fontArtist','fontChineseCopy']);
+const FONT_ROLE_SAMPLE={fontDisplay:'如果呢  WHAT IF',fontArtist:'郑润泽',fontChineseCopy:'把平凡的日子，过成喜欢的样子。',fontEnglishCopy:'SAME STORIES, DIFFERENT DAYS.',fontMetadata:'01 如果呢  03:48',fontSpine:'SIDE TITLE',fontSpineRight:'如果呢｜郑润泽',fontSpineLeft:'如果呢｜郑润泽',fontSpineLeftBack:'如果呢｜郑润泽'};
+const CJK_FONT_TARGETS=new Set(['fontDisplay','fontArtist','fontChineseCopy','fontSpineRight','fontSpineLeft','fontSpineLeftBack']);
 function fontItem(id){return FONT_LIBRARY.find(x=>x.id===id)||FONT_LIBRARY[0]}
 function fontCategory(x){if(x.category)return x.category;const text=((x.name||'')+' '+(x.meta||'')).toLowerCase();if(/kaiti|kai|hand|script|ink|gabriola|caveat/.test(text))return 'handwriting';if(/serif|song|ming|fang|georgia|cambria|times|palatino/.test(text))return 'serif';if(/impact|bahnschrift|black|condensed/.test(text))return 'display';return 'sans';}
 function fontSource(x){if(x.private||(x.id&&x.id.startsWith('private:')))return 'private';return x.id&&x.id.startsWith('builtin:')?'builtin':(x.language==='CJK'?'chinese':'latin');}
@@ -546,6 +628,46 @@ $('#fontPickerFilters').onclick=e=>{const b=e.target.closest('[data-font-filter]
 $('#fontPickerList').onclick=e=>{const row=e.target.closest('[data-font-id]');if(!row||!FONT_TARGET)return;const input=$('#'+FONT_TARGET);input.value=row.dataset.fontId;setFontButton(FONT_TARGET);input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));closeFontPicker();};
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('#fontPicker').hidden)closeFontPicker()});
 loadFontLibrary();
+dockSpineEditor();
+document.querySelectorAll('[data-ribbon-tab]').forEach(button=>button.addEventListener('click',()=>setRibbonTab(button.dataset.ribbonTab)));
+setRibbonTab('side');
+syncSpineEditor();
+
+
+const formatTooltip=$('#formatTooltip');let tooltipTarget=null;
+function showFormatTooltip(target){if(!formatTooltip||!target?.dataset.tooltipTitle)return;tooltipTarget=target;formatTooltip.querySelector('b').textContent=target.dataset.tooltipTitle;formatTooltip.querySelector('span').textContent=target.dataset.tooltipDetail||'';formatTooltip.hidden=false;const r=target.getBoundingClientRect(),w=formatTooltip.offsetWidth||220,h=formatTooltip.offsetHeight||58;formatTooltip.style.left=Math.max(8,Math.min(window.innerWidth-w-8,r.left+r.width/2-w/2))+'px';formatTooltip.style.top=Math.min(window.innerHeight-h-8,r.bottom+8)+'px';}
+function hideFormatTooltip(){if(formatTooltip)formatTooltip.hidden=true;tooltipTarget=null;}
+document.addEventListener('mouseover',e=>{const target=e.target.closest('[data-tooltip-title]');if(target&&!target.contains(e.relatedTarget))showFormatTooltip(target);});
+document.addEventListener('mouseout',e=>{const target=e.target.closest('[data-tooltip-title]');if(target&&!target.contains(e.relatedTarget))hideFormatTooltip();});
+document.addEventListener('focusin',e=>{const target=e.target.closest('[data-tooltip-title]');if(target)showFormatTooltip(target);});
+document.addEventListener('focusout',e=>{const target=e.target.closest('[data-tooltip-title]');if(target)hideFormatTooltip();});
+window.addEventListener('scroll',()=>{if(tooltipTarget)showFormatTooltip(tooltipTarget);},true);
+window.addEventListener('resize',()=>{if(tooltipTarget)showFormatTooltip(tooltipTarget);});
+$('#spineEditorTabs').onclick=e=>{const b=e.target.closest('[data-spine-editor]');if(!b)return;setSpineEditorZone(b.dataset.spineEditor);requestAnimationFrame(()=>$('#spineTextEditor').focus());};
+$('#spineTextEditor').oninput=()=>{$('#'+SPINE_INPUT[SPINE_EDITOR_ZONE]).value=$('#spineTextEditor').value.replace(/\n/g,'').slice(0,14);queuePreview();};
+function updateSpineSize(){const n=Number($('#spineSizeMm').value);SPINE_APPEARANCE[SPINE_EDITOR_ZONE].sizeMm=Math.max(.8,Math.min(2.6,Number.isFinite(n)?n:1.7));queuePreview();}
+$('#spineSizeMm').oninput=updateSpineSize;$('#spineSizeMm').onchange=updateSpineSize;
+$('#spineBold').onclick=()=>toggleSpineStyle('bold');
+$('#spineItalic').onclick=()=>toggleSpineStyle('italic');
+function closeSpineColorMenu(){const panel=$('#spineColorPopover'),button=$('#spineColorMenuButton');if(panel)panel.hidden=true;if(button)button.setAttribute('aria-expanded','false');}
+function placeSpineColorMenu(){const panel=$('#spineColorPopover'),button=$('#spineColorMenuButton');if(!panel||!button)return;const rect=button.getBoundingClientRect(),width=panel.offsetWidth||242,height=panel.offsetHeight||280;panel.style.left=Math.max(8,Math.min(window.innerWidth-width-8,rect.right-width))+'px';panel.style.top=Math.max(8,Math.min(window.innerHeight-height-8,rect.bottom+8))+'px';}
+const spineColorPopover=$('#spineColorPopover');if(spineColorPopover&&spineColorPopover.parentElement!==document.body)document.body.append(spineColorPopover);
+$('#spineColorMenuButton').onclick=()=>{const panel=$('#spineColorPopover'),button=$('#spineColorMenuButton');panel.hidden=!panel.hidden;button.setAttribute('aria-expanded',String(!panel.hidden));if(!panel.hidden)placeSpineColorMenu();};
+document.querySelectorAll('[data-spine-color]').forEach(b=>b.onclick=()=>{SPINE_APPEARANCE[SPINE_EDITOR_ZONE].color=b.dataset.spineColor;syncSpineEditor();queuePreview();closeSpineColorMenu();});
+function normalizeSpineColor(value){const raw=String(value||'').trim();return /^#[0-9a-f]{6}$/i.test(raw)?raw.toUpperCase():null;}
+function setSpineCustomColorValue(value){const color=normalizeSpineColor(value);if(!color)return false;$('#spineCustomColorHex').value=color;$('#spineHexPreview').style.background=color;document.querySelectorAll('[data-custom-color]').forEach(b=>b.classList.toggle('on',b.dataset.customColor===color));return true;}
+function closeSpineCustomColorDialog(){$('#spineCustomColorDialog').hidden=true;}
+$('#spineCustomColorButton').onclick=()=>{const current=SPINE_APPEARANCE[SPINE_EDITOR_ZONE].color;setSpineCustomColorValue(current==='auto'?'#111111':current);closeSpineColorMenu();$('#spineCustomColorDialog').hidden=false;$('#spineCustomColorHex').focus();};
+document.querySelectorAll('[data-custom-color]').forEach(b=>b.onclick=()=>setSpineCustomColorValue(b.dataset.customColor));
+$('#spineCustomColorHex').oninput=()=>{const color=normalizeSpineColor($('#spineCustomColorHex').value);if(color)$('#spineHexPreview').style.background=color;};
+$('#spineCustomColorCancel').onclick=closeSpineCustomColorDialog;
+$('#spineCustomColorApply').onclick=()=>{const color=normalizeSpineColor($('#spineCustomColorHex').value);if(!color){$('#spineCustomColorHex').focus();return;}SPINE_APPEARANCE[SPINE_EDITOR_ZONE].color=color;$('#spineCustomColor').value=color;syncSpineEditor();queuePreview();closeSpineCustomColorDialog();};
+$('#spineCustomColorDialog').onclick=e=>{if(e.target===$('#spineCustomColorDialog'))closeSpineCustomColorDialog();};
+document.addEventListener('click',e=>{if(!e.target.closest('.spineColorMenu')&&!e.target.closest('#spineColorPopover'))closeSpineColorMenu();});
+window.addEventListener('resize',()=>{if(!$('#spineColorPopover').hidden)placeSpineColorMenu();});
+window.addEventListener('scroll',()=>{if(!$('#spineColorPopover').hidden)placeSpineColorMenu();},true);
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeSpineColorMenu();closeSpineCustomColorDialog();}});
+Object.entries(SPINE_FONT_INPUT).forEach(([zone,id])=>{const el=$('#'+id);el.addEventListener('input',()=>{SPINE_APPEARANCE[zone].font=el.value||'auto';queuePreview();});el.addEventListener('change',()=>{SPINE_APPEARANCE[zone].font=el.value||'auto';queuePreview();});});
 
 function recommendedBackLayout(){
   const rows=currentTrackData(), n=rows.length, longest=Math.max(0,...rows.map(x=>x.title.length));
@@ -587,6 +709,7 @@ $('#tracks').addEventListener('keydown',e=>{
 function showMod(name){
   document.querySelectorAll('.mods button').forEach(b=>b.classList.toggle('on', b.dataset.mod===name));
   ['design','print','export'].forEach(m=>{ $('#mod-'+m).hidden = (m!==name); });
+  const ribbon=$('#editorRibbon');if(ribbon)ribbon.hidden=(name!=='design');
 }
 $('#mods').onclick=e=>{const b=e.target.closest('button[data-mod]');if(b)showMod(b.dataset.mod)};
 
@@ -663,7 +786,11 @@ function stageHTML(){
   queuePreview();
 })();
 
-$('#cbGuides').onchange=e=>document.body.classList.toggle('guides', e.target.checked);
+$('#cbGuides').onchange=e=>{document.body.classList.toggle('guides', e.target.checked);const ribbonGuide=$('#cbRibbonGuides');if(ribbonGuide)ribbonGuide.checked=e.target.checked;};
+$('#cbRibbonGuides').onchange=e=>{const guide=$('#cbGuides');guide.checked=e.target.checked;guide.dispatchEvent(new Event('change'));};
+$('#btnRibbonZoom').onclick=()=>openPreviewZoom();
+$('#btnRibbonDetails').onclick=()=>{$('#dataCard').scrollIntoView({behavior:'smooth',block:'start'});};
+document.querySelectorAll('[data-canvas-part]').forEach(button=>button.onclick=()=>{const part=button.dataset.canvasPart;showMod('design');const row=document.querySelector('.stageRow[data-part="'+part+'"]');if(row)row.scrollIntoView({behavior:'smooth',block:'center'});document.querySelectorAll('[data-canvas-part]').forEach(x=>x.classList.toggle('on',x===button));});
 
 /* 编辑页默认保持三件套总览；需要核对细节时，可看整套或直接点其中一件单独放大。 */
 function openPreviewZoom(part){
@@ -721,6 +848,7 @@ async function refreshPreview(){
     $('#imDisc').src=d.parts['disc.png']+bust;
     $('#imCover').src=d.parts['cover.png']+bust;
     $('#imStrip').src=d.parts['strip.png']+bust;
+    updateSpineCanvas();
     $('#previewState').textContent='当前封面自动套入 · 未保存';
     $('#stageNote').textContent='这是当前封面套入的三件套实时预览；可继续修改资料或上传自己的部件图。确认后点击「生成三件套」才会保存正式生产文件。';
   }catch(e){
@@ -735,6 +863,7 @@ const q=new URLSearchParams(location.search);
 /* 内嵌模式（外层商品图工作台用 iframe 载入）：外层才是唯一的工作台外壳，
    这里的品牌与「返回工坊」换成「← 返回专辑列表」，点它通知外层收起本工作台。
    独立访问 /design 时不加这个 class，行为与配色完全不变。 */
+const DEFAULT_COMPANY='Good Life Music Co., Ltd.';
 const EMBED = q.get('embed') === '1';
 /* 从哪儿进来的：作品库点进来的，返回按钮该说「返回作品库」
    （「作品库」= 原来的作品库 + 项目库合并后的唯一一个库，见 index.html） */
@@ -755,6 +884,7 @@ if(EMBED){
 $('#album').value=q.get('album')||'';
 $('#artist').value=q.get('artist')||'';
 $('#company').value=q.get('company')||'';
+syncSpineEditor();
 try{
   // URL 曲目只属于当前打开的专辑；缓存则必须同时带歌手名，旧的匿名缓存
   // 一律丢弃，避免上一位歌手的热门曲目串到下一张专辑。
@@ -805,9 +935,9 @@ function syncBuildEnabled(){
 }
 syncRail();
 syncBuildEnabled();
-$('#album').addEventListener('input',()=>{syncRail();syncBuildEnabled();});
-$('#artist').addEventListener('input',()=>{syncRail();syncBuildEnabled();});
-['album','artist','company','tracks','innerCopy','barcode','copyright','safeBands','primaryCopy','secondaryCopy','shortTag','showBackChineseCopy','copyLayout','typographyStyle','copyAngle','fontDisplay','fontArtist','fontChineseCopy','fontEnglishCopy','fontMetadata','titleMode','titleProvider'].forEach(id=>{
+$('#album').addEventListener('input',()=>{syncRail();syncBuildEnabled();if(!$('#'+SPINE_INPUT[SPINE_EDITOR_ZONE]).value.trim())syncSpineEditor();});
+$('#artist').addEventListener('input',()=>{syncRail();syncBuildEnabled();if(!$('#'+SPINE_INPUT[SPINE_EDITOR_ZONE]).value.trim())syncSpineEditor();});
+['album','artist','company','tracks','innerCopy','barcode','copyright','safeBands','primaryCopy','secondaryCopy','shortTag','showBackChineseCopy','copyLayout','typographyStyle','copyAngle','fontDisplay','fontArtist','fontChineseCopy','fontEnglishCopy','fontMetadata','spineTextRight','spineTextLeft','spineTextLeftBack','fontSpineRight','fontSpineLeft','fontSpineLeftBack','titleMode','titleProvider'].forEach(id=>{
   const el=$('#'+id); if(!el)return;
   el.addEventListener('input',queuePreview);
   el.addEventListener('change',queuePreview);
@@ -827,6 +957,7 @@ async function readDesign(){
     const u='/api/design/album?'+new URLSearchParams({artist:$('#artist').value,album:$('#album').value,
       pic:PIC,company:$('#company').value,tracks:normTracks().join(';'),trackData:currentTrackData(),backLayout:BACK_LAYOUT,safeBands:$('#safeBands').value.trim()});
     const d=await jparse(u);
+    if(!$('#company').value.trim()&&d.company){$('#company').value=d.company||DEFAULT_COMPANY;queuePreview();}
     $('#tagMood').textContent='调性 · '+d.design.mood;$('#tagStyle').textContent='风格 · '+d.design.style;
     $('#swatches').innerHTML=(d.design.palette||[]).map(c=>`<i style="background:rgb(${c[0]},${c[1]},${c[2]})" title="${c.join(',')}"></i>`).join('');
     $('#notes').innerHTML=(d.notes||[]).map(t=>`<li>${esc(t)}</li>`).join('');
@@ -889,7 +1020,7 @@ $('#btnBuild').onclick=async()=>{
     const r=await fetch('/api/design/build',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
     const d=await r.json();if(!r.ok)throw Error(d.error||('HTTP '+r.status));
     const fu=(n)=>'/api/design/file?jid='+encodeURIComponent(d.jid)+'&name='+encodeURIComponent(n);
-    $('#imDisc').src=fu('part-disc.png');$('#imCover').src=fu('part-cover.png');$('#imStrip').src=fu('part-strip.png');
+    $('#imDisc').src=fu('part-disc.png');$('#imCover').src=fu('part-cover.png');$('#imStrip').src=fu('part-strip.png');updateSpineCanvas();
     $('#imSheet').src=fu('★版面总览-1比1.png');
     $('#lnkPrint').href=d.printUrl;$('#lnkPdf').href=d.printPdfUrl;$('#lnkZip').href=d.zipUrl;
     const part=n=>(d.parts||[]).find(p=>p.file.includes(n))||{};
@@ -1065,7 +1196,19 @@ async function loadProject(jid){
   if(m.barcode) $('#barcode').value = m.barcode;
   if(m.copyright) $('#copyright').value = m.copyright;
   if(m.safeBands) $('#safeBands').value = m.safeBands;
+  if(m.spineText && typeof m.spineText==='object'){
+    $('#spineTextRight').value=m.spineText.right||'';
+    $('#spineTextLeft').value=m.spineText.left||'';
+    $('#spineTextLeftBack').value=m.spineText.leftBack||'';
+  }
+  if(m.spineAppearance && typeof m.spineAppearance==='object'){
+    Object.entries(m.spineAppearance).forEach(([zone,value])=>{if(SPINE_APPEARANCE[zone]&&value&&typeof value==='object')SPINE_APPEARANCE[zone]={...SPINE_APPEARANCE[zone],...value};});
+  }
+  syncSpineEditor();
   setBackLayout(m.backLayout||'auto');
+  if(m.spineTemplates && typeof m.spineTemplates==='object'){
+    Object.entries(m.spineTemplates).forEach(([zone,template])=>setSpineTemplate(zone,template));
+  }
   if(m.pic && !PIC){
     PIC = m.pic;
     $('#cover').src = PIC; $('#cover').hidden = false; $('#coverBlank').hidden = true;

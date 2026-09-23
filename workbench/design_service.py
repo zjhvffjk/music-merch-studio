@@ -79,6 +79,7 @@ import make_minicd_sheet as MS
 from PIL import Image, ImageDraw
 
 DPI = 300
+DEFAULT_COMPANY = "Good Life Music Co., Ltd."
 SHEET_DPI = 300
 PREVIEW_DPI = 96
 
@@ -226,6 +227,9 @@ def _release_metadata(data, artist, album, company=""):
             found_date = found_date or str(qq.get("date") or "").strip()
         except Exception as e:
             _slog("qq album metadata lookup skipped:", type(e).__name__)
+    # 用户要求：公开资料与补充检索都没有厂牌时，使用工作室指定的发行公司，
+    # 使输入框、实时预览和正式印刷版权行保持一致。
+    found_company = found_company or DEFAULT_COMPANY
     year_match = re.search(r"(?:19|20)\d{2}", found_date)
     return found_company, (year_match.group(0) if year_match else ""), found_date
 
@@ -464,6 +468,9 @@ def build_job(data):
         "barcode": barcode_code, "copyright": copyright_text,
         "backLayout": str(data.get("backLayout") or "auto"),
         "copyLayout": copy_settings["copyLayout"], "conceptCopy": copy_settings["conceptCopy"],
+        "spineTemplates": copy_settings["spineTemplates"],
+        "spineText": copy_settings["spineText"],
+        "spineAppearance": copy_settings["spineAppearance"],
         "typography": copy_settings["typography"],
         "titleTypography": title_state,
         "mood": D["mood"], "style": D["style"],
@@ -1139,8 +1146,13 @@ def handle(handler, path, query, method):
             D = _read_design(cover, value("mood", ""), value("style", ""),
                              _parse_bands(value("safeBands", "")))
             notes = DP.design_notes(D, album, artist, tracks, has_lyrics=False)
+            resolved_company, release_year, release_date = _release_metadata(
+                {"id": value("id"), "date": value("date")}, artist, album, company)
             handler._json({
                 "ok": True,
+                "company": resolved_company,
+                "releaseYear": release_year,
+                "releaseDate": release_date,
                 "design": {"mood": D["mood"], "style": D["style"],
                            "main": list(D["main"]),
                            "palette": [list(c) for c in D["palette"][:6]]},

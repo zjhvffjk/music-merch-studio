@@ -244,13 +244,19 @@ def make_back_strip(back_im, tray_im, w_px, h_px, cover_im, album, artist,
         t = _solid_block(cover_im, p[4], h_px, album, artist)
     out.paste(t, (p[0] + p[1] + p[2] + p[3], 0))
 
-    # --- 侧封 / 背脊（各 4mm 级）：从相邻件边缘延展 ---
-    out.paste(_edge_stretch(b, p[0], h_px), (0, 0))                  # 右侧封 ← 封底左缘
-    out.paste(_edge_stretch(t, p[2] + p[3], h_px), (p[0] + p[1], 0))  # 左侧封+背脊 ← 内盘底左缘
-    # 左侧封背面是独立的 4.4mm 文案区，不能只拉伸照片边缘。
-    if use_dp and copy_settings:
-        spine = DP.design_spine2(p[3], h_px, D, album, artist, company, copy_settings=copy_settings)
-        out.paste(spine, (p[0] + p[1] + p[2], 0))
+    # --- 三条窄封：画面都从相邻面板延展，文字职责各不相同 ---
+    # 右侧封 = 外侧识别（标题＋歌手）；左侧封 = 封底与内盘底间的纯画面收边；
+    # 左侧封背面 = 面向盒内的标题/短文案。这样不会出现三根一模一样的竖排文字。
+    right_spine = _edge_stretch(b, p[0], h_px)
+    left_spine = _edge_stretch(t, p[2], h_px)
+    left_spine_back = _edge_stretch(t, p[3], h_px)
+    if use_dp:
+        right_spine = DP.spine_overlay(right_spine, "right", album, artist, company, copy_settings)
+        left_spine = DP.spine_overlay(left_spine, "left", album, artist, company, copy_settings)
+        left_spine_back = DP.spine_overlay(left_spine_back, "left-back", album, artist, company, copy_settings)
+    out.paste(right_spine, (0, 0))
+    out.paste(left_spine, (p[0] + p[1], 0))
+    out.paste(left_spine_back, (p[0] + p[1] + p[2], 0))
 
     # 各段逐 0.1mm 四舍五入后求和可能与 BACK_W 取整差 ±1px（如 111.2mm：
     # sum(各段)=1314 vs round(111.2)=1313）。统一对齐到调用方给的 w_px，避免断言崩。

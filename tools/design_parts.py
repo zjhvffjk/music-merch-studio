@@ -1191,13 +1191,13 @@ def design_back2(cover, w, h, D, album="", artist="", tracks=None, seed=0,
     # 两个 Golden Reference 共用的标题块：左起 4mm，上距 2.45mm，
     # 标题／歌手／细线与曲目首行的关系固定。仅标题可因中英文字形变化。
     title_x, title_y, title_w = px(3.70), py(2.45), px(42.0)
-    title_role = "hand" if any("\u2e80" <= c <= "\u9fff" for c in (album or "")) else "display"
-    f, t = fit_tracked(d, album or "", title_w, py(2.82), title_role, 0.55,
+    # 标题与歌手是两个独立的字体角色。不能因为内容是中文就绕过工作台选择，
+    # 否则用户在字体库换了毛笔体，封底却仍然显示旧的默认字体。
+    f, t = fit_tracked(d, album or "", title_w, py(2.82), "serif", 0.55,
                       min_s=max(10, py(1.60)))
     tracked(d, (title_x, title_y), t, f, ink, 0.55, "left", title_w)
     artist_y = title_y + py(3.50)
-    artist_role = "hand" if any("\u2e80" <= c <= "\u9fff" for c in (artist or "")) else "serif"
-    f2, t2 = fit_tracked(d, artist or "", px(25.0), py(1.63), artist_role, 0.15,
+    f2, t2 = fit_tracked(d, artist or "", px(25.0), py(1.63), "artist", 0.15,
                          min_s=max(9, py(1.15)))
     tracked(d, (title_x, artist_y), t2, f2, ink, 0.15, "left", px(25.0))
     rule_y = py(8.42)
@@ -1255,7 +1255,7 @@ def design_back2(cover, w, h, D, album="", artist="", tracks=None, seed=0,
             hand_text(base, (w - pad, y0 + i * step), ln, qs, ink, 1.2, "right",
                       angle=_copy_angle(copy_settings, D), shadow=(0, 0, 0, 170))
         d = ImageDraw.Draw(base)
-        fq = _t("sans", max(8, int(qs * 0.56)), artist)
+        fq = _t("artist", max(8, int(qs * 0.56)), artist)
         tracked(d, (w - pad, y0 + len(lines) * step + int(h * 0.014)),
                 "— %s" % (artist or album or ""), fq, ink, 1.0, "right")
 
@@ -1497,7 +1497,8 @@ def design_inner2(cover, w, h, D, album="", artist="", tracks=None, quote=None, 
         d = ImageDraw.Draw(base)
         if artist:                       # 没填歌手就别印一根孤零零的「—」
             fs = max(8, int(h * 0.062))
-            fm = _t("sans", fs, artist)
+            # 内页落款也属于歌手名，跟随「歌手名字体」选择。
+            fm = _t("artist", fs, artist)
             tracked(d, (pad, y0 + int(len(lines) * qs * 1.35) + int(h * 0.035)),
                     "— %s" % artist, fm, (222, 224, 228), 1.0, "left")
         # Editorial secondary copy is a separate true-font layer, never generated in artwork.
@@ -1560,9 +1561,11 @@ def design_tray2(cover, w, h, D, album="", artist="", company="", copy_settings=
                     tag_size, dim, "right", tag_w, angle=_copy_angle(copy_settings, D))
     d = ImageDraw.Draw(base)
     if company:
+        # 厂牌是功能信息，固定在底部照片条上方；此前引用了未定义的 ty/fs2，
+        # 填写厂牌时会让内盘底渲染失败。
         fL = _t("num", max(6, int(h * 0.038)), company)
-        tracked(d, (int(w * 0.5), ty + int(fs.size * 1.30) + int(fs2.size * 2.9)),
-                company.upper(), fL, dim, 1.6, "center", w - pad * 2)
+        tracked(d, (int(w * 0.5), int(h * 0.735)), company.upper(), fL,
+                dim, 1.2, "center", w - pad * 2)
     return base
 
 
@@ -1718,6 +1721,217 @@ def design_postcard(cover, w, h, D, album="", artist="", quote=None):
         for i, ln in enumerate(qlines):
             hand_text(base, (w - pad, y0 + i * step), ln, qs,
                       (252, 252, 250), 1.0, "right", shadow=(0, 0, 0, 160))
+    return base
+
+
+def _vertical_spine_text(draw, x, y, text, font, fill, max_h, leading=1.08, bold=False, italic=False):
+    """在 4.4mm 窄封内逐字竖排，超出安全高度时以省略号收束。"""
+    text = str(text or "").strip()
+    if not text:
+        return y
+    step = max(1, int(font.size * leading))
+    limit = int(y + max_h)
+    for index, char in enumerate(text):
+        if y + step > limit:
+            char = "…"
+        width = draw.textlength(char, font=font)
+        px = x - width / 2.0
+        if italic:
+            # 在没有对应 italic 字形的个人字体上保留可见的倾斜效果。
+            px += max(1, int(font.size * 0.12))
+        draw.text((px, y), char, font=font, fill=fill)
+        if bold:
+            draw.text((px + 1, y), char, font=font, fill=fill)
+        y += step
+        if char == "…":
+            break
+    return y
+
+
+def _spine_font(font_id, size, text):
+    if _typo is not None and font_id and font_id != "auto" and hasattr(_typo, "font_from_id"):
+        return _typo.font_from_id(font_id, size, text, "spine")
+    return _t("spine", size, text)
+
+
+def _spine_fill(value, automatic):
+    value = str(value or "auto").lower()
+    if value == "auto":
+        return automatic
+    try:
+        return tuple(int(value[i:i + 2], 16) for i in (1, 3, 5))
+    except (TypeError, ValueError):
+        return automatic
+
+
+def _rotated_spine_label(base, x, y, text, font, fill, max_h):
+    """在窄封内放置旋转的英文姓名，保留摄影唱片常用的书脊读法。"""
+    text = str(text or "").strip()
+    if not text:
+        return y
+    # 英文横排旋转后沿书脊阅读；过长时缩小到指定安全高度内。
+    f = font
+    while f.size > 6 and ImageDraw.Draw(Image.new("RGB", (4, 4))).textlength(text, font=f) > max_h:
+        f = _t("artist", f.size - 1, text)
+    width = max(1, int(ImageDraw.Draw(Image.new("RGB", (4, 4))).textlength(text, font=f)) + 6)
+    layer = Image.new("RGBA", (width, f.size + 8), (0, 0, 0, 0))
+    color = tuple(fill[:3]) + (255,)
+    ImageDraw.Draw(layer).text((3, 2), text, font=f, fill=color)
+    label = layer.rotate(90, expand=True, resample=Image.Resampling.BICUBIC)
+    base.paste(label, (int(x - label.width / 2), int(y)), label)
+    return int(y + label.height)
+
+
+def spine_overlay(base, variant, album="", artist="", company="", copy_settings=None):
+    """给三条 4.4mm 窄封分配不同职责，不生成独立的小海报。
+
+    ``right`` 是外侧识别边：标题和歌手名；``left`` 只保留相邻画面的延续；
+    ``left-back`` 面向盒内，以标题或短英文连接内盘底。所有底图由调用方从相邻
+    面板延展而来，文字只是最后一层，不会破坏整条展开图的同源关系。
+    """
+    if base is None:
+        return base
+    d = ImageDraw.Draw(base)
+    w, h = base.size
+    swatch = palette(base.convert("RGB"), 3)[0]
+    ink = ink_on(swatch)
+    dim = dim_ink(ink, swatch, 0.68)
+    x = w / 2.0
+    top = int(h * 0.075)
+    usable = int(h * 0.77)
+    templates = (copy_settings or {}).get("spineTemplates") or {}
+    zone_key = {"right": "right", "left": "left", "left-back": "leftBack"}.get(variant, "")
+    # 格式工具针对当前整条物理侧封：无论沿用固定模板还是改成自定义文字，字体、字号、
+    # 加粗、斜体和颜色都必须进入最终成品，不能只在输入了自定义文字时才生效。
+    appearance = ((copy_settings or {}).get("spineAppearance") or {}).get(zone_key) or {}
+    size_mm = max(0.8, min(2.6, float(appearance.get("sizeMm") or 1.7)))
+    size_px = max(7, int(w * size_mm / 4.4))
+    style = str(appearance.get("style") or "normal")
+    custom_fill = _spine_fill(appearance.get("color"), ink)
+    has_custom_fill = str(appearance.get("color") or "auto").lower() != "auto"
+    custom_text = str(((copy_settings or {}).get("spineText") or {}).get(zone_key) or "").strip()
+    if custom_text:
+        # 这是最终 4.4×38mm 的出图尺寸，不按页面缩略图猜字号。字号受窄边宽度
+        # 限制，文本超出高度时由 _vertical_spine_text 明确省略，绝不压折线。
+        custom_font = _spine_font(appearance.get("font"), size_px, custom_text)
+        _vertical_spine_text(d, x, top, custom_text, custom_font, custom_fill, usable, 1.10,
+                              bold=style in {"bold", "boldItalic"},
+                              italic=style in {"italic", "boldItalic"})
+        return base
+
+    # 三条 4.4×38mm 物理侧封共用模板库。这是第一套基准：参考白色植物封面的
+    # 标题+歌手排法，标题更黑、更大，歌手较小，顶部和底部保留给延展画面。
+    template = templates.get(zone_key, "title-artist-classic")
+    if template == "title-artist-classic":
+        # 固定模板只固定标题与歌手的位置；文字外观完全服从当前侧封工具栏。
+        title_font = _spine_font(appearance.get("font"), size_px, album)
+        after_title = _vertical_spine_text(d, x, int(h * 0.29), album, title_font, custom_fill,
+                                            int(h * 0.27), 1.06,
+                                            bold=style in {"bold", "boldItalic"},
+                                            italic=style in {"italic", "boldItalic"})
+        artist_font = _spine_font(appearance.get("font"), max(6, int(size_px * 0.74)), artist)
+        artist_fill = custom_fill if has_custom_fill else dim
+        _vertical_spine_text(d, x, max(int(h * 0.62), after_title + int(h * 0.06)),
+                              artist, artist_font, artist_fill, int(h * 0.20), 1.04,
+                              bold=style in {"bold", "boldItalic"},
+                              italic=style in {"italic", "boldItalic"})
+        return base
+
+    if variant == "right":
+        template = templates.get("right", "white-poetry")
+        _primary, secondary, short = _copy_text(copy_settings)
+        english_tag = (short or secondary or company or "").upper().replace(" ", "")[:10]
+
+        if template == "photo-artist":
+            # 参考的蓝色摄影版：人物与风景是底图，歌手名成为唯一的大识别信息。
+            artist_font = _t("artist", max(7, int(min(w * 0.56, h * 0.050))), artist)
+            if artist and artist.isascii():
+                _rotated_spine_label(base, x, int(h * 0.20), artist.upper(), artist_font, ink, int(h * 0.54))
+            else:
+                _vertical_spine_text(d, x, int(h * 0.20), artist, artist_font, ink,
+                                      int(h * 0.54), 1.12)
+            return base
+
+        if template == "dark-editorial":
+            # 深色油画/隧道类封面：细规则、标题、歌手、英文收尾四层，保持克制。
+            hairline(d, int(w * 0.22), int(h * 0.17), int(w * 0.78), dim, 1)
+            title_font = _t("serif", max(7, int(min(w * 0.62, h * 0.052))), album)
+            after_title = _vertical_spine_text(d, x, int(h * 0.27), album, title_font, ink,
+                                                int(h * 0.26), 1.10)
+            hairline(d, int(w * 0.35), min(int(h * 0.57), after_title + int(h * 0.025)),
+                     int(w * 0.65), dim, 1)
+            artist_font = _t("artist", max(6, int(min(w * 0.46, h * 0.036))), artist)
+            after_artist = _vertical_spine_text(d, x, max(int(h * 0.60), after_title + int(h * 0.07)),
+                                                 artist, artist_font, dim, int(h * 0.17), 1.05)
+            if english_tag:
+                tag_font = _t("spine", max(6, int(min(w * 0.36, h * 0.023))), english_tag)
+                _vertical_spine_text(d, x, max(int(h * 0.82), after_artist + int(h * 0.02)),
+                                      english_tag, tag_font, dim, int(h * 0.11), 1.00)
+            return base
+
+        if template == "bold-title":
+            # 夜景/烟花海报版保留顶端画面，只在中下段压入高对比的大标题。
+            title_font = _t("serif", max(8, int(min(w * 0.70, h * 0.060))), album)
+            after_title = _vertical_spine_text(d, x, int(h * 0.29), album, title_font,
+                                                (210, 42, 32), int(h * 0.34), 1.05)
+            artist_font = _t("artist", max(6, int(min(w * 0.46, h * 0.035))), artist)
+            after_artist = _vertical_spine_text(d, x, max(int(h * 0.69), after_title + int(h * 0.05)),
+                                                 artist, artist_font, ink, int(h * 0.13), 1.02)
+            if english_tag:
+                tag_font = _t("spine", max(6, int(min(w * 0.34, h * 0.022))), english_tag)
+                _vertical_spine_text(d, x, max(int(h * 0.84), after_artist + int(h * 0.015)),
+                                      english_tag, tag_font, dim, int(h * 0.09), 1.00)
+            return base
+
+        # 白色植物/手写封面：中段标题、下段歌手，顶部和底部留给花瓣与画面呼吸。
+        title_font = _t("serif", max(7, int(min(w * 0.56, h * 0.047))), album)
+        after_title = _vertical_spine_text(d, x, int(h * 0.31), album, title_font, ink,
+                                            int(h * 0.25), 1.12)
+        artist_font = _t("artist", max(6, int(min(w * 0.42, h * 0.034))), artist)
+        _vertical_spine_text(d, x, max(int(h * 0.62), after_title + int(h * 0.05)),
+                              artist, artist_font, dim, int(h * 0.19), 1.05)
+        return base
+
+    if variant == "left":
+        template = templates.get("left", "artwork")
+        if template == "artwork":
+            return base
+        if template == "tag":
+            _primary, secondary, short = _copy_text(copy_settings)
+            tag = (short or secondary or "").upper().replace(" ", "")[:12]
+            if tag:
+                tag_font = _t("sans", max(6, int(min(w * 0.54, h * 0.038))), tag)
+                _vertical_spine_text(d, x, top, tag, tag_font, ink, usable, 1.03)
+            return base
+        title_font = _t("serif", max(7, int(min(w * 0.62, h * 0.050))), album)
+        _vertical_spine_text(d, x, top, album, title_font, ink, usable, 1.10)
+        return base
+
+    # 面向内侧：标题或短英文，而不是再复制完整的歌手信息。
+    template = templates.get("leftBack", "inner-title")
+    if template == "copy":
+        primary, _secondary, _short = _copy_text(copy_settings)
+        phrase = primary.replace("，", "").replace("。", "")[:10]
+        copy_font = _t("hand", max(7, int(min(w * 0.62, h * 0.048))), phrase)
+        _vertical_spine_text(d, x, top, phrase, copy_font, ink, usable, 1.08)
+        return base
+    if template == "title-artist":
+        title_font = _t("serif", max(7, int(min(w * 0.62, h * 0.050))), album)
+        after_title = _vertical_spine_text(d, x, top, album, title_font, ink,
+                                            int(usable * 0.58), 1.10)
+        artist_font = _t("artist", max(6, int(min(w * 0.48, h * 0.037))), artist)
+        _vertical_spine_text(d, x, max(after_title + int(h * 0.025), int(h * 0.64)),
+                              artist, artist_font, dim, int(h * 0.22), 1.04)
+        return base
+    title_font = _t("serif", max(7, int(min(w * 0.61, h * 0.048))), album)
+    after_title = _vertical_spine_text(d, x, top, album, title_font, ink,
+                                        int(usable * 0.60), 1.10)
+    _primary, secondary, short = _copy_text(copy_settings)
+    tag = (short or secondary or "").upper().replace(" ", "")[:10]
+    if tag:
+        tag_font = _t("sans", max(6, int(min(w * 0.46, h * 0.030))), tag)
+        _vertical_spine_text(d, x, max(after_title + int(h * 0.025), int(h * 0.66)),
+                              tag, tag_font, dim, int(h * 0.22), 1.00)
     return base
 
 
