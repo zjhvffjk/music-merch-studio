@@ -45,10 +45,10 @@ class CopyTypographyTests(unittest.TestCase):
         self.assertEqual(settings["spineTemplates"],
                          {"right": "title-artist-classic", "left": "title-artist-classic", "leftBack": "title-artist-classic"})
 
-    def test_custom_spine_text_is_kept_short_for_the_real_4_4mm_print_area(self):
+    def test_custom_spine_text_keeps_a_full_short_phrase_for_the_real_4_4mm_print_area(self):
         from copy_typography import normalize_copy_settings
         settings = normalize_copy_settings({"spineText": {"right": "这是超过十四个字的侧封自定义文字内容"}})
-        self.assertEqual(len(settings["spineText"]["right"]), 14)
+        self.assertEqual(settings["spineText"]["right"], "这是超过十四个字的侧封自定义文字内容")
 
     def test_fixed_spine_template_uses_selected_text_color(self):
         from PIL import Image
@@ -70,6 +70,14 @@ class CopyTypographyTests(unittest.TestCase):
         self.assertEqual(appearance["sizeMm"], 2.6)
         self.assertEqual(appearance["style"], "boldItalic")
         self.assertEqual(appearance["color"], "#c8102e")
+
+    def test_fixed_spine_title_and_artist_keep_separate_sizes(self):
+        from copy_typography import normalize_copy_settings
+        appearance = normalize_copy_settings({"spineAppearance": {"right": {
+            "sizeMm": 1.7, "titleSizeMm": 2.2, "artistSizeMm": 1.0
+        }}})["spineAppearance"]["right"]
+        self.assertEqual(appearance["titleSizeMm"], 2.2)
+        self.assertEqual(appearance["artistSizeMm"], 1.0)
 
 
 if __name__ == "__main__":

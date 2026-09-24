@@ -1167,7 +1167,7 @@ html:not([data-theme="dark"]) .song-maker-replace:hover{color:#fffdf6;border-bot
     <div class="bar" data-page-node-id="ABF4cgZMJkcxmagyVDvfGZ">
       <div class="ttl" id="ttl" data-page-node-id="ugxroEdkkZsrda9ZUOfXoc">音乐搜索<small id="sub" data-page-node-id="xfMKTCwCqTg1jU68vIYZ7B">搜索歌手、单曲或专辑封面，开始制作</small></div>
       <div class="global-search" id="globalSearchBox">
-        <span class="global-search__icon">⌕</span><input id="globalSearch" type="search" autocomplete="off" placeholder="搜索歌手、单曲或专辑" aria-label="搜索歌手、单曲或专辑"><button id="globalSearchClear" type="button" aria-label="清空搜索" hidden>×</button>
+        <span class="global-search__icon">⌕</span><input id="globalSearch" type="text" autocomplete="off" placeholder="搜索歌手、单曲或专辑" aria-label="搜索歌手、单曲或专辑"><button id="globalSearchClear" type="button" aria-label="清空搜索" hidden>×</button>
         <div class="search-popover" id="searchPopover" hidden></div>
       </div>
       <div class="acts" data-page-node-id="nA8nfcPZ8EFbpGO8AKelGL">
@@ -2976,6 +2976,7 @@ function libRow(j){
   // 迷你CD 是同步出件，没有"耗时"这个概念
   const when = esc(libWhen(j.createdTs, j.created));
   const zipHref = mini ? (j.zipUrl || '') : ('/api/zip?id=' + j.id);
+  const openResult = mini ? `libOpenStudio('${jsq(j.id)}')` : `libOpenWork('${jsq(j.id)}')`;
   const key = libKey(j);
   const sel = LIB_SEL.has(key);
   return `<div class="librow${sel ? ' on' : ''}" id="lib-${esc(j.id)}">
@@ -2991,7 +2992,7 @@ function libRow(j){
       </div>
       <div class="ops">
         <button class="btn" onclick="libToggle('${jsq(j.id)}')">回看</button>
-        ${!mini ? `<button class="btn" onclick="libOpenWork('${jsq(j.id)}')">打开制作结果</button>` : ''}
+        <button class="btn" onclick="${openResult}">打开制作结果</button>
         ${zipHref ? `<a class="mini" href="${esc(asset(zipHref))}" title="打包下载">ZIP</a>` : ''}
         <button class="btn" onclick="libReveal('${jsq(j.id)}')">文件夹</button>
         <button class="btn del" onclick="libDel('${jsq(j.id)}')">回收站</button>

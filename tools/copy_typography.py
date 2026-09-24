@@ -16,13 +16,37 @@ def _spine_appearance(raw):
     except (TypeError, ValueError):
         size_mm = 1.7
     size_mm = max(0.8, min(2.6, size_mm))
+    def size_value(key, fallback):
+        try:
+            value = float(raw.get(key) or fallback)
+        except (TypeError, ValueError):
+            value = fallback
+        return max(0.8, min(2.6, value))
+    # 旧项目只有一套字号：把它保留给专辑名，自然得到较小的歌手名，保证旧成品外观不跳变。
+    title_size_mm = size_value("titleSizeMm", size_mm)
+    artist_size_mm = size_value("artistSizeMm", round(size_mm * 0.74, 1))
     style = str(raw.get("style") or "normal")
     if style not in {"normal", "bold", "italic", "boldItalic"}:
         style = "normal"
     color = str(raw.get("color") or "auto").lower()
     if color != "auto" and not __import__("re").fullmatch(r"#[0-9a-f]{6}", color):
         color = "auto"
-    return {"font": font, "sizeMm": size_mm, "style": style, "color": color}
+    return {"font": font, "sizeMm": size_mm, "titleSizeMm": title_size_mm,
+            "artistSizeMm": artist_size_mm, "style": style, "color": color}
+
+
+def _spine_character_styles(raw):
+    raw = raw if isinstance(raw, dict) else {}
+    result = {}
+    for zone in SPINE_TEMPLATE_DEFAULTS:
+        zone_raw = raw.get(zone) if isinstance(raw.get(zone), dict) else {}
+        result[zone] = {}
+        for role in ("title", "artist"):
+            entries = zone_raw.get(role) if isinstance(zone_raw.get(role), dict) else {}
+            result[zone][role] = {str(index): _spine_appearance(value)
+                                  for index, value in entries.items()
+                                  if str(index).isdigit() and 0 <= int(index) < 18 and isinstance(value, dict)}
+    return result
 
 FONT_LIBRARY = [
     {"id": "noto-serif-sc", "fontFamily": "Noto Serif SC", "path": r"C:\Windows\Fonts\NotoSerifSC-VF.ttf", "language": "CJK", "license": "SIL OFL", "commercialStatus": "verified-open", "usageRoles": ["display", "artist", "chineseCopy"]},
@@ -36,6 +60,7 @@ def normalize_copy_settings(raw):
     spine_raw = raw.get("spineTemplates") or {}
     spine_text_raw = raw.get("spineText") or {}
     spine_appearance_raw = raw.get("spineAppearance") or {}
+    spine_character_styles_raw = raw.get("spineCharacterStyles") or {}
     spine_templates = {
         key: (str(spine_raw.get(key) or SPINE_TEMPLATE_DEFAULTS[key])
               if str(spine_raw.get(key) or SPINE_TEMPLATE_DEFAULTS[key]) in allowed
@@ -48,11 +73,12 @@ def normalize_copy_settings(raw):
             "typographyStyle": str(raw.get("typographyStyle") or "auto"),
             "copyAngle": str(raw.get("copyAngle") or "none"),
             "spineTemplates": spine_templates,
-            # 窄封的自定义字会在渲染时按 4.4×38mm 安全区逐字排；这里只保留短文本。
-            "spineText": {key: str(spine_text_raw.get(key) or "").replace("\n", "").strip()[:14]
+            # 侧封保持用户所选字号，并使用延长后的可用高度容纳一段完整短文。
+            "spineText": {key: str(spine_text_raw.get(key) or "").replace("\n", "").strip()[:18]
                           for key in SPINE_TEMPLATE_DEFAULTS},
             "spineAppearance": {key: _spine_appearance(spine_appearance_raw.get(key))
                                for key in SPINE_TEMPLATE_DEFAULTS},
+            "spineCharacterStyles": _spine_character_styles(spine_character_styles_raw),
             "typography": {k: str(typo.get(k) or "auto") for k in ROLES}}
 
 def recommend_copy_layout(settings, design):

@@ -55,7 +55,7 @@ class DesignUiRegressionTests(unittest.TestCase):
         self.assertNotIn('<div class="templateFieldTitle">字体 <span>选择后立即套入预览与正式出件</span></div>', html)
         self.assertIn('function setRibbonTab(tab)', html)
         self.assertIn('height:112px', html)
-        self.assertIn('grid-template-rows:28px minmax(0,1fr)', html)
+        self.assertIn('grid-template-rows:28px 56px', html)
         self.assertIn("setRibbonTab('side');", html)
 
 if __name__ == '__main__':

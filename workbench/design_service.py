@@ -378,13 +378,18 @@ def build_preview(data):
     ai = {"disc": _load_ai(data.get("aiDisc")),
           "fold": _load_ai(data.get("aiFold")),
           "strip": _load_ai(data.get("aiStrip"))}
+    requested_dpi = data.get("previewDpi", PREVIEW_DPI)
+    try:
+        preview_dpi = max(PREVIEW_DPI, min(DPI, int(requested_dpi)))
+    except (TypeError, ValueError):
+        preview_dpi = PREVIEW_DPI
     token = "p-" + uuid.uuid4().hex[:16]
     dest = PREVIEW_DIR / token
     dest.mkdir(parents=True, exist_ok=True)
     font_token = TYPO.set_font_overrides(copy_settings.get("typography"))
     try:
         disc, fold, strip = build_parts(cover, album, artist, D, tracks, company,
-                                        ai if any(ai.values()) else None, PREVIEW_DPI,
+                                        ai if any(ai.values()) else None, preview_dpi,
                                         inner_copy, barcode_code, copyright_text, release_year, str(data.get("backLayout") or "auto"), copy_settings)
     finally:
         TYPO.reset_font_overrides(font_token)

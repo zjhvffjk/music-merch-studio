@@ -1724,7 +1724,8 @@ def design_postcard(cover, w, h, D, album="", artist="", quote=None):
     return base
 
 
-def _vertical_spine_text(draw, x, y, text, font, fill, max_h, leading=1.08, bold=False, italic=False):
+def _vertical_spine_text(draw, x, y, text, font, fill, max_h, leading=1.08, bold=False, italic=False,
+                         char_styles=None, pixels_per_mm=0):
     """在 4.4mm 窄封内逐字竖排，超出安全高度时以省略号收束。"""
     text = str(text or "").strip()
     if not text:
@@ -1732,16 +1733,24 @@ def _vertical_spine_text(draw, x, y, text, font, fill, max_h, leading=1.08, bold
     step = max(1, int(font.size * leading))
     limit = int(y + max_h)
     for index, char in enumerate(text):
+        char_style = (char_styles or {}).get(str(index), {})
+        char_font = font
+        if char_style and pixels_per_mm:
+            char_font = _spine_font(char_style.get("font"), max(6, int(float(char_style.get("sizeMm") or 1.7) * pixels_per_mm)), char)
+        char_fill = _spine_fill(char_style.get("color"), fill) if char_style else fill
+        char_bold = str(char_style.get("style") or "") in {"bold", "boldItalic"} if char_style else bold
+        char_italic = str(char_style.get("style") or "") in {"italic", "boldItalic"} if char_style else italic
+        step = max(1, int(char_font.size * leading))
         if y + step > limit:
             char = "…"
-        width = draw.textlength(char, font=font)
+        width = draw.textlength(char, font=char_font)
         px = x - width / 2.0
-        if italic:
+        if char_italic:
             # 在没有对应 italic 字形的个人字体上保留可见的倾斜效果。
-            px += max(1, int(font.size * 0.12))
-        draw.text((px, y), char, font=font, fill=fill)
-        if bold:
-            draw.text((px + 1, y), char, font=font, fill=fill)
+            px += max(1, int(char_font.size * 0.12))
+        draw.text((px, y), char, font=char_font, fill=char_fill)
+        if char_bold:
+            draw.text((px + 1, y), char, font=char_font, fill=char_fill)
         y += step
         if char == "…":
             break
@@ -1798,7 +1807,7 @@ def spine_overlay(base, variant, album="", artist="", company="", copy_settings=
     dim = dim_ink(ink, swatch, 0.68)
     x = w / 2.0
     top = int(h * 0.075)
-    usable = int(h * 0.77)
+    usable = int(h * 0.89)
     templates = (copy_settings or {}).get("spineTemplates") or {}
     zone_key = {"right": "right", "left": "left", "left-back": "leftBack"}.get(variant, "")
     # 格式工具针对当前整条物理侧封：无论沿用固定模板还是改成自定义文字，字体、字号、
@@ -1806,13 +1815,17 @@ def spine_overlay(base, variant, album="", artist="", company="", copy_settings=
     appearance = ((copy_settings or {}).get("spineAppearance") or {}).get(zone_key) or {}
     size_mm = max(0.8, min(2.6, float(appearance.get("sizeMm") or 1.7)))
     size_px = max(7, int(w * size_mm / 4.4))
+    title_size_mm = max(0.8, min(2.6, float(appearance.get("titleSizeMm") or size_mm)))
+    artist_size_mm = max(0.8, min(2.6, float(appearance.get("artistSizeMm") or round(size_mm * 0.74, 1))))
+    title_size_px = max(7, int(w * title_size_mm / 4.4))
+    artist_size_px = max(6, int(w * artist_size_mm / 4.4))
     style = str(appearance.get("style") or "normal")
     custom_fill = _spine_fill(appearance.get("color"), ink)
     has_custom_fill = str(appearance.get("color") or "auto").lower() != "auto"
     custom_text = str(((copy_settings or {}).get("spineText") or {}).get(zone_key) or "").strip()
+    character_styles = ((copy_settings or {}).get("spineCharacterStyles") or {}).get(zone_key) or {}
     if custom_text:
-        # 这是最终 4.4×38mm 的出图尺寸，不按页面缩略图猜字号。字号受窄边宽度
-        # 限制，文本超出高度时由 _vertical_spine_text 明确省略，绝不压折线。
+        # 自定义文字始终保持用户选定的字号，向下使用延长后的侧封可用区域。
         custom_font = _spine_font(appearance.get("font"), size_px, custom_text)
         _vertical_spine_text(d, x, top, custom_text, custom_font, custom_fill, usable, 1.10,
                               bold=style in {"bold", "boldItalic"},
@@ -1824,17 +1837,19 @@ def spine_overlay(base, variant, album="", artist="", company="", copy_settings=
     template = templates.get(zone_key, "title-artist-classic")
     if template == "title-artist-classic":
         # 固定模板只固定标题与歌手的位置；文字外观完全服从当前侧封工具栏。
-        title_font = _spine_font(appearance.get("font"), size_px, album)
+        title_font = _spine_font(appearance.get("font"), title_size_px, album)
         after_title = _vertical_spine_text(d, x, int(h * 0.29), album, title_font, custom_fill,
                                             int(h * 0.27), 1.06,
                                             bold=style in {"bold", "boldItalic"},
-                                            italic=style in {"italic", "boldItalic"})
-        artist_font = _spine_font(appearance.get("font"), max(6, int(size_px * 0.74)), artist)
+                                            italic=style in {"italic", "boldItalic"},
+                                            char_styles=character_styles.get("title"), pixels_per_mm=w / 4.4)
+        artist_font = _spine_font(appearance.get("font"), artist_size_px, artist)
         artist_fill = custom_fill if has_custom_fill else dim
         _vertical_spine_text(d, x, max(int(h * 0.62), after_title + int(h * 0.06)),
                               artist, artist_font, artist_fill, int(h * 0.20), 1.04,
                               bold=style in {"bold", "boldItalic"},
-                              italic=style in {"italic", "boldItalic"})
+                              italic=style in {"italic", "boldItalic"},
+                              char_styles=character_styles.get("artist"), pixels_per_mm=w / 4.4)
         return base
 
     if variant == "right":
