@@ -201,6 +201,7 @@ DEFAULTS = {
     "keychain": False,         # 是否同时出「钥匙扣商品图」（5 层合成）
     "shop": False,             # 是否同时出「白底商品图」（product shot）
     "shopCanvas": ["long", "square"],   # 商品图画布：config/canvas_presets.json 里的 key，可多选
+    "shopStyle": "classic",       # 商品图钥匙扣外壳款式
     "shopBg": "both",          # 商品图底色: white 白底 / transparent 透明 / both
     "shopGrid": True,          # 商品图是否另出拼版总览
     "vinyl": False,            # 是否同时出「黑胶播放界面」（1:2 竖图）
@@ -837,7 +838,7 @@ def render_keychain(job, base, cpath, ppath):
 
 # 贴片裁到钥匙扣外轮廓后只有 546×1456（原图 1920²），一次裁好复用，
 # 和 _KC_CACHE 一样按指纹失效 —— 重标定贴片后不必重启服务。
-_SHOP_CACHE = {"ov": None, "err": None, "stamp": None}
+_SHOP_CACHE = {"ov": {}, "err": {}, "stamp": None}
 
 SHOP_BG_TAG = {"white": "", "transparent": "-透明"}
 
@@ -863,21 +864,41 @@ def shop_presets():
             for k, v in spec.items()]
 
 
-def shop_assets():
-    """惰性载入商品图用的「裁切后贴片」。失败返回 None。"""
+def shop_styles():
+    """提供给前端的商品图实物款式；文件缺失的款式不下发。"""
+    if SHOP is None:
+        return []
+    out = []
+    for key, spec in getattr(SHOP, "STYLE_SPEC", {}).items():
+        if os.path.isfile(spec.get("path", "")):
+            out.append({"key": key, "label": spec.get("label") or key,
+                        "tag": spec.get("tag") or key})
+    return out
+
+
+def shop_assets(style="classic"):
+    """惰性载入指定实物款的裁切贴片；失败返回 None。"""
     if SHOP is None:
         return None
-    stamp = _asset_stamp()
-    if _SHOP_CACHE["ov"] is None or _SHOP_CACHE["stamp"] != stamp:
+    style = SHOP.parse_style(style)
+    spec = SHOP.style_info(style)
+    try:
+        s = os.stat(spec["path"])
+        stamp = f"{int(s.st_mtime)}:{s.st_size}"
+    except OSError:
+        stamp = "missing"
+    old_stamp = (_SHOP_CACHE["stamp"] or {}).get(style) if isinstance(_SHOP_CACHE["stamp"], dict) else None
+    if _SHOP_CACHE["ov"].get(style) is None or old_stamp != stamp:
         try:
-            _SHOP_CACHE["ov"] = SHOP.load_overlay_trimmed()
-            _SHOP_CACHE["stamp"] = stamp
-            _SHOP_CACHE["err"] = None
-            slog("SYS", f"商品图贴片已裁切载入（指纹 {stamp}）")
+            _SHOP_CACHE["ov"][style] = SHOP.load_overlay_trimmed(style)
+            if not isinstance(_SHOP_CACHE["stamp"], dict): _SHOP_CACHE["stamp"] = {}
+            _SHOP_CACHE["stamp"][style] = stamp
+            _SHOP_CACHE["err"][style] = None
+            slog("SYS", f"商品图贴片「{style}」已裁切载入（指纹 {stamp}）")
         except Exception as e:
-            _SHOP_CACHE["err"] = f"{type(e).__name__}: {e}"
-            slog("WARN", f"商品图素材加载失败：{_SHOP_CACHE['err']}")
-    return _SHOP_CACHE["ov"]
+            _SHOP_CACHE["err"][style] = f"{type(e).__name__}: {e}"
+            slog("WARN", f"商品图素材「{style}」加载失败：{_SHOP_CACHE['err'][style]}")
+    return _SHOP_CACHE["ov"].get(style)
 
 
 def shop_ready():
@@ -885,7 +906,7 @@ def shop_ready():
     if SHOP is None:
         return False, f"商品图模块不可用（{_SHOP_IMPORT_ERR}）"
     if shop_assets() is None:
-        return False, f"商品图素材缺失：{_SHOP_CACHE['err']}"
+        return False, f"商品图素材缺失：{_SHOP_CACHE['err'].get('classic')}"
     return True, None
 
 
@@ -902,6 +923,15 @@ def shop_plan(opt):
     return canvases, bgs
 
 
+def shop_style(opt):
+    return SHOP.parse_style(opt.get("shopStyle", "classic"))
+
+
+def shop_variant_key(style, kind, bg):
+    # 历史的长条款键名保持不变，新款加前缀，旧任务和现有前端都能继续回看。
+    return f"{kind}_{bg}" if style == "classic" else f"{style}__{kind}_{bg}"
+
+
 def render_shop(job, base, ppath, opt):
     """给一首歌追加白底/透明底商品图。
 
@@ -910,9 +940,10 @@ def render_shop(job, base, ppath, opt):
     """
     if SHOP is None:
         return {}, f"商品图模块不可用（{_SHOP_IMPORT_ERR}）"
-    ov = shop_assets()
+    style = shop_style(opt)
+    ov = shop_assets(style)
     if ov is None:
-        return {}, f"商品图素材缺失（{_SHOP_CACHE['err']}）"
+        return {}, f"商品图素材缺失（{_SHOP_CACHE['err'].get(style)}）"
 
     canvases, bgs = shop_plan(opt)
     out_dir = os.path.join(job["dir"], "shop")
@@ -923,17 +954,18 @@ def render_shop(job, base, ppath, opt):
         tag = shop_tag(kind)
         for bg in bgs:
             ext = ".png" if bg == "transparent" else ".jpg"
-            name = "%s-商品图-%s%s%s" % (base, tag, SHOP_BG_TAG[bg], ext)
+            style_tag = "" if style == "classic" else "-%s" % SHOP.style_info(style)["tag"]
+            name = "%s-商品图-%s%s%s%s" % (base, tag, style_tag, SHOP_BG_TAG[bg], ext)
             p = os.path.join(out_dir, name)
             try:
-                im = SHOP.build_unit(ppath, ov, kind=kind, bg=bg)
+                im = SHOP.build_unit(ppath, ov, kind=kind, bg=bg, style=style)
                 SHOP.save_img(im, p, bg=bg)
                 im.close()
             except Exception as e:
                 err = f"{type(e).__name__}: {e}"
                 log(job, f"  └ 商品图 {tag}{SHOP_BG_TAG[bg]} 失败：{err}", "warn")
                 continue
-            made[f"{kind}_{bg}"] = os.path.relpath(p, job["dir"])
+            made[shop_variant_key(style, kind, bg)] = os.path.relpath(p, job["dir"])
     return made, (None if made else err)
 
 
@@ -1165,16 +1197,13 @@ def _shop_label(shop_rel):
     顺序跟着预设声明顺序走（用户能在 config/canvas_presets.json 里调整），
     不再写死 long/square —— 预设是可配置的。
     """
-    spec = getattr(SHOP, "CANVAS_SPEC", None) or {}
-    keys = [f"{kind}_{bg}" for kind in spec for bg in ("white", "transparent")
-            if f"{kind}_{bg}" in shop_rel]
-    for k in shop_rel:                      # 预设里没有的键（理论上不会出现）兜底
-        if k not in keys:
-            keys.append(k)
     tags = []
-    for k in keys:
-        kind = k.rpartition("_")[0]         # 用 rpartition：预设 key 里可能带下划线
-        tags.append("%s·%s" % (shop_tag(kind), "白底" if k.endswith("white") else "透明"))
+    for k in shop_rel:
+        style, kind_bg = (k.split("__", 1) if "__" in k else ("classic", k))
+        kind = kind_bg.rpartition("_")[0]
+        style_name = SHOP.style_info(style).get("label", style)
+        tags.append("%s·%s·%s" % (style_name, shop_tag(kind),
+                                   "白底" if k.endswith("white") else "透明"))
     return " / ".join(tags)
 
 
@@ -1466,22 +1495,28 @@ def finish(job, made, ar_name, total_label, src=None):
     if shop_made and job.get("shopGrid", True) and SHOP is not None:
         job["phase"] = "生成商品图总览"
         grids = []
-        # 要拼哪些画布，从实际产出里反推；顺序跟预设声明顺序走
+        # 要拼哪些「款式 + 画布」从实际产出反推。老款仍是 long_white，
+        # 新款是 square_ring__long_white，二者要分开拼，不能混进同一张总览。
         seen = []
         for it in shop_made:
             for key in it["shopPaths"]:
-                k = key.rpartition("_")[0]
-                if k not in seen:
-                    seen.append(k)
+                style, kind_bg = (key.split("__", 1) if "__" in key else ("classic", key))
+                pair = (style, kind_bg.rpartition("_")[0])
+                if pair not in seen:
+                    seen.append(pair)
         order = list(getattr(SHOP, "CANVAS_SPEC", None) or {})
-        for kind in [k for k in order if k in seen] + [k for k in seen if k not in order]:
-            label = shop_tag(kind)
+        seen.sort(key=lambda pair: (list(getattr(SHOP, "STYLE_SPEC", {})).index(pair[0])
+                                    if pair[0] in getattr(SHOP, "STYLE_SPEC", {}) else 999,
+                                    order.index(pair[1]) if pair[1] in order else 999))
+        for style, kind in seen:
+            style_name = SHOP.style_info(style).get("label", style)
+            label = "%s · %s" % (style_name, shop_tag(kind))
             # 白底优先；用户只选了透明底就退而用透明底拼
-            prefer = "white" if any(it["shopPaths"].get(f"{kind}_white") for it in shop_made) \
+            prefer = "white" if any(it["shopPaths"].get(shop_variant_key(style, kind, "white")) for it in shop_made) \
                 else "transparent"
             units = []
             for it in shop_made:
-                rel = it["shopPaths"].get(f"{kind}_{prefer}")
+                rel = it["shopPaths"].get(shop_variant_key(style, kind, prefer))
                 if rel:
                     units.append(os.path.join(job["dir"], rel))
             if not units:
@@ -1497,7 +1532,7 @@ def finish(job, made, ar_name, total_label, src=None):
                         ims.append(f.convert("RGBA"))
                 g = SHOP.build_grid(ims, bg=prefer)
                 bg_tag = "白底" if prefer == "white" else "透明"
-                gname = "总览-商品图-%s-%s.%s" % (label, bg_tag,
+                gname = "总览-商品图-%s-%s.%s" % (label.replace(" · ", "-"), bg_tag,
                                                 "jpg" if prefer == "white" else "png")
                 gpath = os.path.join(job["dir"], gname)
                 SHOP.save_img(g, gpath, bg=prefer)
@@ -1926,7 +1961,8 @@ class Handler(BaseHTTPRequestHandler):
                                    "albumSizes": list(getattr(ALBUM, "CARD_SIZES",
                                                               (1200, 1500, 2000)))
                                                   if ab_ok else [],
-                                   "shopPresets": (shop_presets() if sh_ok else [])})
+                                   "shopPresets": (shop_presets() if sh_ok else []),
+                                   "shopStyles": (shop_styles() if sh_ok else [])})
             if p in ("/", "/index.html"):
                 return self._file(os.path.join(HERE, "index.html"))
             if p == "/favicon.ico":
@@ -2331,6 +2367,8 @@ class Handler(BaseHTTPRequestHandler):
                 # 这里不再写死白名单 —— 否则用户新增的预设会被当非法值丢掉。
                 opt["shopCanvas"] = (SHOP.parse_canvases(opt["shopCanvas"])
                                      if SHOP is not None else list(DEFAULTS["shopCanvas"]))
+                opt["shopStyle"] = (SHOP.parse_style(opt.get("shopStyle"))
+                                    if SHOP is not None else "classic")
                 opt["shopBg"] = opt.get("shopBg") \
                     if opt.get("shopBg") in ("white", "transparent", "both") else "both"
                 opt["top"] = max(1, min(opt["top"] or 10, 50))

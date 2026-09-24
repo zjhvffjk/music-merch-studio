@@ -32,7 +32,7 @@ import glob
 import json
 import math
 import argparse
-from PIL import Image
+from PIL import Image, ImageOps
 
 try:
     from make_set import save_retry          # 写文件重试，抗 Windows 文件锁
@@ -43,6 +43,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 ASSETS = os.path.join(ROOT, "assets", "keychain")
 OVERLAY = os.path.join(ASSETS, "keychain_overlay.png")
+SQUARE_RING_OVERLAY = os.path.join(ASSETS, "clear_square_ring_overlay.png")
 DEMO_DIR = os.path.join(ROOT, "assets", "demo")
 
 
@@ -50,11 +51,22 @@ def log(*a):
     print(*a, flush=True)
 
 
-# ---------- 实测几何（改这里之前先重跑 _tmp/measure_overlay.py）----------
-OBX0, OBY0, OBX1, OBY1 = 688, 232, 1233, 1687        # 钥匙扣外轮廓
-IBX0, IBY0, IBX1, IBY1 = 732, 873, 1184, 1627         # 内腔
-OW, OH = OBX1 - OBX0 + 1, OBY1 - OBY0 + 1             # 546 × 1456
-IW, IH = IBX1 - IBX0 + 1, IBY1 - IBY0 + 1             # 453 × 755
+# ---------- 款式与内腔几何 ----------
+# bbox / inner 都以对应的原始贴片坐标为准。内腔比播放卡略宽时，用 cover 裁切
+# 填满，避免白边；不会拉伸卡面。
+STYLE_SPEC = {
+    "classic": {
+        "label": "长条透明款", "tag": "长条款", "path": OVERLAY,
+        "bbox": (688, 232, 1233, 1687),
+        "inner": (732, 873, 1184, 1627),
+    },
+    "square_ring": {
+        "label": "透明方形圆环款", "tag": "方形圆环款", "path": SQUARE_RING_OVERLAY,
+        # 由透明贴片的非透明外轮廓和可放卡片的窗口实测。
+        "bbox": (41, 21, 1193, 1227),
+        "inner": (445, 555, 809, 1108),
+    },
+}
 
 # ---------- 画布配方（可配置）----------
 #   label: 界面显示名            tag: 写进文件名的中文简称（**必须唯一**）
@@ -233,23 +245,38 @@ GRID_GAP = 0.12         # 单元间距 = 单元宽 × 该值
 GRID_MARGIN = 0.24      # 画布外边距 = 单元宽 × 该值
 
 
-def load_overlay_trimmed(path=OVERLAY):
-    """读贴片并裁到钥匙扣外轮廓 —— 省掉四周大片透明区，缩放更省、定位更准。"""
-    ov = Image.open(path).convert("RGBA")
-    return ov.crop((OBX0, OBY0, OBX1 + 1, OBY1 + 1))
+def parse_style(value):
+    """把外部传入的款式收敛为已知 key，未知值退回现有长条款。"""
+    return str(value) if str(value) in STYLE_SPEC else "classic"
 
 
-def canvas_size(kind):
+def style_info(style="classic"):
+    return STYLE_SPEC[parse_style(style)]
+
+
+def load_overlay_trimmed(style="classic"):
+    """读指定款式的贴片并裁到外轮廓，省掉四周透明区。"""
+    spec = style_info(style)
+    x0, y0, x1, y1 = spec["bbox"]
+    with Image.open(spec["path"]) as src:
+        return src.convert("RGBA").crop((x0, y0, x1 + 1, y1 + 1))
+
+
+def canvas_size(kind, style="classic"):
     spec = CANVAS_SPEC[kind]
+    style_spec = style_info(style)
+    x0, y0, x1, y1 = style_spec["bbox"]
+    ow, oh = x1 - x0 + 1, y1 - y0 + 1
     h = spec["h"]
     pad = spec.get("pad", 0.07)
     target_h = round(h * (1 - 2 * pad))
-    w_need = round(OW * target_h / OH)
+    w_need = round(ow * target_h / oh)
     w = spec.get("w") or round(w_need / (1 - 2 * pad))   # 左右也留同样比例的白
     return w, h
 
 
-def build_unit(player_path, ov_trim, kind="long", bg="white", padding_rgb=None):
+def build_unit(player_path, ov_trim, kind="long", bg="white", padding_rgb=None,
+               style="classic"):
     """出一只钥匙扣的商品图。
 
     kind: long(竖长) / square(正方形)
@@ -257,12 +284,17 @@ def build_unit(player_path, ov_trim, kind="long", bg="white", padding_rgb=None):
     返回 RGBA Image。
     """
     spec = CANVAS_SPEC[kind]
-    CW, CH = canvas_size(kind)
+    style_spec = style_info(style)
+    x0, y0, x1, y1 = style_spec["bbox"]
+    ix0, iy0, ix1, iy1 = style_spec["inner"]
+    ow, oh = x1 - x0 + 1, y1 - y0 + 1
+    iw, ih = ix1 - ix0 + 1, iy1 - iy0 + 1
+    CW, CH = canvas_size(kind, style)
     pad = spec.get("pad", 0.07)
     target_h = round(CH * (1 - 2 * pad))
-    scale = target_h / OH
+    scale = target_h / oh
 
-    uw = round(OW * scale)
+    uw = round(ow * scale)
     ux = (CW - uw) // 2
     uy = round(CH * pad)
 
@@ -276,11 +308,12 @@ def build_unit(player_path, ov_trim, kind="long", bg="white", padding_rgb=None):
         raise ValueError("未知 bg: %s" % bg)
 
     # 卡片：按内腔等比缩放，四周各多 1px 藏进卡套边框底下
-    card_w = round(IW * scale) + CARD_BLEED
-    card_h = round(IH * scale) + CARD_BLEED
-    card_x = ux + round((IBX0 - OBX0) * scale) - CARD_BLEED // 2
-    card_y = uy + round((IBY0 - OBY0) * scale) - CARD_BLEED // 2
-    card = Image.open(player_path).convert("RGB").resize((card_w, card_h), Image.LANCZOS)
+    card_w = round(iw * scale) + CARD_BLEED
+    card_h = round(ih * scale) + CARD_BLEED
+    card_x = ux + round((ix0 - x0) * scale) - CARD_BLEED // 2
+    card_y = uy + round((iy0 - y0) * scale) - CARD_BLEED // 2
+    with Image.open(player_path) as src:
+        card = ImageOps.fit(src.convert("RGB"), (card_w, card_h), Image.LANCZOS)
     base.paste(card, (card_x, card_y))
 
     # 贴片盖在上面（内腔透明，卡片正好透出来）
@@ -330,12 +363,13 @@ def save_img(im, path, bg="white"):
     return path
 
 
-def variants_of(name, player_path, ov_trim, out_dir, canvases, bgs, log_each=True):
+def variants_of(name, player_path, ov_trim, out_dir, canvases, bgs, log_each=True,
+                style="classic"):
     """给一首歌出全部变体，返回 {变体键: 路径}。"""
     made = {}
     for kind in canvases:
         for bg in bgs:
-            im = build_unit(player_path, ov_trim, kind=kind, bg=bg)
+            im = build_unit(player_path, ov_trim, kind=kind, bg=bg, style=style)
             suffix = canvas_tag(kind)
             ext = ".png" if bg == "transparent" else ".jpg"
             tag = "" if bg == "white" else "-透明"
@@ -348,7 +382,7 @@ def variants_of(name, player_path, ov_trim, out_dir, canvases, bgs, log_each=Tru
 
 
 def batch(folder, out_dir=None, canvases=("long", "square"), bgs=("white", "transparent"),
-          grid=True, only=None):
+          grid=True, only=None, style="classic"):
     covers = sorted(glob.glob(os.path.join(folder, "covers", "*.*")))
     players = sorted(glob.glob(os.path.join(folder, "players", "*.png"))) or \
         sorted(glob.glob(os.path.join(folder, "players", "*.jpg")))
@@ -357,7 +391,8 @@ def batch(folder, out_dir=None, canvases=("long", "square"), bgs=("white", "tran
         return []
     cmap = {os.path.splitext(os.path.basename(c))[0]: c for c in covers}
     out_dir = out_dir or os.path.join(folder, "shop")
-    ov_trim = load_overlay_trimmed()
+    style = parse_style(style)
+    ov_trim = load_overlay_trimmed(style)
 
     names = [os.path.splitext(os.path.basename(p))[0] for p in players]
     if only:
@@ -372,10 +407,10 @@ def batch(folder, out_dir=None, canvases=("long", "square"), bgs=("white", "tran
     grid_units = {k: {} for k in canvases}
     for i, (pl, name) in enumerate(zip(players, names), 1):
         log("  [%d/%d] %s" % (i, len(players), name))
-        variants_of(name, pl, ov_trim, out_dir, canvases, bgs)
+        variants_of(name, pl, ov_trim, out_dir, canvases, bgs, style=style)
         if grid:
             for kind in canvases:
-                grid_units[kind][name] = build_unit(pl, ov_trim, kind=kind, bg="white")
+                grid_units[kind][name] = build_unit(pl, ov_trim, kind=kind, bg="white", style=style)
 
     if grid:
         for kind in canvases:
@@ -408,6 +443,8 @@ def main():
     ap.add_argument("--no-grid", action="store_true", help="不出拼版总览")
     ap.add_argument("--only", nargs="*", default=None, help="只处理名字含这些关键词的曲目")
     ap.add_argument("--overlay", default=OVERLAY)
+    ap.add_argument("--style", default="classic", choices=tuple(STYLE_SPEC),
+                    help="钥匙扣款式")
     ap.add_argument("--list-canvas", action="store_true", help="列出所有画布预设后退出")
     a = ap.parse_args()
 
@@ -426,7 +463,7 @@ def main():
         sys.exit(1)
 
     if a.batch:
-        batch(a.batch, a.out, canvases, bgs, grid=not a.no_grid, only=a.only)
+        batch(a.batch, a.out, canvases, bgs, grid=not a.no_grid, only=a.only, style=a.style)
         return
 
     if not a.player:
@@ -434,8 +471,8 @@ def main():
         log("未提供 --player，用占位素材：%s" % a.player)
     out_dir = a.out or os.path.join(ROOT, "outputs", "keychain_shop_test")
     os.makedirs(out_dir, exist_ok=True)
-    ov_trim = load_overlay_trimmed()
-    variants_of("demo", a.player, ov_trim, out_dir, canvases, bgs)
+    ov_trim = load_overlay_trimmed(a.style)
+    variants_of("demo", a.player, ov_trim, out_dir, canvases, bgs, style=a.style)
 
 
 if __name__ == "__main__":
