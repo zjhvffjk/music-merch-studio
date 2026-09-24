@@ -199,6 +199,7 @@ DEFAULTS = {
     "dedupe": True,            # 同名歌曲只留热度最高的一版
     "coverSize": 1492,         # 正方形封面母版边长（= 画布里"清晰封面"的边长，1:1 用上）
     "keychain": False,         # 是否同时出「钥匙扣商品图」（5 层合成）
+    "keychainStyle": "classic", # 钥匙扣商品图外壳款式
     "shop": False,             # 是否同时出「白底商品图」（product shot）
     "shopCanvas": ["long", "square"],   # 商品图画布：config/canvas_presets.json 里的 key，可多选
     "shopStyle": "classic",       # 商品图钥匙扣外壳款式
@@ -773,13 +774,13 @@ def jobs_dir_of(jid):
 
 # 贴片是 1.3MB PNG + 256 项色调曲线，解压一次约 0.2s。整组出图时逐张重读
 # 会白等十几秒，所以缓存起来复用（进程级，只加载一次）。
-_KC_CACHE = {"overlay": None, "lut": None, "err": None, "stamp": None}
+_KC_CACHE = {"overlay": {}, "lut": None, "err": {}, "stamp": {}}
 
 
-def _asset_stamp():
+def _asset_stamp(style="classic"):
     """贴片+曲线的指纹（mtime + 大小），用来判断要不要重载"""
     st = []
-    for p in (KC.OVERLAY, KC.CURVE_JSON):
+    for p in (KC.style_info(style)["path"], KC.CURVE_JSON):
         try:
             s = os.stat(p)
             st.append(f"{int(s.st_mtime)}:{s.st_size}")
@@ -788,7 +789,7 @@ def _asset_stamp():
     return "|".join(st)
 
 
-def keychain_assets():
+def keychain_assets(style="classic"):
     """惰性加载钥匙扣贴片与色调曲线。返回 (overlay, lut)，失败返回 (None, None)。
 
     贴片会被 tools/keychain_build.py 重新标定 —— 所以缓存记指纹，
@@ -796,17 +797,18 @@ def keychain_assets():
     """
     if KC is None:
         return None, None
-    stamp = _asset_stamp()
-    if _KC_CACHE["overlay"] is None or _KC_CACHE["stamp"] != stamp:
+    style = KC.parse_style(style)
+    stamp = _asset_stamp(style)
+    if _KC_CACHE["overlay"].get(style) is None or _KC_CACHE["stamp"].get(style) != stamp:
         try:
-            _KC_CACHE["overlay"], _KC_CACHE["lut"] = KC.prepare()
-            _KC_CACHE["stamp"] = stamp
-            _KC_CACHE["err"] = None
-            slog("SYS", f"钥匙扣贴片已载入（指纹 {stamp}）")
+            _KC_CACHE["overlay"][style], _KC_CACHE["lut"] = KC.prepare(style=style)
+            _KC_CACHE["stamp"][style] = stamp
+            _KC_CACHE["err"][style] = None
+            slog("SYS", f"钥匙扣贴片「{style}」已载入（指纹 {stamp}）")
         except Exception as e:
-            _KC_CACHE["err"] = f"{type(e).__name__}: {e}"
-            slog("WARN", f"钥匙扣素材加载失败：{_KC_CACHE['err']}")
-    return _KC_CACHE["overlay"], _KC_CACHE["lut"]
+            _KC_CACHE["err"][style] = f"{type(e).__name__}: {e}"
+            slog("WARN", f"钥匙扣素材加载失败：{_KC_CACHE['err'][style]}")
+    return _KC_CACHE["overlay"].get(style), _KC_CACHE["lut"]
 
 
 def keychain_ready():
@@ -815,20 +817,22 @@ def keychain_ready():
         return False, f"钥匙扣模块不可用（{_KC_IMPORT_ERR}）"
     overlay, _ = keychain_assets()
     if overlay is None:
-        return False, f"钥匙扣素材缺失：{_KC_CACHE['err']}"
+        return False, f"钥匙扣素材缺失：{_KC_CACHE['err'].get('classic')}"
     return True, None
 
 
-def render_keychain(job, base, cpath, ppath):
+def render_keychain(job, base, cpath, ppath, style="classic"):
     """给一首歌追加一张钥匙扣商品图。返回 (相对路径, 失败原因)"""
     if KC is None:
         return None, f"钥匙扣模块不可用（{_KC_IMPORT_ERR}）"
-    overlay, lut = keychain_assets()
+    style = KC.parse_style(style)
+    overlay, lut = keychain_assets(style)
     if overlay is None:
-        return None, f"钥匙扣素材缺失（{_KC_CACHE['err']}）"
-    kpath = os.path.join(job["dir"], "keychain", base + "-钥匙扣.jpg")
+        return None, f"钥匙扣素材缺失（{_KC_CACHE['err'].get(style)}）"
+    suffix = "" if style == "classic" else "-" + KC.style_info(style)["tag"]
+    kpath = os.path.join(job["dir"], "keychain", base + "-钥匙扣" + suffix + ".jpg")
     try:
-        KC.compose(cpath, ppath, kpath, overlay, lut)
+        KC.compose(cpath, ppath, kpath, overlay, lut, style=style)
     except Exception as e:
         return None, f"{type(e).__name__}: {e}"
     return os.path.relpath(kpath, job["dir"]), None
@@ -1147,7 +1151,7 @@ def render_song(job, s, rank, opt):
     # --- 3) 钥匙扣商品图（可选，复用上面刚出的封面 + 播放界面）---
     kc_rel = None
     if opt.get("keychain"):
-        kc_rel, kc_err = render_keychain(job, base, cpath, ppath)
+        kc_rel, kc_err = render_keychain(job, base, cpath, ppath, opt.get("keychainStyle", "classic"))
         if kc_rel:
             log(job, "  └ 钥匙扣商品图 1920×1920 已出图", "ok")
         else:
@@ -2351,6 +2355,8 @@ class Handler(BaseHTTPRequestHandler):
                 opt["follow"] = _as_bool(opt.get("follow"), True)
                 opt["allow_placeholder"] = _as_bool(opt.get("allow_placeholder"), False)
                 opt["keychain"] = _as_bool(opt.get("keychain"), False)
+                opt["keychainStyle"] = (KC.parse_style(opt.get("keychainStyle"))
+                                        if KC is not None else "classic")
                 opt["shop"] = _as_bool(opt.get("shop"), False)
                 opt["shopGrid"] = _as_bool(opt.get("shopGrid"), True)
                 opt["vinyl"] = _as_bool(opt.get("vinyl"), False)

@@ -6,6 +6,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'tools'))
 import make_keychain_shop as shop
+import make_keychain as scene
 
 
 class SquareRingKeychainTests(unittest.TestCase):
@@ -25,6 +26,13 @@ class SquareRingKeychainTests(unittest.TestCase):
 
     def test_unknown_style_falls_back_to_existing_classic_style(self):
         self.assertEqual(shop.parse_style('not-a-style'), 'classic')
+
+    def test_square_ring_style_is_available_to_the_scene_product_image_too(self):
+        self.assertIn('square_ring', scene.STYLE_SPEC)
+        overlay, lut = scene.prepare(style='square_ring')
+        self.assertEqual(overlay.size, (scene.CANVAS, scene.CANVAS))
+        self.assertEqual(scene.style_info('square_ring')['player'], (734, 866, 452, 687))
+        overlay.close()
 
 
 if __name__ == '__main__':

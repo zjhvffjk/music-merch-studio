@@ -166,29 +166,22 @@ class ServiceTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.service.create({"coverId": "../../a", "mode": "layout"})
 
-    def test_http_guards(self):
+    def test_packaging_routes_remain_unmounted_in_this_workbench(self):
         import server
         httpd = server.Server(("127.0.0.1", 0), server.Handler)
-        old = server.PACKAGING
-        server.PACKAGING = self.service
         thread = threading.Thread(target=httpd.serve_forever, daemon=True)
         thread.start()
         session = requests.Session()
         session.trust_env = False
         base = f"http://127.0.0.1:{httpd.server_port}"
         try:
-            self.assertEqual(session.get(base + "/packaging").status_code, 200)
-            self.assertEqual(session.post(base + "/api/packaging/run", json={}, headers={"Origin": "http://evil.example"}).status_code, 403)
-            self.assertEqual(session.post(base + "/api/packaging/run", json=[]).status_code, 400)
-            self.assertEqual(session.get(base + "/api/packaging/jobs", headers={"Host": "evil.example"}).status_code, 403)
-            self.assertEqual(session.get(base + "/api/packaging/jobs", headers={"Origin": "http://evil.example"}).status_code, 403)
-            self.assertEqual(session.post(base + "/api/packaging/upload", data=png()).status_code, 200)
-            self.assertEqual(session.get(base + "/api/packaging/jobs").json()["items"], [])
+            self.assertEqual(session.get(base + "/packaging").status_code, 404)
+            self.assertEqual(session.get(base + "/api/packaging/jobs").status_code, 404)
+            self.assertEqual(session.post(base + "/api/packaging/run", json={}).status_code, 404)
         finally:
             session.close()
             httpd.shutdown()
             httpd.server_close()
-            server.PACKAGING = old
 
 
 if __name__ == "__main__":

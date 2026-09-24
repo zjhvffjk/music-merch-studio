@@ -60,7 +60,20 @@ BG_CAP = 140.0
 PL_X, PL_Y, PL_W, PL_H = 732, 873, 453, 755      # 播放界面图落点与尺寸
 
 OVERLAY = os.path.join(ASSETS, "keychain_overlay.png")
+SQUARE_RING_OVERLAY = os.path.join(ASSETS, "clear_square_ring_overlay.png")
 CURVE_JSON = os.path.join(ASSETS, "tone_curve.json")
+
+# 统一两个商品图出口的实物款式。方形圆环款沿用同一张透明贴片，
+# 但在 1920 场景图里的播放卡窗口坐标与长条款不同。
+STYLE_SPEC = {
+    "classic": {"label": "长条透明款", "tag": "长条款", "path": OVERLAY,
+                "player": (PL_X, PL_Y, PL_W, PL_H)},
+    "square_ring": {"label": "透明方形圆环款", "tag": "方形圆环款",
+                    "path": SQUARE_RING_OVERLAY,
+                    # 与旧款保持同一主体高度和上下留白，不能让圆环顶到画布边缘。
+                    "scene_scale": 0.81, "scene_offset": (182, 177),
+                    "player": (734, 866, 452, 687)},
+}
 
 # 未提供 --cover/--player 时使用的演示占位素材。
 # 仓库自带，抽象图形，不含第三方版权内容，可用 tools/make_demo_assets.py 重新生成。
@@ -104,24 +117,43 @@ def apply_curve(arr, lut, strength=1.0):
     return arr * (1.0 - strength) + out * strength
 
 
-def load_overlay(path=OVERLAY):
+def parse_style(value):
+    return str(value) if str(value) in STYLE_SPEC else "classic"
+
+
+def style_info(style="classic"):
+    return STYLE_SPEC[parse_style(style)]
+
+
+def load_overlay(path=None, style="classic"):
     """读出钥匙扣 RGBA 贴片并统一到画布尺寸。
 
     贴片是 1.3MB 的 PNG，解压一次约 0.2s。批量出图（工作台整组 10~50 首）
     时逐张重读会白等十几秒，所以单独抽出来给调用方复用（见 prepare()）。
     """
+    path = path or style_info(style)["path"]
     ov = Image.open(path).convert("RGBA")
     if ov.size != (CANVAS, CANVAS):
         ov = ov.resize((CANVAS, CANVAS), Image.LANCZOS)
+    spec = style_info(style)
+    scale = float(spec.get("scene_scale", 1.0))
+    if scale != 1.0:
+        w = round(CANVAS * scale)
+        h = round(CANVAS * scale)
+        x, y = spec.get("scene_offset", ((CANVAS - w) // 2, (CANVAS - h) // 2))
+        fitted = Image.new("RGBA", (CANVAS, CANVAS), (0, 0, 0, 0))
+        fitted.alpha_composite(ov.resize((w, h), Image.LANCZOS), (int(x), int(y)))
+        ov.close()
+        ov = fitted
     return ov
 
 
-def prepare(overlay_path=OVERLAY, curve_path=CURVE_JSON):
+def prepare(overlay_path=None, curve_path=CURVE_JSON, style="classic"):
     """一次性备好可复用的贴片与色调曲线，返回 (overlay_img, lut)。
 
     lut 为 None 表示没有曲线文件（按原样贴图，不报错）。
     """
-    return load_overlay(overlay_path), load_curve()
+    return load_overlay(overlay_path, style), load_curve()
 
 
 def dim_background(canvas):
@@ -144,7 +176,7 @@ def dim_background(canvas):
     return canvas
 
 
-def build_canvas(cov, player_rgb, dim=True):
+def build_canvas(cov, player_rgb, player_box=(PL_X, PL_Y, PL_W, PL_H), dim=True):
     """按版式常量拼出「无钥匙扣」底图（1920×1920 float32）。
 
     唯一实现，生产（compose）与标定（keychain_build.build_base）共用，
@@ -164,29 +196,33 @@ def build_canvas(cov, player_rgb, dim=True):
     canvas[COVER_IN:COVER_IN + COVER_SIZE, COVER_IN:COVER_IN + COVER_SIZE] = \
         np.asarray(cov.resize((COVER_SIZE, COVER_SIZE), Image.LANCZOS)).astype(np.float32)
     # 播放界面图
-    canvas[PL_Y:PL_Y + PL_H, PL_X:PL_X + PL_W] = player_rgb
+    px, py, pw, ph = player_box
+    canvas[py:py + ph, px:px + pw] = player_rgb
     return canvas
 
 
-def compose(cover_path, player_path, out_path, overlay=OVERLAY, lut=None, curve=None):
+def compose(cover_path, player_path, out_path, overlay=None, lut=None, curve=None,
+            style="classic"):
     """合成一张钥匙扣商品图。
 
     curve：播放界面曲线强度 0~1。None = 用模块默认 CURVE_STRENGTH（0，原生效果）。
     """
+    style = parse_style(style)
+    px, py, pw, ph = style_info(style)["player"]
     strength = CURVE_STRENGTH if curve is None else float(curve)
     cov = Image.open(cover_path).convert("RGB")
 
     # 播放界面图（默认原样贴入；曲线强度由 CURVE_STRENGTH / --curve 决定）
     pl = np.asarray(Image.open(player_path).convert("RGB")
-                    .resize((PL_W, PL_H), Image.LANCZOS)).astype(np.float32)
+                    .resize((pw, ph), Image.LANCZOS)).astype(np.float32)
     if lut is not None and strength > 0:
         pl = apply_curve(pl, lut, strength)
 
-    canvas = build_canvas(cov, pl)
+    canvas = build_canvas(cov, pl, (px, py, pw, ph))
 
     # 钥匙扣叠加（overlay 可以是路径，也可以是已经加载好的 RGBA 图）
     base = Image.fromarray(np.clip(canvas, 0, 255).astype(np.uint8)).convert("RGBA")
-    ov = overlay if isinstance(overlay, Image.Image) else load_overlay(overlay)
+    ov = overlay if isinstance(overlay, Image.Image) else load_overlay(overlay, style)
     out = Image.alpha_composite(base, ov).convert("RGB")
 
     d = os.path.dirname(out_path)
@@ -207,7 +243,7 @@ def find_first(patterns):
     return None
 
 
-def batch(folder, overlay, lut, curve=None):
+def batch(folder, overlay, lut, curve=None, style="classic"):
     covers = sorted(glob.glob(os.path.join(folder, "covers", "*.*")))
     players = sorted(glob.glob(os.path.join(folder, "players", "*.png"))) or \
         sorted(glob.glob(os.path.join(folder, "players", "*.jpg")))
@@ -221,8 +257,9 @@ def batch(folder, overlay, lut, curve=None):
     for i, pl in enumerate(players, 1):
         name = os.path.splitext(os.path.basename(pl))[0]
         cov = cmap.get(name) or covers[(i - 1) % len(covers)]
-        out = os.path.join(folder, "keychain", "%s-钥匙扣.jpg" % name)
-        compose(cov, pl, out, overlay, lut, curve)
+        suffix = "" if parse_style(style) == "classic" else "-" + style_info(style)["tag"]
+        out = os.path.join(folder, "keychain", "%s-钥匙扣%s.jpg" % (name, suffix))
+        compose(cov, pl, out, overlay, lut, curve, style)
         outs.append(out)
         log("  [%d/%d] %s" % (i, len(players), os.path.basename(out)))
     log("完成，共 %d 张 -> %s" % (len(outs), os.path.join(folder, "keychain")))
@@ -233,33 +270,37 @@ def main():
     ap.add_argument("--cover", default=None, help="封面图（1:1 最佳）")
     ap.add_argument("--player", default=None, help="30×50mm 播放界面图（3:5）")
     ap.add_argument("--overlay", default=OVERLAY, help="钥匙扣 RGBA 叠加贴片")
+    ap.add_argument("--style", default="classic", choices=tuple(STYLE_SPEC), help="钥匙扣款式")
     ap.add_argument("--out", default=os.path.join(ROOT, "outputs", "keychain_test", "final.jpg"))
     ap.add_argument("--batch", default=None, help="对某歌手输出目录整组批处理")
     ap.add_argument("--curve", type=float, default=None,
                     help="播放界面色调曲线强度 0~1（默认 %s，即原生不套曲线）" % CURVE_STRENGTH)
     a = ap.parse_args()
 
-    if not os.path.exists(a.overlay):
-        log("缺少叠加贴片：%s\n请先运行 tools/keychain_build.py" % a.overlay)
+    overlay_path = a.overlay
+    if a.style != "classic" and a.overlay == OVERLAY:
+        overlay_path = style_info(a.style)["path"]
+    if not os.path.exists(overlay_path):
+        log("缺少叠加贴片：%s\n请先运行 tools/keychain_build.py" % overlay_path)
         sys.exit(1)
 
-    overlay, lut = prepare(a.overlay)
+    overlay, lut = prepare(overlay_path, style=a.style)
     eff = CURVE_STRENGTH if a.curve is None else a.curve
     log("色调曲线: %s（强度 %.2f）"
         % ("已加载" if lut is not None else "未找到（按原样贴图）", eff))
 
     if a.batch:
-        batch(a.batch, overlay, lut, a.curve)
+        batch(a.batch, overlay, lut, a.curve, a.style)
         return
 
     if a.cover and a.player:
-        compose(a.cover, a.player, a.out, overlay, lut, a.curve)
+        compose(a.cover, a.player, a.out, overlay, lut, a.curve, a.style)
         log("已输出: %s" % a.out)
     elif a.cover or a.player:
         log("--cover 与 --player 必须同时提供")
         sys.exit(1)
     else:
-        compose(PLACEHOLDER_COVER, PLACEHOLDER_PLAYER, a.out, overlay, lut, a.curve)
+        compose(PLACEHOLDER_COVER, PLACEHOLDER_PLAYER, a.out, overlay, lut, a.curve, a.style)
         log("已用占位素材输出: %s" % a.out)
 
 
