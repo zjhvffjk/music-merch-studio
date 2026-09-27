@@ -2582,9 +2582,12 @@ function singleDeliveryView(d){
   }
   // 两款与多个画布都放进同一个电商图页面并排展示，避免用户误以为只生成了一种。
   const shopGrids = d.shopGrids || [];
-  const shopImages = shopGrids.length
-    ? shopGrids.map(shop=>({url:shop.url,label:shop.label||'商品图拼版',title:shop.label||'电商白底图'}))
-    : shopShown(item).map(key=>({url:item.shopUrls[key],label:SHOP_TAG[key]||key,title:(item.name||'')+' '+(SHOP_TAG[key]||key)}));
+  const shopUrls = item.shopUrls || {};
+  const shopKeys = Object.keys(shopUrls).filter(key=>
+    key.endsWith('_white') || !shopUrls[key.replace(/_transparent$/, '_white')]);
+  const shopImages = shopKeys.length
+    ? shopKeys.map(key=>({url:shopUrls[key],label:SHOP_TAG[key]||key,title:(item.name||'')+' '+(SHOP_TAG[key]||key)}))
+    : shopGrids.map(shop=>({url:shop.url,label:shop.label||'商品图拼版',title:shop.label||'电商白底图'}));
   if(shopImages.length) tabs.push({key:'shop',no:String(tabs.length+1).padStart(2,'0'),label:'电商白底图',
     sub:shopImages.length+' 张成品',images:shopImages});
   const vinylNo=String(tabs.length+1).padStart(2,'0');
