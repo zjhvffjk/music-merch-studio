@@ -2759,8 +2759,8 @@ function paint(d){
 /* ---------------- 放大 ---------------- */
 function zoom(url, cap){
   const image = $('#lbimg');
-  image.src = url;
   image.dataset.scale = '1';
+  image.dataset.maxScale = '1';
   image.style.transform = 'scale(1)';
   /* 🔴 绝不能把 cap 拼进 innerHTML。
      cap 来自歌名/歌手/画布名（用户可控），内联 onclick 里 jsq() 只保证
@@ -2771,9 +2771,20 @@ function zoom(url, cap){
   const box = $('#lbcap');
   box.textContent = String(cap == null ? '' : cap);
   const sm = document.createElement('small');
-  sm.textContent = '滚轮向上放大、向下缩小 · 点击空白处关闭 · 右键可另存';
+  sm.textContent = '正在读取原图尺寸…';
   box.appendChild(sm);
+  image.onload = ()=>{
+    // 预览初始状态会按视窗缩小。只允许放大到 1:1 原始像素，不能让浏览器
+    // 把 1920px 的图硬插值成更大的图后看起来“低清”。
+    const shownW = image.getBoundingClientRect().width;
+    const shownH = image.getBoundingClientRect().height;
+    const nativeScale = Math.min(image.naturalWidth / shownW, image.naturalHeight / shownH);
+    const maxScale = Math.max(1, Math.min(3.5, nativeScale || 1));
+    image.dataset.maxScale = String(maxScale);
+    sm.textContent = `滚轮向上放大、向下缩小 · 最多原图 1:1（${Math.round(maxScale * 100)}%）· 点击空白处关闭 · 右键可另存`;
+  };
   $('#lb').classList.add('on');
+  image.src = url;
 }
 $('#lb').onclick = ()=> $('#lb').classList.remove('on');
 $('#lb').addEventListener('wheel', e=>{
@@ -2781,7 +2792,8 @@ $('#lb').addEventListener('wheel', e=>{
   e.preventDefault();
   const image = $('#lbimg');
   const current = Number(image.dataset.scale || 1);
-  const next = Math.max(.5, Math.min(3.5, current * (e.deltaY < 0 ? 1.16 : .86)));
+  const maxScale = Number(image.dataset.maxScale || 1);
+  const next = Math.max(.5, Math.min(maxScale, current * (e.deltaY < 0 ? 1.16 : .86)));
   image.dataset.scale = String(next);
   image.style.transform = `scale(${next})`;
 }, {passive:false});
