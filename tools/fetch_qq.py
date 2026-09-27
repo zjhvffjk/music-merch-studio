@@ -46,6 +46,13 @@ COVER = "https://y.gtimg.cn/music/photo_new/T002R{size}M000{amid}.jpg"
 
 MAX_COVER = 800          # 实测上限，别改 1000（404）
 
+# QQ 的旧搜索接口偶尔会直接返回 500，但歌手详情接口仍然可用。对版权高度
+# 集中的头部歌手，保留官方歌手 MID，避免错误退回到网易云的合唱／创作曲列表。
+# 未命中的歌手仍按下面的搜索逻辑处理。
+KNOWN_SINGER_MIDS = {
+    "周杰伦": ("0025NhlN2yWrP4", "周杰伦"),
+}
+
 
 def _get(url, timeout=20):
     req = urllib.request.Request(url, headers=UA)
@@ -82,6 +89,11 @@ def search_singer_mid(name):
     所以退一步：搜单曲，从结果的 singer 数组里挑与查询名一致的 mid。
     同名歌手用出现频次兜底。
     """
+    name = (name or "").strip()
+    known = KNOWN_SINGER_MIDS.get(name)
+    if known:
+        return known
+
     songs = search_song(name, 15)
     votes = Counter()
     for s in songs:

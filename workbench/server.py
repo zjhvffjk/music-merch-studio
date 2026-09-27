@@ -1670,8 +1670,16 @@ def pick_source(artist, mode, want):
         except Exception as e:
             notes.append(f"⚠ QQ音乐接口异常：{type(e).__name__}: {e}")
             if mode == "auto" and fallback_pool:
-                ar, pool, src_used = fallback_ar, fallback_pool, "163"
-                notes.append("已暂用网易云结果；QQ音乐恢复后会自动优先使用 QQ 数据")
+                # 网易云缺版权时会把“参与创作／Live 合唱”的条目混进歌手榜。
+                # QQ 失效也不能把这些错歌展示成热门歌曲；最多保留主唱确实是
+                # 当前歌手的少量可核对条目。
+                primary = [s for s in fallback_pool
+                           if (s.get("artists") or "").split("/", 1)[0].strip() == artist]
+                if primary:
+                    ar, pool, src_used = fallback_ar, primary, "163"
+                    notes.append("QQ音乐暂不可用；已仅保留网易云中主唱完全匹配的歌曲")
+                else:
+                    notes.append("QQ音乐暂不可用；已拒绝展示网易云混入的合唱／创作歌曲")
 
     return src_used, ar, pool or [], notes
 
