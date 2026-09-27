@@ -2758,7 +2758,10 @@ function paint(d){
 
 /* ---------------- 放大 ---------------- */
 function zoom(url, cap){
-  $('#lbimg').src = url;
+  const image = $('#lbimg');
+  image.src = url;
+  image.dataset.scale = '1';
+  image.style.transform = 'scale(1)';
   /* 🔴 绝不能把 cap 拼进 innerHTML。
      cap 来自歌名/歌手/画布名（用户可控），内联 onclick 里 jsq() 只保证
      「JS 字符串不被引号截断」—— 浏览器解析属性时会先把 HTML 实体**解码回原字符**，
@@ -2768,11 +2771,20 @@ function zoom(url, cap){
   const box = $('#lbcap');
   box.textContent = String(cap == null ? '' : cap);
   const sm = document.createElement('small');
-  sm.textContent = '点击任意处关闭 · 右键可另存';
+  sm.textContent = '滚轮向上放大、向下缩小 · 点击空白处关闭 · 右键可另存';
   box.appendChild(sm);
   $('#lb').classList.add('on');
 }
 $('#lb').onclick = ()=> $('#lb').classList.remove('on');
+$('#lb').addEventListener('wheel', e=>{
+  if(!$('#lb').classList.contains('on')) return;
+  e.preventDefault();
+  const image = $('#lbimg');
+  const current = Number(image.dataset.scale || 1);
+  const next = Math.max(.5, Math.min(3.5, current * (e.deltaY < 0 ? 1.16 : .86)));
+  image.dataset.scale = String(next);
+  image.style.transform = `scale(${next})`;
+}, {passive:false});
 document.addEventListener('keydown', e=>{
   if(e.key === 'Escape') $('#lb').classList.remove('on');
 });
