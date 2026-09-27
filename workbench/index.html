@@ -2466,9 +2466,16 @@ function render(d){
    只靠棋盘格区分，没必要占格子），白底一张都没出才退回透明版。最多两格。 */
 function shopShown(it){
   const u = it.shopUrls || {};
-  // 画布预设可配置，所以从 SHOP_ORDER 里取所有 *_white —— 不能写死
-  // ['long_white','square_white']，用户只勾淘宝/天猫时那样永远命中不到。
-  const keys = SHOP_ORDER.filter(k=> k.endsWith('_white') && u[k]).slice(0, 2);
+  // 每种已选款式各展示一张白底图。此前直接取前两张，会把方形圆环款排在
+  // 长条款所有画布之后，导致结果页看起来“只出了一种”。
+  const keys = [];
+  SHOP_STYLES.forEach(style=>{
+    const key = SHOP_ORDER.find(k=>{
+      const current = k.includes('__') ? k.split('__', 1)[0] : 'classic';
+      return current === style.key && k.endsWith('_white') && u[k];
+    });
+    if(key) keys.push(key);
+  });
   if(!keys.length) keys.push(...Object.keys(u).slice(0,2));
   return keys;
 }
@@ -2571,8 +2578,22 @@ function singleDeliveryView(d){
   }else if(d.keychainOverview){
     tabs.push({key:'keychain',no:'02',label:'钥匙扣商品图',sub:'实物合成主图',url:d.keychainOverview,title:(item.name||'')+' 钥匙扣商品图'});
   }
-  const nextNo=String(tabs.length+1).padStart(2,'0');
-  const shop=(d.shopGrids||[])[0]; if(shop) tabs.push({key:'shop',no:nextNo,label:'电商白底图',sub:shop.label||'商品图拼版',url:shop.url,title:shop.label||'电商白底图'});
+  // 两款 × 多个画布会有多张拼版；不能只拿第 1 张，否则后续款式会被藏掉。
+  const shopGrids = d.shopGrids || [];
+  shopGrids.forEach((shop, i)=>{
+    tabs.push({key:'shop-'+i,no:String(tabs.length+1).padStart(2,'0'),
+      label:'电商白底图 · '+(shop.label||'商品图拼版'),sub:'商品图拼版',
+      url:shop.url,title:shop.label||'电商白底图'});
+  });
+  // 用户关闭“拼版总览”时，仍要给每款实际商品图留查看入口，不能让已生成文件消失。
+  if(!shopGrids.length){
+    shopShown(item).forEach((key, i)=>{
+      const label = SHOP_TAG[key] || key;
+      tabs.push({key:'shop-unit-'+i,no:String(tabs.length+1).padStart(2,'0'),
+        label:'电商白底图 · '+label,sub:'单张商品图',
+        url:item.shopUrls[key],title:(item.name||'')+' '+label});
+    });
+  }
   const vinylNo=String(tabs.length+1).padStart(2,'0');
   if(item.vinylUrl || d.vinylOverview) tabs.push({key:'vinyl',no:vinylNo,label:'黑胶播放界面',sub:'竖图 · 播放卡',url:item.vinylUrl||d.vinylOverview,title:(item.name||'')+' 黑胶播放界面'});
   const printNo=String(tabs.length+1).padStart(2,'0');
