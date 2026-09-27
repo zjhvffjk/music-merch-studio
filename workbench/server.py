@@ -1250,7 +1250,7 @@ def _shop_label(shop_rel):
     return " / ".join(tags)
 
 
-PRINT_DPI = 300
+PRINT_DPI = 600
 
 # 播放界面是实际要裁切的卡片，模板不是单纯缩略图的视觉差异，而是不同的
 # 纸张利用率 / 裁切习惯。默认值严格对齐用户现有的 4×8 横向密排。
@@ -1331,7 +1331,7 @@ def render_player_print_sheets(job, made, layout="landscape32", dpi=PRINT_DPI):
         png = os.path.join(out_dir, base + "-" + suffix + ".png")
         pdf = os.path.join(out_dir, base + "-" + suffix + ".pdf")
         page.save(png, dpi=(dpi, dpi))
-        page.save(pdf, "PDF", resolution=dpi)
+        page.save(pdf, "PDF", resolution=dpi, quality=98, subsampling=0)
         rel_png, rel_pdf = _rel(job, png), _rel(job, pdf)
         out.append({
             "label": (f"{item.get('rank', 0):02d} {item.get('name') or '播放界面'} · "
@@ -1441,7 +1441,7 @@ def render_player_fold_prints(job, made, dpi=PRINT_DPI):
         draw.text((ruler_x, page_h - _mm_px(18, dpi)), "打印请选择 100% 原尺寸；不要“适应页面”或缩放。", font=font_label, fill=line)
         proof_png = os.path.join(out_dir, base + "-对折卡-1比1印刷总览.png")
         proof_pdf = os.path.join(out_dir, base + "-对折卡-1比1印刷总览.pdf")
-        proof.save(proof_png, dpi=(dpi, dpi)); proof.save(proof_pdf, "PDF", resolution=dpi)
+        proof.save(proof_png, dpi=(dpi, dpi)); proof.save(proof_pdf, "PDF", resolution=dpi, quality=98, subsampling=0)
         rel_png, rel_pdf = _rel(job, proof_png), _rel(job, proof_pdf)
         out.append({"kind": "proof", "label": f"{item.get('name') or '播放界面'} · 对折卡 1:1 印刷版面总览", "file": rel_png, "url": url_of(job, rel_png), "pdf": rel_pdf, "pdfUrl": url_of(job, rel_pdf)})
         proof.close()
@@ -1462,7 +1462,7 @@ def render_player_fold_prints(job, made, dpi=PRINT_DPI):
         draw.text((ox, foot_y), "3×5＝15 张对折卡｜实线裁切、虚线对折｜折好后每张 30×50mm｜100% 原尺寸打印", font=font_note, fill=(82, 82, 82))
         sheet_png = os.path.join(out_dir, base + "-对折卡-A4-3x5-15张.png")
         sheet_pdf = os.path.join(out_dir, base + "-对折卡-A4-3x5-15张.pdf")
-        sheet.save(sheet_png, dpi=(dpi, dpi)); sheet.save(sheet_pdf, "PDF", resolution=dpi)
+        sheet.save(sheet_png, dpi=(dpi, dpi)); sheet.save(sheet_pdf, "PDF", resolution=dpi, quality=98, subsampling=0)
         rel_png, rel_pdf = _rel(job, sheet_png), _rel(job, sheet_pdf)
         out.append({"kind": "sheet", "label": f"{item.get('name') or '播放界面'} · 对折卡 A4 裁切拼版（3×5＝15 张）", "file": rel_png, "url": url_of(job, rel_png), "pdf": rel_pdf, "pdfUrl": url_of(job, rel_pdf)})
         sheet.close(); card.close()
@@ -1891,14 +1891,39 @@ def run_album(job, opt):
 
 # ---------------------------------------------------------------- 打包
 
-def build_zip(dirpath, title):
+def build_zip(dirpath, title, image_format="jpg"):
     """把任务目录打成 ZIP。
 
     参数是 (目录, 标题) 而不是 job 对象 —— 这样**重启后**（内存里没有 job 了）
     也能用 meta.json 里的标题重建 ZIP，作品库的"重下"才有得下载。
     """
-    zpath = os.path.join(dirpath, f"{safe_name(title or '作品')}.zip")
+    image_format = image_format if image_format in ("jpg", "png", "original") else "jpg"
+    zpath = os.path.join(dirpath, f"{safe_name(title or '作品')}-{image_format}.zip")
     with zipfile.ZipFile(zpath, "w", zipfile.ZIP_DEFLATED) as z:
+        written = set()
+        def add_file(path, name):
+            ext = os.path.splitext(name)[1].lower()
+            if image_format != "original" and ext in (".jpg", ".jpeg", ".png"):
+                target = os.path.splitext(name)[0] + "." + image_format
+                if target in written:
+                    return
+                # Prefer lossless source when the renderer produced both formats.
+                lossless = os.path.splitext(path)[0] + ".png"
+                source = lossless if os.path.isfile(lossless) else path
+                with Image.open(source) as im:
+                    dpi = im.info.get("dpi", (300, 300))
+                    out = io.BytesIO()
+                    if image_format == "jpg":
+                        rgba = im.convert("RGBA")
+                        rgb = Image.new("RGB", im.size, "white")
+                        rgb.paste(rgba, mask=rgba.getchannel("A"))
+                        rgb.save(out, "JPEG", quality=98, subsampling=0, dpi=dpi)
+                    else:
+                        im.save(out, "PNG", dpi=dpi)
+                    z.writestr(target, out.getvalue())
+                written.add(target)
+            else:
+                z.write(path, name)
         folders = {
             "covers": "歌曲封面", "players": "播放界面", "print": "打印文件",
             "keychain": "钥匙扣商品图", "vinyl": "黑胶播放图", "shop": "白底与透明底商品图",
@@ -1911,11 +1936,11 @@ def build_zip(dirpath, title):
             for f in sorted(os.listdir(d)):
                 if f.startswith("_probe"):
                     continue
-                z.write(os.path.join(d, f), f"{label}/{f}")
+                add_file(os.path.join(d, f), f"{label}/{f}")
         # 总览类文件都在任务根目录（总览.jpg / 总览-钥匙扣.jpg / 总览-商品图-*.jpg|png）
         for f in sorted(os.listdir(dirpath)):
             if f.startswith("总览") and f.lower().endswith((".jpg", ".png")):
-                z.write(os.path.join(dirpath, f), f)
+                add_file(os.path.join(dirpath, f), f)
         # 专辑模式：albums.json 是专辑清单（含日期/曲目数/类别），
         # 带上它才能离线用 `make_album.py --batch` 重出，别漏。
         aj = os.path.join(dirpath, "albums.json")
@@ -2292,14 +2317,14 @@ class Handler(BaseHTTPRequestHandler):
                 jid = (q.get("id") or [""])[0]
                 job = JOBS.get(jid)
                 if job:
-                    z = build_zip(job["dir"], job["title"])
+                    z = build_zip(job["dir"], job["title"], (q.get("format") or ["jpg"])[0])
                     return self._file(z, name=f"{job['title']}.zip")
                 # 历史任务（重启后内存里没有）：用 meta.json 里的标题重建 ZIP
                 d = jobs_dir_of(jid)
                 m = load_meta(jid) if d else None
                 if not d or not m:
                     return self._json({"error": "job not found"}, 404)
-                z = build_zip(d, m.get("title"))
+                z = build_zip(d, m.get("title"), (q.get("format") or ["jpg"])[0])
                 return self._file(z, name=f"{m.get('title') or '作品'}.zip")
 
             return self._json({"error": "bad path"}, 404)
