@@ -1899,15 +1899,19 @@ def build_zip(dirpath, title):
     """
     zpath = os.path.join(dirpath, f"{safe_name(title or '作品')}.zip")
     with zipfile.ZipFile(zpath, "w", zipfile.ZIP_DEFLATED) as z:
-        for sub in ("covers", "players", "print", "keychain", "vinyl", "shop",
-                    "albums", "album_cards"):
+        folders = {
+            "covers": "歌曲封面", "players": "播放界面", "print": "打印文件",
+            "keychain": "钥匙扣商品图", "vinyl": "黑胶播放图", "shop": "白底与透明底商品图",
+            "albums": "专辑封面", "album_cards": "专辑卡",
+        }
+        for sub, label in folders.items():
             d = os.path.join(dirpath, sub)
             if not os.path.isdir(d):
                 continue
             for f in sorted(os.listdir(d)):
                 if f.startswith("_probe"):
                     continue
-                z.write(os.path.join(d, f), f"{sub}/{f}")
+                z.write(os.path.join(d, f), f"{label}/{f}")
         # 总览类文件都在任务根目录（总览.jpg / 总览-钥匙扣.jpg / 总览-商品图-*.jpg|png）
         for f in sorted(os.listdir(dirpath)):
             if f.startswith("总览") and f.lower().endswith((".jpg", ".png")):
