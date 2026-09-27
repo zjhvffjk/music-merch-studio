@@ -5,8 +5,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'tools'))
+sys.path.insert(0, str(ROOT / 'workbench'))
 import make_keychain_shop as shop
 import make_keychain as scene
+import server
 
 
 class SquareRingKeychainTests(unittest.TestCase):
@@ -33,6 +35,14 @@ class SquareRingKeychainTests(unittest.TestCase):
         self.assertEqual(overlay.size, (scene.CANVAS, scene.CANVAS))
         self.assertEqual(scene.style_info('square_ring')['player'], (734, 866, 452, 687))
         overlay.close()
+
+    def test_both_styles_are_kept_when_one_run_requests_them_together(self):
+        self.assertEqual(
+            server.keychain_styles({'keychainStyles': ['classic', 'square_ring']}),
+            ['classic', 'square_ring'])
+        self.assertEqual(
+            server.shop_styles_selected({'shopStyles': ['classic', 'square_ring']}),
+            ['classic', 'square_ring'])
 
 
 if __name__ == '__main__':

@@ -1400,7 +1400,7 @@ let SEL    = null;   // 选中的候选对象（含 source / albummid / id）
 let SHOP_PRESETS = [];       // [{key, label, tag}]
 let SHOP_KEYS    = [];       // 预设 key 顺序
 let SHOP_STYLES  = [];       // [{key, label, tag}]
-let SHOP_STYLE   = 'classic';
+let SHOP_STYLE_KEYS = [];    // 同次制作可同时生成多个钥匙扣款式
 let SHOP_ORDER   = [];       // 变体键顺序：款式__{key}_{bg}
 let SHOP_CV      = [];       // 选中的画布（多选）
 let SHOP_BG      = 'both';   // 底色：white / transparent / both
@@ -1973,9 +1973,20 @@ function renderShopStyleChips(){
   box.innerHTML = SHOP_STYLES.map(s=>
     `<button data-v="${esc(s.key)}" title="${esc(s.label || s.key)}">${esc(s.label || s.key)}</button>`).join('');
   box.querySelectorAll('button').forEach(b=>{
-    b.classList.toggle('on', b.dataset.v === SHOP_STYLE);
-    b.onclick = ()=>{ SHOP_STYLE = b.dataset.v; renderShopStyleChips(); };
+    b.classList.toggle('on', SHOP_STYLE_KEYS.includes(b.dataset.v));
+    b.onclick = ()=>toggleShopStyle(b.dataset.v);
   });
+  $$('[data-detail-shop-style]').forEach(b=>b.classList.toggle('on', SHOP_STYLE_KEYS.includes(b.dataset.detailShopStyle)));
+}
+function toggleShopStyle(style){
+  const at = SHOP_STYLE_KEYS.indexOf(style);
+  if(at >= 0){
+    if(SHOP_STYLE_KEYS.length === 1) return toast('至少保留一种钥匙扣款式');
+    SHOP_STYLE_KEYS.splice(at, 1);
+  }else{
+    SHOP_STYLE_KEYS.push(style);
+  }
+  renderShopStyleChips();
 }
 function mountShopStyleDetail(page){
   const shopButton = page && page.querySelector('[data-output="shop"]');
@@ -1984,17 +1995,13 @@ function mountShopStyleDetail(page){
   const item = document.createElement('section');
   item.className = 'song-maker-style-choice';
   item.dataset.detailShopStyle = '1';
-  item.innerHTML = '<span>钥匙扣商品图款式</span><div class="detail-chips">' +
+  item.innerHTML = '<span>钥匙扣商品图款式（可同时生成）</span><div class="detail-chips">' +
     SHOP_STYLES.map(s=>`<button type="button" data-detail-shop-style="${esc(s.key)}">${esc(s.label || s.key)}</button>`).join('') +
     '</div>';
   host.insertAdjacentElement('afterend', item);
   item.querySelectorAll('[data-detail-shop-style]').forEach(b=>{
-    b.classList.toggle('on', b.dataset.detailShopStyle === SHOP_STYLE);
-    b.onclick = ()=>{
-      SHOP_STYLE = b.dataset.detailShopStyle;
-      item.querySelectorAll('[data-detail-shop-style]').forEach(x=>x.classList.toggle('on', x === b));
-      renderShopStyleChips();
-    };
+    b.classList.toggle('on', SHOP_STYLE_KEYS.includes(b.dataset.detailShopStyle));
+    b.onclick = ()=>toggleShopStyle(b.dataset.detailShopStyle);
   });
 }
 
@@ -2005,7 +2012,8 @@ function initShopPresets(){
                                    {key:'square', label:'方形', tag:'方形'}];
   const ss = (BACKEND.info && BACKEND.info.shopStyles) || [];
   SHOP_STYLES = ss.length ? ss : [{key:'classic', label:'长条透明款', tag:'长条款'}];
-  if(!SHOP_STYLES.some(s=>s.key === SHOP_STYLE)) SHOP_STYLE = SHOP_STYLES[0].key;
+  SHOP_STYLE_KEYS = SHOP_STYLE_KEYS.filter(key=>SHOP_STYLES.some(s=>s.key === key));
+  if(!SHOP_STYLE_KEYS.length) SHOP_STYLE_KEYS = SHOP_STYLES.map(s=>s.key);
   SHOP_KEYS  = SHOP_PRESETS.map(p=>p.key);
   SHOP_ORDER = SHOP_STYLES.flatMap(s=>SHOP_KEYS.flatMap(k=>[
     shopVariantKey(s.key, k, 'white'), shopVariantKey(s.key, k, 'transparent')
@@ -2335,10 +2343,12 @@ function collect(){
     follow:     $('#p_follow').checked,
     allow_placeholder: $('#p_ph').checked,
     keychain:   $('#p_keychain').checked && !$('#p_keychain').disabled,
-    keychainStyle: SHOP_STYLE,
+    keychainStyle: SHOP_STYLE_KEYS[0],
+    keychainStyles: SHOP_STYLE_KEYS.slice(),
     shop:       $('#p_shop').checked && !$('#p_shop').disabled,
     shopCanvas: SHOP_CV,
-    shopStyle:  SHOP_STYLE,
+    shopStyle:  SHOP_STYLE_KEYS[0],
+    shopStyles: SHOP_STYLE_KEYS.slice(),
     shopBg:     SHOP_BG,
     shopGrid:   $('#p_shopGrid').checked,
     vinyl:      $('#p_vinyl').checked && !$('#p_vinyl').disabled,
@@ -2471,6 +2481,28 @@ function shopStrip(it){
         <img src="${esc(asset(it.shopUrls[k]))}" alt="" loading="lazy">
         <span>${esc(SHOP_TAG[k]||k)}</span>
       </div>`).join('') + '</div>';
+}
+function keychainEntries(it){
+  const urls = it.keychainUrls || {};
+  const entries = Object.entries(urls).filter(([,url])=>!!url);
+  if(entries.length) return entries;
+  return it.keychainUrl ? [['classic', it.keychainUrl]] : [];
+}
+function keychainStrip(it){
+  const entries = keychainEntries(it);
+  if(!entries.length) return '';
+  return '<div class="shopstrip">' + entries.map(([style,url])=>{
+    const spec = SHOP_STYLES.find(s=>s.key===style);
+    const label = (spec && spec.label) || style;
+    return `<div class="sst" onclick="zoom('${jsq(asset(url))}','${jsq(it.name)} ${jsq(label)} 钥匙扣商品图')">
+      <img src="${esc(asset(url))}" alt="" loading="lazy"><span>${esc(label)}</span></div>`;
+  }).join('') + '</div>';
+}
+function keychainLinks(it){
+  return keychainEntries(it).map(([style,url])=>{
+    const spec = SHOP_STYLES.find(s=>s.key===style);
+    return `\n          <a class="mini" href="${esc(asset(url))}?dl=1">${esc((spec && spec.label) || style)}</a>`;
+  }).join('');
 }
 function shopLinks(it){
   const u = it.shopUrls || {};
@@ -2661,18 +2693,13 @@ function paint(d){
           <div class="sh pl" onclick="zoom('${jsq(asset(it.playerUrl))}','${jsq(it.name)} 30×50mm 播放界面')">
             <img src="${esc(asset(it.playerUrl))}" alt="" loading="lazy">
             <span class="cap">播放界面</span>
-          </div>${it.keychainUrl ? `
-          <div class="sh kc" onclick="zoom('${jsq(asset(it.keychainUrl))}','${jsq(it.name)} 钥匙扣商品图')">
-            <img src="${esc(asset(it.keychainUrl))}" alt="" loading="lazy">
-            <span class="cap">钥匙扣</span>
-          </div>` : ''}
-        </div>${shopStrip(it)}${vinylStrip(it)}
+          </div>
+        </div>${keychainStrip(it)}${shopStrip(it)}${vinylStrip(it)}
         <div class="ft">
           <span class="mm">${esc(it.mm)} @ ${$('#p_dpi').value}DPI</span>
           <a class="mini" href="${esc(asset(it.coverUrl))}?dl=1">封面</a>
           <a class="mini" href="${esc(asset(it.playerJpgUrl))}?dl=1">JPG</a>
-          <a class="mini" href="${esc(asset(it.playerUrl))}?dl=1">PNG</a>${it.keychainUrl ?
-          `\n          <a class="mini" href="${esc(asset(it.keychainUrl))}?dl=1">钥匙扣</a>` : ''}${it.vinylUrl ?
+          <a class="mini" href="${esc(asset(it.playerUrl))}?dl=1">PNG</a>${keychainLinks(it)}${it.vinylUrl ?
           `\n          <a class="mini" href="${esc(asset(it.vinylUrl))}?dl=1">黑胶</a>` : ''}${shopLinks(it)}
         </div>
       </div>`).join('') + '</div>';
@@ -2869,7 +2896,10 @@ function libDetail(j){
       if(it.coverUrl) links.push(['封面', it.coverUrl]);
       if(it.playerJpgUrl) links.push(['播放图JPG', it.playerJpgUrl]);
       if(it.playerUrl) links.push(['播放图PNG', it.playerUrl]);
-      if(it.keychainUrl) links.push(['钥匙扣', it.keychainUrl]);
+      keychainEntries(it).forEach(([style,url])=>{
+        const spec = SHOP_STYLES.find(s=>s.key===style);
+        links.push([((spec && spec.label) || style) + ' 钥匙扣', url]);
+      });
       if(it.vinylUrl) links.push(['黑胶', it.vinylUrl]);
       if(it.albumUrl) links.push(['封面母版', it.albumUrl]);
       if(it.cardUrl) links.push(['专辑卡', it.cardUrl]);

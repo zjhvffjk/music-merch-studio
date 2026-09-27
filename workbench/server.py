@@ -199,10 +199,12 @@ DEFAULTS = {
     "dedupe": True,            # 同名歌曲只留热度最高的一版
     "coverSize": 1492,         # 正方形封面母版边长（= 画布里"清晰封面"的边长，1:1 用上）
     "keychain": False,         # 是否同时出「钥匙扣商品图」（5 层合成）
-    "keychainStyle": "classic", # 钥匙扣商品图外壳款式
+    "keychainStyle": "classic", # 兼容旧任务的单款字段
+    "keychainStyles": ["classic", "square_ring"], # 钥匙扣商品图外壳款式（可多选）
     "shop": False,             # 是否同时出「白底商品图」（product shot）
     "shopCanvas": ["long", "square"],   # 商品图画布：config/canvas_presets.json 里的 key，可多选
-    "shopStyle": "classic",       # 商品图钥匙扣外壳款式
+    "shopStyle": "classic",       # 兼容旧任务的单款字段
+    "shopStyles": ["classic", "square_ring"], # 商品图钥匙扣外壳款式（可多选）
     "shopBg": "both",          # 商品图底色: white 白底 / transparent 透明 / both
     "shopGrid": True,          # 商品图是否另出拼版总览
     "vinyl": False,            # 是否同时出「黑胶播放界面」（1:2 竖图）
@@ -280,6 +282,7 @@ def snap(job):
             d.pop("playerPath", None)      # 内部字段：本机绝对路径，不下发
             d.pop("coverPath", None)
             d.pop("keychainPath", None)
+            d.pop("keychainPaths", None)
             d.pop("vinylPath", None)
             d.pop("shopPaths", None)
             d.pop("albumPath", None)
@@ -361,6 +364,8 @@ def _meta_of(job):
             # 播放界面同时存了 png 与 jpg（同名不同后缀），不必再占一个字段
             "playerJpg": (os.path.splitext(player)[0] + ".jpg") if player else None,
             "keychain": _rel(job, it.get("keychainPath")),
+            "keychains": {style: _rel(job, path)
+                          for style, path in (it.get("keychainPaths") or {}).items()},
             "vinyl": _rel(job, it.get("vinylPath")),
             "shop": dict(it.get("shopPaths") or {}),
             # 专辑模式：一张专辑一张封面母版 + 一张专辑卡
@@ -571,6 +576,8 @@ def job_card(m):
             "playerUrl": _asset_url(jid, it.get("player")),
             "playerJpgUrl": _asset_url(jid, it.get("playerJpg")),
             "keychainUrl": _asset_url(jid, it.get("keychain")),
+            "keychainUrls": {str(style): _asset_url(jid, path)
+                              for style, path in (it.get("keychains") or {}).items()},
             "vinylUrl": _asset_url(jid, it.get("vinyl")),
             "albumUrl": _asset_url(jid, it.get("albumCover")),
             "cardUrl": _asset_url(jid, it.get("albumCard")),
@@ -927,8 +934,31 @@ def shop_plan(opt):
     return canvases, bgs
 
 
-def shop_style(opt):
-    return SHOP.parse_style(opt.get("shopStyle", "classic"))
+def _styles(value, parse, fallback="classic"):
+    """将前端多选款式收敛为稳定、去重后的列表，并兼容历史单选任务。"""
+    values = _as_list(value)
+    if not values:
+        values = [fallback]
+    out = []
+    for value in values:
+        style = parse(value)
+        if style not in out:
+            out.append(style)
+    return out
+
+
+def keychain_styles(opt):
+    value = opt.get("keychainStyles")
+    if value is None:
+        value = opt.get("keychainStyle", "classic")
+    return _styles(value, KC.parse_style)
+
+
+def shop_styles_selected(opt):
+    value = opt.get("shopStyles")
+    if value is None:
+        value = opt.get("shopStyle", "classic")
+    return _styles(value, SHOP.parse_style)
 
 
 def shop_variant_key(style, kind, bg):
@@ -944,32 +974,33 @@ def render_shop(job, base, ppath, opt):
     """
     if SHOP is None:
         return {}, f"商品图模块不可用（{_SHOP_IMPORT_ERR}）"
-    style = shop_style(opt)
-    ov = shop_assets(style)
-    if ov is None:
-        return {}, f"商品图素材缺失（{_SHOP_CACHE['err'].get(style)}）"
-
     canvases, bgs = shop_plan(opt)
     out_dir = os.path.join(job["dir"], "shop")
     os.makedirs(out_dir, exist_ok=True)
 
     made, err = {}, None
-    for kind in canvases:
-        tag = shop_tag(kind)
-        for bg in bgs:
-            ext = ".png" if bg == "transparent" else ".jpg"
-            style_tag = "" if style == "classic" else "-%s" % SHOP.style_info(style)["tag"]
-            name = "%s-商品图-%s%s%s%s" % (base, tag, style_tag, SHOP_BG_TAG[bg], ext)
-            p = os.path.join(out_dir, name)
-            try:
-                im = SHOP.build_unit(ppath, ov, kind=kind, bg=bg, style=style)
-                SHOP.save_img(im, p, bg=bg)
-                im.close()
-            except Exception as e:
-                err = f"{type(e).__name__}: {e}"
-                log(job, f"  └ 商品图 {tag}{SHOP_BG_TAG[bg]} 失败：{err}", "warn")
-                continue
-            made[shop_variant_key(style, kind, bg)] = os.path.relpath(p, job["dir"])
+    for style in shop_styles_selected(opt):
+        ov = shop_assets(style)
+        if ov is None:
+            err = f"商品图素材缺失（{_SHOP_CACHE['err'].get(style)}）"
+            log(job, f"  └ {SHOP.style_info(style)['label']}未出图：{err}", "warn")
+            continue
+        for kind in canvases:
+            tag = shop_tag(kind)
+            for bg in bgs:
+                ext = ".png" if bg == "transparent" else ".jpg"
+                style_tag = "" if style == "classic" else "-%s" % SHOP.style_info(style)["tag"]
+                name = "%s-商品图-%s%s%s%s" % (base, tag, style_tag, SHOP_BG_TAG[bg], ext)
+                p = os.path.join(out_dir, name)
+                try:
+                    im = SHOP.build_unit(ppath, ov, kind=kind, bg=bg, style=style)
+                    SHOP.save_img(im, p, bg=bg)
+                    im.close()
+                except Exception as e:
+                    err = f"{type(e).__name__}: {e}"
+                    log(job, f"  └ 商品图 {tag}{SHOP_BG_TAG[bg]} 失败：{err}", "warn")
+                    continue
+                made[shop_variant_key(style, kind, bg)] = os.path.relpath(p, job["dir"])
     return made, (None if made else err)
 
 
@@ -1149,13 +1180,17 @@ def render_song(job, s, rank, opt):
              f"{mm[0]:.1f}×{mm[1]:.1f}mm", "ok")
 
     # --- 3) 钥匙扣商品图（可选，复用上面刚出的封面 + 播放界面）---
-    kc_rel = None
+    kc_rel = {}
     if opt.get("keychain"):
-        kc_rel, kc_err = render_keychain(job, base, cpath, ppath, opt.get("keychainStyle", "classic"))
+        for style in keychain_styles(opt):
+            rel, kc_err = render_keychain(job, base, cpath, ppath, style)
+            if rel:
+                kc_rel[style] = rel
+            else:
+                log(job, f"  └ {KC.style_info(style)['label']}钥匙扣出图失败：{kc_err}", "warn")
         if kc_rel:
-            log(job, "  └ 钥匙扣商品图 1920×1920 已出图", "ok")
-        else:
-            log(job, f"  └ 钥匙扣出图失败：{kc_err}", "warn")
+            labels = " / ".join(KC.style_info(style)["label"] for style in kc_rel)
+            log(job, f"  └ 钥匙扣商品图 {len(kc_rel)} 款已出图：{labels}", "ok")
 
     # --- 4) 白底商品图（可选，复用刚出的播放界面当卡面）---
     shop_rel = {}
@@ -1183,13 +1218,17 @@ def render_song(job, s, rank, opt):
         "coverUrl": url_of(job, os.path.relpath(cpath, job["dir"])),
         "playerUrl": url_of(job, os.path.relpath(ppath, job["dir"])),
         "playerJpgUrl": url_of(job, os.path.relpath(jpath, job["dir"])),
-        "keychainUrl": url_of(job, kc_rel) if kc_rel else None,
+        # keychainUrl / keychainPath 保留首张，保证旧作品库与旧前端仍能读取；
+        # 新的多款数据放入 keychainUrls / keychainPaths。
+        "keychainUrl": url_of(job, next(iter(kc_rel.values()), None)) if kc_rel else None,
+        "keychainUrls": {style: url_of(job, rel) for style, rel in kc_rel.items()},
         "vinylUrl": url_of(job, vin_rel) if vin_rel else None,
         "shopUrls": {k: url_of(job, v) for k, v in shop_rel.items()},
         "mm": f"{mm[0]:.1f}×{mm[1]:.1f}mm",
         "coverPath": cpath,
         "playerPath": ppath,
-        "keychainPath": (os.path.join(job["dir"], kc_rel) if kc_rel else None),
+        "keychainPath": (os.path.join(job["dir"], next(iter(kc_rel.values()))) if kc_rel else None),
+        "keychainPaths": {style: os.path.join(job["dir"], rel) for style, rel in kc_rel.items()},
         "vinylPath": (os.path.join(job["dir"], vin_rel) if vin_rel else None),
         "shopPaths": shop_rel,
     }, None
@@ -1466,12 +1505,18 @@ def finish(job, made, ar_name, total_label, src=None):
             log(job, f"对折播放卡印刷文件已生成（{len(job['playerFoldPrints'])} 份：1:1 总览 + A4 拼版）", "ok")
 
     # 钥匙扣总览（1:1，用方形缩略图，别按 3:5 压扁）
-    kc_made = [it for it in made if it.get("keychainPath")]
+    kc_made = [(it, style, path)
+               for it in made
+               for style, path in (it.get("keychainPaths") or {}).items()]
+    # 历史任务只有单张 keychainPath，仍可生成总览。
+    if not kc_made:
+        kc_made = [(it, "classic", it["keychainPath"])
+                   for it in made if it.get("keychainPath")]
     if kc_made:
         job["phase"] = "生成钥匙扣总览"
         kgrid = contact_sheet(
-            [(it["keychainPath"], f"{it['rank']:02d} {it['name']}")
-             for it in kc_made],
+            [(path, f"{it['rank']:02d} {it['name']} · {KC.style_info(style)['label']}")
+             for it, style, path in kc_made],
             os.path.join(job["dir"], "总览-钥匙扣.jpg"),
             cols=min(5, len(kc_made)), thumb_w=300, ratio=1.0,
             title=f"{ar_name} · 钥匙扣商品图{tag}",
@@ -2355,8 +2400,9 @@ class Handler(BaseHTTPRequestHandler):
                 opt["follow"] = _as_bool(opt.get("follow"), True)
                 opt["allow_placeholder"] = _as_bool(opt.get("allow_placeholder"), False)
                 opt["keychain"] = _as_bool(opt.get("keychain"), False)
-                opt["keychainStyle"] = (KC.parse_style(opt.get("keychainStyle"))
-                                        if KC is not None else "classic")
+                opt["keychainStyles"] = (keychain_styles(opt)
+                                          if KC is not None else ["classic"])
+                opt["keychainStyle"] = opt["keychainStyles"][0]
                 opt["shop"] = _as_bool(opt.get("shop"), False)
                 opt["shopGrid"] = _as_bool(opt.get("shopGrid"), True)
                 opt["vinyl"] = _as_bool(opt.get("vinyl"), False)
@@ -2373,8 +2419,9 @@ class Handler(BaseHTTPRequestHandler):
                 # 这里不再写死白名单 —— 否则用户新增的预设会被当非法值丢掉。
                 opt["shopCanvas"] = (SHOP.parse_canvases(opt["shopCanvas"])
                                      if SHOP is not None else list(DEFAULTS["shopCanvas"]))
-                opt["shopStyle"] = (SHOP.parse_style(opt.get("shopStyle"))
-                                    if SHOP is not None else "classic")
+                opt["shopStyles"] = (shop_styles_selected(opt)
+                                     if SHOP is not None else ["classic"])
+                opt["shopStyle"] = opt["shopStyles"][0]
                 opt["shopBg"] = opt.get("shopBg") \
                     if opt.get("shopBg") in ("white", "transparent", "both") else "both"
                 opt["top"] = max(1, min(opt["top"] or 10, 50))
