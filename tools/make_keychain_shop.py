@@ -322,7 +322,7 @@ def build_unit(player_path, ov_trim, kind="long", bg="white", padding_rgb=None,
 
 
 def build_grid(units, cols=None, cell_w=GRID_CELL_W, bg="white",
-               gap_ratio=GRID_GAP, margin_ratio=GRID_MARGIN):
+               gap_ratio=GRID_GAP, margin_ratio=GRID_MARGIN, target_size=None):
     """把若干只单只商品图排成网格总览（仿样板：等距、白底、整体留白）。
 
     cols 传 None 表示用默认列数，但**不足一整行时按实际数量收窄** ——
@@ -330,6 +330,51 @@ def build_grid(units, cols=None, cell_w=GRID_CELL_W, bg="white",
     """
     if not units:
         raise ValueError("没有可拼版的单元")
+    # 工作台里的“商品图总览”也要是一张可上架的成品图，不能为了预览把
+    # 1920px 的单品缩成 480px。target_size 传入当前白底商品图画布时，
+    # 输出严格遵循该画布尺寸；单图更直接原样返回。
+    if target_size:
+        CW, CH = (int(target_size[0]), int(target_size[1]))
+        if CW <= 0 or CH <= 0:
+            raise ValueError("总览画布尺寸必须为正整数")
+        if len(units) == 1 and units[0].size == (CW, CH):
+            return units[0].copy()
+
+        uw, uh = units[0].size
+        unit_ratio = uw / uh
+        edge = min(CW, CH)
+        margin = max(12, round(edge * margin_ratio))
+        gap = max(8, round(edge * gap_ratio))
+
+        # 逐个试列数，选择能让每只钥匙扣占用面积最大的排法。
+        best = None
+        for candidate in range(1, len(units) + 1):
+            rows = math.ceil(len(units) / candidate)
+            available_w = CW - margin * 2 - gap * (candidate - 1)
+            available_h = CH - margin * 2 - gap * (rows - 1)
+            if available_w <= 0 or available_h <= 0:
+                continue
+            cell_w_fit = available_w / candidate
+            cell_h_fit = available_h / rows
+            image_w = min(cell_w_fit, cell_h_fit * unit_ratio)
+            if best is None or image_w > best[0]:
+                best = (image_w, candidate, rows, cell_w_fit, cell_h_fit)
+        if best is None:
+            raise ValueError("总览画布过小，无法排版")
+        _, cols, rows, cell_w_fit, cell_h_fit = best
+        fill = (255, 255, 255, 255) if bg == "white" else (0, 0, 0, 0)
+        base = Image.new("RGBA", (CW, CH), fill)
+        for i, im in enumerate(units):
+            r, c = divmod(i, cols)
+            box_w, box_h = round(cell_w_fit), round(cell_h_fit)
+            thumb = ImageOps.contain(im, (box_w, box_h), Image.LANCZOS)
+            cell_x = margin + round(c * (cell_w_fit + gap))
+            cell_y = margin + round(r * (cell_h_fit + gap))
+            x = cell_x + (box_w - thumb.width) // 2
+            y = cell_y + (box_h - thumb.height) // 2
+            base.alpha_composite(thumb, (x, y))
+        return base
+
     cols = min(cols or GRID_COLS, len(units))
     uw, uh = units[0].size
     cell_h = round(cell_w * uh / uw)

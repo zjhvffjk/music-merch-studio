@@ -1579,7 +1579,12 @@ def finish(job, made, ar_name, total_label, src=None):
                         #    ValueError: images do not match。
                         #    CLI 那边单元是内存里现成的 RGBA，所以露不出这个问题。
                         ims.append(f.convert("RGBA"))
-                g = SHOP.build_grid(ims, bg=prefer)
+                # 总览不是后台缩略图，而是可下载、可上架的商品图：画布尺寸
+                # 必须与用户勾选的白底商品图预设完全相同。
+                g = SHOP.build_grid(
+                    ims, bg=prefer,
+                    target_size=SHOP.canvas_size(kind, style),
+                )
                 bg_tag = "白底" if prefer == "white" else "透明"
                 gname = "总览-商品图-%s-%s.%s" % (label.replace(" · ", "-"), bg_tag,
                                                 "jpg" if prefer == "white" else "png")

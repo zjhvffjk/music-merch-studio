@@ -2,6 +2,7 @@ import os
 import sys
 import unittest
 from pathlib import Path
+from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'tools'))
@@ -28,6 +29,20 @@ class SquareRingKeychainTests(unittest.TestCase):
 
     def test_unknown_style_falls_back_to_existing_classic_style(self):
         self.assertEqual(shop.parse_style('not-a-style'), 'classic')
+
+    def test_shop_overview_keeps_the_selected_product_canvas_size(self):
+        size = shop.canvas_size('square', 'square_ring')
+        unit = Image.new('RGBA', size, (24, 72, 90, 255))
+        overview = shop.build_grid([unit], bg='white', target_size=size)
+        self.assertEqual(overview.size, size)
+        self.assertEqual(overview.getpixel((0, 0)), (24, 72, 90, 255))
+        overview.close()
+
+        # 多首时仍输出同样的电商画布，只在画布内排版。
+        multi = shop.build_grid([unit, unit], bg='white', target_size=size)
+        self.assertEqual(multi.size, size)
+        multi.close()
+        unit.close()
 
     def test_square_ring_style_is_available_to_the_scene_product_image_too(self):
         self.assertIn('square_ring', scene.STYLE_SPEC)
