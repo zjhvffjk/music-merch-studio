@@ -1328,9 +1328,9 @@ def render_player_print_sheets(job, made, layout="landscape32", dpi=PRINT_DPI):
 
         base = safe_name(f"{item.get('rank', 0):02d} {item.get('name') or '播放界面'}")
         suffix = safe_name(f"播放界面-A4-{cols}x{rows}-{cols * rows}张")
-        png = os.path.join(out_dir, base + "-" + suffix + ".png")
+        png = os.path.join(out_dir, base + "-" + suffix + ".jpg")
         pdf = os.path.join(out_dir, base + "-" + suffix + ".pdf")
-        page.save(png, dpi=(dpi, dpi))
+        page.save(png, quality=98, subsampling=0, dpi=(dpi, dpi))
         page.save(pdf, "PDF", resolution=dpi, quality=98, subsampling=0)
         rel_png, rel_pdf = _rel(job, png), _rel(job, pdf)
         out.append({
@@ -1439,9 +1439,9 @@ def render_player_fold_prints(job, made, dpi=PRINT_DPI):
             tick = _mm_px(4 if n % 10 == 0 else 2.5, dpi)
             draw.line((px, ruler_y - tick, px, ruler_y + tick), fill=line, width=2 if n % 10 == 0 else 1)
         draw.text((ruler_x, page_h - _mm_px(18, dpi)), "打印请选择 100% 原尺寸；不要“适应页面”或缩放。", font=font_label, fill=line)
-        proof_png = os.path.join(out_dir, base + "-对折卡-1比1印刷总览.png")
+        proof_png = os.path.join(out_dir, base + "-对折卡-1比1印刷总览.jpg")
         proof_pdf = os.path.join(out_dir, base + "-对折卡-1比1印刷总览.pdf")
-        proof.save(proof_png, dpi=(dpi, dpi)); proof.save(proof_pdf, "PDF", resolution=dpi, quality=98, subsampling=0)
+        proof.save(proof_png, quality=98, subsampling=0, dpi=(dpi, dpi)); proof.save(proof_pdf, "PDF", resolution=dpi, quality=98, subsampling=0)
         rel_png, rel_pdf = _rel(job, proof_png), _rel(job, proof_pdf)
         out.append({"kind": "proof", "label": f"{item.get('name') or '播放界面'} · 对折卡 1:1 印刷版面总览", "file": rel_png, "url": url_of(job, rel_png), "pdf": rel_pdf, "pdfUrl": url_of(job, rel_pdf)})
         proof.close()
@@ -1460,9 +1460,9 @@ def render_player_fold_prints(job, made, dpi=PRINT_DPI):
                 _crop_marks(draw, sx, sy, card_w, card_h, dpi)
         foot_y = oy + grid_h + _mm_px(8, dpi)
         draw.text((ox, foot_y), "3×5＝15 张对折卡｜实线裁切、虚线对折｜折好后每张 30×50mm｜100% 原尺寸打印", font=font_note, fill=(82, 82, 82))
-        sheet_png = os.path.join(out_dir, base + "-对折卡-A4-3x5-15张.png")
+        sheet_png = os.path.join(out_dir, base + "-对折卡-A4-3x5-15张.jpg")
         sheet_pdf = os.path.join(out_dir, base + "-对折卡-A4-3x5-15张.pdf")
-        sheet.save(sheet_png, dpi=(dpi, dpi)); sheet.save(sheet_pdf, "PDF", resolution=dpi, quality=98, subsampling=0)
+        sheet.save(sheet_png, quality=98, subsampling=0, dpi=(dpi, dpi)); sheet.save(sheet_pdf, "PDF", resolution=dpi, quality=98, subsampling=0)
         rel_png, rel_pdf = _rel(job, sheet_png), _rel(job, sheet_pdf)
         out.append({"kind": "sheet", "label": f"{item.get('name') or '播放界面'} · 对折卡 A4 裁切拼版（3×5＝15 张）", "file": rel_png, "url": url_of(job, rel_png), "pdf": rel_pdf, "pdfUrl": url_of(job, rel_pdf)})
         sheet.close(); card.close()
@@ -1901,10 +1901,11 @@ def build_zip(dirpath, title, image_format="jpg"):
     zpath = os.path.join(dirpath, f"{safe_name(title or '作品')}-{image_format}.zip")
     with zipfile.ZipFile(zpath, "w", zipfile.ZIP_DEFLATED) as z:
         written = set()
-        def add_file(path, name):
+        def add_file(path, name, format_override=None):
+            fmt = format_override or image_format
             ext = os.path.splitext(name)[1].lower()
-            if image_format != "original" and ext in (".jpg", ".jpeg", ".png"):
-                target = os.path.splitext(name)[0] + "." + image_format
+            if fmt != "original" and ext in (".jpg", ".jpeg", ".png"):
+                target = os.path.splitext(name)[0] + "." + fmt
                 if target in written:
                     return
                 # Prefer lossless source when the renderer produced both formats.
@@ -1913,7 +1914,7 @@ def build_zip(dirpath, title, image_format="jpg"):
                 with Image.open(source) as im:
                     dpi = im.info.get("dpi", (300, 300))
                     out = io.BytesIO()
-                    if image_format == "jpg":
+                    if fmt == "jpg":
                         rgba = im.convert("RGBA")
                         rgb = Image.new("RGB", im.size, "white")
                         rgb.paste(rgba, mask=rgba.getchannel("A"))
@@ -1936,7 +1937,7 @@ def build_zip(dirpath, title, image_format="jpg"):
             for f in sorted(os.listdir(d)):
                 if f.startswith("_probe"):
                     continue
-                add_file(os.path.join(d, f), f"{label}/{f}")
+                add_file(os.path.join(d, f), f"{label}/{f}", "jpg" if sub == "print" else None)
         # 总览类文件都在任务根目录（总览.jpg / 总览-钥匙扣.jpg / 总览-商品图-*.jpg|png）
         for f in sorted(os.listdir(dirpath)):
             if f.startswith("总览") and f.lower().endswith((".jpg", ".png")):

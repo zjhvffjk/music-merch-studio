@@ -2796,7 +2796,7 @@ document.addEventListener('keydown', e=>{
 function downloadZip(id){
   const dialog=document.createElement('dialog');
   dialog.style.cssText='margin:auto;padding:24px;border:1px solid #ddd;border-radius:14px;max-width:420px;width:90%';
-  dialog.innerHTML=`<form method="dialog"><h3>下载图片格式</h3><p style="margin:12px 0">打印文件默认 JPG，PDF 也会保留。</p><select id="zipFormat" style="width:100%;padding:10px"><option value="jpg">JPG · 透明区域转为白底</option><option value="png">PNG · 保留透明背景</option><option value="original">原始格式 · 保留全部文件</option></select><p style="margin:12px 0;color:#667">格式选择适用于本次 ZIP 内的图片，不改变打印尺寸。</p><div style="display:flex;gap:10px;justify-content:flex-end"><button class="btn" value="cancel">取消</button><button class="btn" value="download">下载 ZIP</button></div></form>`;
+  dialog.innerHTML=`<form method="dialog"><h3>下载图片格式</h3><p style="margin:12px 0">打印文件默认 JPG，PDF 也会保留。</p><select id="zipFormat" style="width:100%;padding:10px"><option value="jpg">JPG · 透明区域转为白底</option><option value="png">PNG · 保留透明背景</option><option value="original">原始格式 · 保留全部文件</option></select><p style="margin:12px 0;color:#667">此选项不影响打印文件：打印图片统一为 JPG，并保留 PDF。</p><div style="display:flex;gap:10px;justify-content:flex-end"><button class="btn" value="cancel">取消</button><button class="btn" value="download">下载 ZIP</button></div></form>`;
   document.body.appendChild(dialog);dialog.showModal();
   dialog.addEventListener('close',()=>{
     if(dialog.returnValue==='download'){
