@@ -194,6 +194,7 @@ DEFAULTS = {
     "played": 0.0,
     "vip": True,
     "follow": True,
+    "playbackMode": "loop",
     "allow_placeholder": False,
     "source": "auto",          # auto=网易云优先,版权缺失自动切 QQ
     "dedupe": True,            # 同名歌曲只留热度最高的一版
@@ -1166,7 +1167,7 @@ def render_song(job, s, rank, opt):
         width=opt["width"], played_ratio=opt["played"], playlist=opt["playlist"],
         likes=opt["likes"], comments=cmt, listeners=opt["listeners"],
         quality=opt["quality"], statusbar=False, ratio=opt["ratio"],
-        vip=opt["vip"], follow=opt["follow"], video_tag=False, fav_loop=True,
+        vip=opt["vip"], follow=opt["follow"], video_tag=False, fav_loop=True, playback_mode=opt.get("playbackMode", "loop"),
     )
     with Image.open(ppath) as _f:
         im = _f.convert("RGB")

@@ -258,6 +258,38 @@ def draw_loop(d, cx, cy, r, color, lw):
                (cx + r * 0.46, cy - r * 0.16)], fill=color)
 
 
+def draw_reference_path(d, cx, cy, size, points, color, lw):
+    d.line([(cx+x*size, cy+y*size) for x,y in points], fill=color, width=lw, joint="curve")
+
+
+def draw_open_heart(d, cx, cy, size, color, lw):
+    # Open upper-right shoulder, leaving room for the superscript count.
+    curves = [((.10,-.36),(-.12,-.62),(-.52,-.40),(-.46,-.10)),
+              ((-.46,-.10),(-.42,.15),(-.16,.36),(0,.48)),
+              ((0,.48),(.18,.37),(.40,.15),(.44,-.04))]
+    points=[]
+    for a,b,c,e in curves:
+        for i in range(33):
+            t=i/32;u=1-t
+            points.append((u**3*a[0]+3*u*u*t*b[0]+3*u*t*t*c[0]+t**3*e[0],u**3*a[1]+3*u*u*t*b[1]+3*u*t*t*c[1]+t**3*e[1]))
+    draw_reference_path(d,cx,cy,size,points,color,lw)
+
+
+def draw_play_mode(d, cx, cy, r, color, lw, mode):
+    if mode == "random":
+        for sign in (-1,1):
+            points=[(-1,sign*.65),(-.65,sign*.6),(-.3,sign*.3),(.3,-sign*.4),(.7,-sign*.65),(1,-sign*.65)]
+            draw_reference_path(d,cx,cy,r,points,color,lw)
+            y=cy-sign*r*.65
+            d.polygon([(cx+r,y),(cx+r*.65,y-r*.22),(cx+r*.65,y+r*.22)],fill=color)
+    else:
+        d.arc([cx-r,cy-r*.75,cx+r,cy+r*.75],0,270,fill=color,width=lw)
+        d.line([(cx,cy-r*.75),(cx+r*.8,cy-r*.75)],fill=color,width=lw)
+        d.polygon([(cx+r,cy-r*.75),(cx+r*.55,cy-r*1.02),(cx+r*.55,cy-r*.48)],fill=color)
+        if mode == "single":
+            d.text((cx,cy),"1",font=_font(int(r*1.1)),fill=color,anchor="mm")
+
+
 def draw_pause(d, cx, cy, bw, bh, gap_c, color):
     for sx in (-1, 1):
         x = cx + sx * gap_c / 2
@@ -278,19 +310,19 @@ def draw_tri(d, cx, cy, s, color, direction, outline=False, lw=3):
 
 
 def draw_bar_icon(d, cx, cy, s, color, lw):
-    """列表图标 (三横线, 首行内缩)"""
-    for i, y in enumerate((-0.36, 0.0, 0.36)):
-        x0 = cx - s / 2 + (s * 0.18 if i == 0 else 0)
-        d.line([(x0, cy + s * y), (cx + s / 2, cy + s * y)], fill=color, width=lw)
+    """Playback queue with a leading triangle."""
+    for i, y in enumerate((-.36, 0, .36)):
+        x0=cx+s*.02 if i==0 else cx-s/2
+        d.line([(x0,cy+s*y),(cx+s/2,cy+s*y)],fill=color,width=lw)
+    d.polygon([(cx-s/2,cy-s*.51),(cx-s/2,cy-s*.21),(cx-s*.25,cy-s*.36)],fill=color)
 
 
 def draw_bubble(d, cx, cy, s, color, lw):
-    """评论气泡轮廓"""
-    bw, bh = s, s * 0.84
-    d.rounded_rectangle([cx - bw / 2, cy - bh / 2, cx + bw / 2, cy + bh * 0.24],
-                        radius=bh * 0.34, outline=color, width=lw)
-    d.line([(cx - bw * 0.28, cy + bh * 0.22), (cx - bw * 0.36, cy + bh * 0.58),
-            (cx - bw * 0.02, cy + bh * 0.23)], fill=color, width=lw, joint="curve")
+    d.arc([cx-s*.48,cy-s*.48,cx+s*.48,cy+s*.48],0,220,fill=color,width=lw)
+    d.arc([cx-s*.48,cy-s*.48,cx+s*.48,cy+s*.48],220,275,fill=color,width=lw)
+    draw_reference_path(d,cx,cy,s,[(-.37,.30),(-.46,.48),(0,.48)],color,lw)
+    for y, end in [(-.10,.04),(.13,.17)]:
+        d.line([(cx-s*.22,cy+s*y),(cx+s*end,cy+s*y)],fill=color,width=lw)
 
 
 def fmt_time(sec):
@@ -339,7 +371,7 @@ def make(cover_path, out_path, title, artist, duration, width=1200,
          played_ratio=0.047, playlist="我喜欢的音乐",
          likes="999w+", comments="100w+", listeners="999+人", quality="极高音质",
          statusbar=False, clock="12:01", ratio=RATIO,
-         vip=False, follow=False, video_tag=False, fav_loop=True):
+         vip=False, follow=False, video_tag=False, fav_loop=True, playback_mode="loop"):
     W = width
     H = int(W * ratio)
     is_3x5 = abs(ratio - RATIO_3X5) < 0.06
@@ -439,23 +471,15 @@ def make(cover_path, out_path, title, artist, duration, width=1200,
         d.text((vx + vw / 2, title_y), "VIP", font=f_vip,
                fill=(234, 236, 244, 255), anchor="mm")
 
-    f_num = _font(int(W * 0.0225))
-    # 评论 (右对齐到屏幕安全边)
-    r_edge = W * 0.9830
-    cw = tw_of(d, comments, f_num)
-    c_x = r_edge - cw
-    d.text((c_x, title_y + W * 0.0035), comments, font=f_num,
-           fill=TEXT_SUB, anchor="lm")
-    bsz = W * 0.0356
-    b_cx = c_x - W * 0.0140 - bsz / 2
-    draw_bubble(d, b_cx, title_y, bsz, TEXT_SUB + (255,),
-                max(2, int(W * 0.0026)))
-    # 点赞
-    hw = tw_of(d, likes, f_num)
-    h_x = b_cx - bsz / 2 - W * 0.0566 - hw
-    d.text((h_x, title_y + W * 0.0035), likes, font=f_num,
-           fill=ACCENT_RED + (255,), anchor="lm")
-    draw_heart(d, h_x - W * 0.0255, title_y, W * 0.0520, ACCENT_RED + (255,))
+    f_num = _font(int(W * 0.0205), bold=True)
+    icon_y = title_y + W*.012
+    icon_size = W*.047
+    for cx, count, kind in [(W*.70, likes, "heart"),(W*.88, comments, "comment")]:
+        if kind == "heart":
+            draw_open_heart(d,cx,icon_y,icon_size,TEXT_SUB+(255,),max(2,int(W*.0028)))
+        else:
+            draw_bubble(d,cx,icon_y,icon_size,TEXT_SUB+(255,),max(2,int(W*.0028)))
+        d.text((cx+W*.012,icon_y-icon_size*.42),count,font=f_num,fill=TEXT_SUB,anchor="lm")
 
     # ---------- 5. 歌手 (+ 「关注」按钮 或 > 箭头) ----------
     art_y = H * ART_Y
@@ -502,8 +526,8 @@ def make(cover_path, out_path, title, artist, duration, width=1200,
     lw_i = max(3, int(W * 0.0042))
     # 第一个图标: 新版是「循环」(参考模板), 旧版是「心形+闪光」
     if fav_loop:
-        draw_loop(d, W * 0.0968, ctl_y, W * 0.0272, ICON_DIM + (255,),
-                  max(3, int(W * 0.0042)))
+        draw_play_mode(d, W * 0.0968, ctl_y, W * 0.0272, ICON_DIM + (255,),
+                       max(3, int(W * 0.0032)), playback_mode)
     else:
         draw_heart_outline(img, W * 0.0958, ctl_y, W * 0.0509, ICON_DIM + (255,),
                            max(2, int(W * 0.0032)))
