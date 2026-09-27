@@ -166,9 +166,11 @@ def dim_background(canvas):
     """
     if BG_CAP >= 255:
         return canvas
-    m = np.ones((CANVAS, CANVAS), bool)
-    m[FRAME_OUT:FRAME_OUT + COVER_SIZE + 2 * FRAME_THICK,
-      FRAME_OUT:FRAME_OUT + COVER_SIZE + 2 * FRAME_THICK] = False
+    factor = canvas.shape[0] / CANVAS
+    start = round(FRAME_OUT * factor)
+    end = round((FRAME_OUT + COVER_SIZE + 2 * FRAME_THICK) * factor)
+    m = np.ones(canvas.shape[:2], bool)
+    m[start:end, start:end] = False
     lum = canvas @ np.array([.299, .587, .114], np.float32)
     p95 = float(np.percentile(lum[m], 95)) if m.any() else 255.0
     if p95 > BG_CAP:
@@ -176,13 +178,18 @@ def dim_background(canvas):
     return canvas
 
 
-def build_canvas(cov, player_rgb, player_box=(PL_X, PL_Y, PL_W, PL_H), dim=True):
+def build_canvas(cov, player_rgb, player_box=(PL_X, PL_Y, PL_W, PL_H), dim=True, render_scale=1):
     """按版式常量拼出「无钥匙扣」底图（1920×1920 float32）。
 
     唯一实现，生产（compose）与标定（keychain_build.build_base）共用，
     避免两边常量漂移。
     """
-    bg = cov.resize((CANVAS, CANVAS), Image.LANCZOS).filter(ImageFilter.GaussianBlur(BG_BLUR))
+    size = CANVAS * render_scale
+    frame_out = FRAME_OUT * render_scale
+    cover_in = COVER_IN * render_scale
+    cover_size = COVER_SIZE * render_scale
+    frame_thick = FRAME_THICK * render_scale
+    bg = cov.resize((size, size), Image.LANCZOS).filter(ImageFilter.GaussianBlur(BG_BLUR * render_scale))
     canvas = np.asarray(bg).astype(np.float32)
     if BG_WHITE:
         canvas = canvas * (1 - BG_WHITE) + 255.0 * BG_WHITE
@@ -190,11 +197,11 @@ def build_canvas(cov, player_rgb, player_box=(PL_X, PL_Y, PL_W, PL_H), dim=True)
         canvas = dim_background(canvas)
 
     # 白卡纸
-    canvas[FRAME_OUT:FRAME_OUT + COVER_SIZE + 2 * FRAME_THICK,
-           FRAME_OUT:FRAME_OUT + COVER_SIZE + 2 * FRAME_THICK] = 255.0
+    canvas[frame_out:frame_out + cover_size + 2 * frame_thick,
+           frame_out:frame_out + cover_size + 2 * frame_thick] = 255.0
     # 清晰封面
-    canvas[COVER_IN:COVER_IN + COVER_SIZE, COVER_IN:COVER_IN + COVER_SIZE] = \
-        np.asarray(cov.resize((COVER_SIZE, COVER_SIZE), Image.LANCZOS)).astype(np.float32)
+    canvas[cover_in:cover_in + cover_size, cover_in:cover_in + cover_size] = \
+        np.asarray(cov.resize((cover_size, cover_size), Image.LANCZOS)).astype(np.float32)
     # 播放界面图
     px, py, pw, ph = player_box
     canvas[py:py + ph, px:px + pw] = player_rgb
@@ -202,13 +209,14 @@ def build_canvas(cov, player_rgb, player_box=(PL_X, PL_Y, PL_W, PL_H), dim=True)
 
 
 def compose(cover_path, player_path, out_path, overlay=None, lut=None, curve=None,
-            style="classic"):
+            style="classic", render_scale=2):
     """合成一张钥匙扣商品图。
 
     curve：播放界面曲线强度 0~1。None = 用模块默认 CURVE_STRENGTH（0，原生效果）。
     """
     style = parse_style(style)
     px, py, pw, ph = style_info(style)["player"]
+    px, py, pw, ph = (v * render_scale for v in (px, py, pw, ph))
     strength = CURVE_STRENGTH if curve is None else float(curve)
     cov = Image.open(cover_path).convert("RGB")
 
@@ -218,20 +226,22 @@ def compose(cover_path, player_path, out_path, overlay=None, lut=None, curve=Non
     if lut is not None and strength > 0:
         pl = apply_curve(pl, lut, strength)
 
-    canvas = build_canvas(cov, pl, (px, py, pw, ph))
+    canvas = build_canvas(cov, pl, (px, py, pw, ph), render_scale=render_scale)
 
     # 钥匙扣叠加（overlay 可以是路径，也可以是已经加载好的 RGBA 图）
     base = Image.fromarray(np.clip(canvas, 0, 255).astype(np.uint8)).convert("RGBA")
     ov = overlay if isinstance(overlay, Image.Image) else load_overlay(overlay, style)
+    if ov.size != base.size:
+        ov = ov.resize(base.size, Image.LANCZOS)
     out = Image.alpha_composite(base, ov).convert("RGB")
 
     d = os.path.dirname(out_path)
     if d:
         os.makedirs(d, exist_ok=True)
     if save_retry:
-        save_retry(out, out_path, quality=95)
+        save_retry(out, out_path, quality=98, subsampling=0)
     else:
-        out.save(out_path, quality=95)
+        out.save(out_path, quality=98, subsampling=0)
     return out
 
 

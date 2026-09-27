@@ -240,7 +240,7 @@ def parse_canvases(value):
 
 CARD_BLEED = 2          # 卡片每边多出 1px，防止缩放取整导致边缘露白
 GRID_COLS = 5           # 拼版列数（仿样板图 5 列）
-GRID_CELL_W = 360       # 拼版单元宽（高按竖长比例自动算）
+GRID_CELL_W = 1080      # 直接从成品原图采样，保留原网格比例
 GRID_GAP = 0.12         # 单元间距 = 单元宽 × 该值
 GRID_MARGIN = 0.24      # 画布外边距 = 单元宽 × 该值
 
@@ -357,9 +357,9 @@ def save_img(im, path, bg="white"):
     else:
         out = im.convert("RGB") if im.mode == "RGBA" else im
         if save_retry:
-            save_retry(out, path, quality=95)
+            save_retry(out, path, quality=98, subsampling=0)
         else:
-            out.save(path, quality=95)
+            out.save(path, quality=98, subsampling=0)
     return path
 
 

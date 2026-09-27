@@ -241,29 +241,30 @@ def is_placeholder(path: str) -> bool:
 
 # ---------------- 总览九宫格 ----------------
 
-def contact_sheet(players, out_path, cols=5, thumb_w=300, title="", ratio=None):
+def contact_sheet(players, out_path, cols=5, thumb_w=300, title="", ratio=None, render_scale=3):
     """缩略图总览。ratio 缺省按 30×50mm（3:5）；钥匙扣商品图是 1:1，传 1.0。"""
     if not players:
         return ""
+    thumb_w *= render_scale
     rows = (len(players) + cols - 1) // cols
     th = int(thumb_w * (RATIO_30X50 if ratio is None else ratio))
-    gap, pad, cap = 22, 40, 34
+    gap, pad, cap = (v * render_scale for v in (22, 40, 34))
     W = pad * 2 + cols * thumb_w + (cols - 1) * gap
-    H = pad * 2 + (60 if title else 0) + rows * (th + cap) + (rows - 1) * gap
+    H = pad * 2 + (60 * render_scale if title else 0) + rows * (th + cap) + (rows - 1) * gap
     canvas = Image.new("RGB", (W, H), (18, 18, 22))
     d = ImageDraw.Draw(canvas)
     if title:
         # 单曲时画布只有一列，沿用批量任务的 30px 标题会直接超出画布并被裁切。
         # 根据实际可用宽度缩小标题，确保歌名、歌手和规格完整可读。
         max_title_w = W - pad * 2
-        title_size = 30
+        title_size = 30 * render_scale
         title_font = ImageFont.truetype(FONT_BD, title_size, index=0)
-        while title_size > 14 and d.textbbox((0, 0), title, font=title_font)[2] > max_title_w:
+        while title_size > 14 * render_scale and d.textbbox((0, 0), title, font=title_font)[2] > max_title_w:
             title_size -= 1
             title_font = ImageFont.truetype(FONT_BD, title_size, index=0)
-        d.text((W // 2, pad + 14), title,
+        d.text((W // 2, pad + 14 * render_scale), title,
                font=title_font, fill=(235, 235, 242), anchor="mm")
-    y0 = pad + (60 if title else 0)
+    y0 = pad + (60 * render_scale if title else 0)
     for i, (p, label) in enumerate(players):
         r, c = divmod(i, cols)
         x = pad + c * (thumb_w + gap)
@@ -271,9 +272,9 @@ def contact_sheet(players, out_path, cols=5, thumb_w=300, title="", ratio=None):
         im = Image.open(p).convert("RGB").resize((thumb_w, th), Image.LANCZOS)
         canvas.paste(im, (x, y))
         d.text((x + thumb_w // 2, y + th + cap // 2), label,
-               font=ImageFont.truetype(FONT_BD, 19, index=0),
+               font=ImageFont.truetype(FONT_BD, 19 * render_scale, index=0),
                fill=(150, 150, 160), anchor="mm")
-    canvas.save(out_path, quality=94)
+    canvas.save(out_path, quality=98, subsampling=0)
     return out_path
 
 
