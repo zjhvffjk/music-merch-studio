@@ -313,7 +313,11 @@ def build_unit(player_path, ov_trim, kind="long", bg="white", padding_rgb=None,
     card_x = ux + round((ix0 - x0) * scale) - CARD_BLEED // 2
     card_y = uy + round((iy0 - y0) * scale) - CARD_BLEED // 2
     with Image.open(player_path) as src:
-        card = ImageOps.fit(src.convert("RGB"), (card_w, card_h), Image.LANCZOS)
+        # 内腔比例与播放卡不同，完整容纳卡面，避免裁掉底部控制栏。
+        rgb = src.convert("RGB")
+        card = Image.new("RGB", (card_w, card_h), rgb.getpixel((0, rgb.height-1)))
+        fitted = ImageOps.contain(rgb, (card_w, card_h), Image.LANCZOS)
+        card.paste(fitted, ((card_w-fitted.width)//2, (card_h-fitted.height)//2))
     base.paste(card, (card_x, card_y))
 
     # 贴片盖在上面（内腔透明，卡片正好透出来）

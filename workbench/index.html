@@ -1631,8 +1631,7 @@ function renderArtistResultStage(data){
       el.onclick=()=>{VINYL_W=Number(el.dataset.detailVinyl);page.querySelectorAll('[data-detail-vinyl]').forEach(x=>x.classList.toggle('on',x===el));bindVinylChips();};
     });
     try{
-      const d=await jget('/api/song?name='+encodeURIComponent((track.name||'')+' '+(artist.name||'')));
-      const found=(d.songs||[]).find(x=>x.name===track.name && String(x.artist||'').includes(artist.name||'')) || (d.songs||[])[0];
+      const found={...track,source:data.source||track.source||'163'};
       if(!found)throw new Error('没有找到可用封面');
       const cover=page.querySelector('.song-maker-hero img'); if(found.pic && !customCover)cover.src=asset(found.pic);
       status.textContent='已匹配封面 · 默认完整商品包已选，可按需取消'; start.disabled=false;
@@ -2371,6 +2370,7 @@ function collect(){
       o.songSource = SEL.source || 'auto';
       if(SEL.albummid) o.albummid = SEL.albummid;
       if(SEL.id) o.songId = SEL.id;
+      o.selectedSong = {name:SEL.name,artist:SEL.artist,album:SEL.album,dur:SEL.dur};
       if(SEL.coverUpload) o.coverUpload = SEL.coverUpload;
     }
   }

@@ -1738,6 +1738,36 @@ def run_song(job, opt):
     log(job, f"搜索单曲：{kw}")
     job["total"] = 1
 
+    # 已明确点选的歌曲必须按 ID 制作，不能再搜索后取第一首或同专辑的另一首。
+    selected = opt.get("selectedSong")
+    if opt.get("songId") and isinstance(selected, dict):
+        src = opt.get("songSource")
+        if src == "qq" and opt.get("albummid"):
+            duration = str(selected.get("dur") or "0:00").split(":")
+            try:
+                ms = (int(duration[-2]) * 60 + int(duration[-1])) * 1000
+            except (ValueError, IndexError):
+                ms = 0
+            one = {"id": opt["songId"], "name": selected.get("name") or kw,
+                   "artists": selected.get("artist") or "", "album": selected.get("album") or "",
+                   "pic": opt["albummid"], "dur_ms": ms}
+        else:
+            sid = int(opt["songId"])
+            detail = get_json(f"{API}/song/detail/", {"id": sid, "ids": json.dumps([sid])})
+            exact = next((s for s in detail.get("songs", []) if str(s.get("id")) == str(sid)), None)
+            if not exact:
+                return fail(job, "选中歌曲的详情暂不可用，请重试")
+            one, src = norm(exact), "163"
+        opt["_src"] = src
+        item, why = render_song(job, one, 1, opt)
+        if item is None:
+            return fail(job, f"选中歌曲出图失败：{why}")
+        job["items"].append(item)
+        job["done"] = 1
+        job["title"] = f"{one['name']} — {one['artists']}"
+        finish(job, job["items"], one["name"], "30×50mm", src)
+        return
+
     # ---- QQ 源：前端点选时就带回了 albummid，直接走腾讯版权曲目 ----
     amid = (opt.get("albummid") or "").strip()
     if amid:
@@ -2384,7 +2414,7 @@ class Handler(BaseHTTPRequestHandler):
                 opt = dict(DEFAULTS)
                 for k, v in req.items():
                     if k in DEFAULTS or k in ("artist", "song", "pick", "songId",
-                                              "songSource", "albummid", "coverUpload"):
+                                              "songSource", "albummid", "coverUpload", "selectedSong"):
                         opt[k] = v
                 # 类型收敛, 防止前端传字符串把算术搞崩
                 for k in ("top", "width", "dpi", "pick", "duration"):
