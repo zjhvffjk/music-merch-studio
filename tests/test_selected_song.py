@@ -9,6 +9,18 @@ import server
 
 
 class SelectedSongTests(unittest.TestCase):
+    def test_netease_selected_cover_does_not_require_detail_endpoint(self):
+        seen = []
+        def render(job, song, rank, opt):
+            seen.append(song.copy())
+            return {'name': song['name']}, None
+        with patch.object(server, 'render_song', side_effect=render), patch.object(server, 'finish'), patch.object(server, 'log'), patch.object(server, 'get_json', side_effect=AssertionError('No extra detail request')):
+            server.run_song({'items': []}, {'song': 'chosen', 'songId': 102, 'songSource': '163',
+                'selectedSong': {'name': 'chosen', 'artist': 'artist', 'dur': '04:12', 'pic': 'https://p1.music.126.net/cover.jpg'}})
+        self.assertEqual(seen[0]['id'], 102)
+        self.assertEqual(seen[0]['dur_ms'], 252000)
+        self.assertEqual(seen[0]['name'], 'chosen')
+
     def test_two_qq_tracks_in_same_album_keep_their_own_identity(self):
         seen = []
         def render(job, song, rank, opt):

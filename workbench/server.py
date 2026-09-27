@@ -1752,6 +1752,15 @@ def run_song(job, opt):
             one = {"id": opt["songId"], "name": selected.get("name") or kw,
                    "artists": selected.get("artist") or "", "album": selected.get("album") or "",
                    "pic": opt["albummid"], "dur_ms": ms}
+        elif src == "163" and str(selected.get("pic") or "").startswith(("https://", "http://")):
+            duration = str(selected.get("dur") or "0:00").split(":")
+            try:
+                ms = (int(duration[-2]) * 60 + int(duration[-1])) * 1000
+            except (ValueError, IndexError):
+                ms = 0
+            one = {"id": opt["songId"], "name": selected.get("name") or kw,
+                   "artists": selected.get("artist") or "", "album": selected.get("album") or "",
+                   "pic": selected["pic"], "dur_ms": ms}
         else:
             sid = int(opt["songId"])
             detail = get_json(f"{API}/song/detail/", {"id": sid, "ids": json.dumps([sid])})
