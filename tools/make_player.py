@@ -275,10 +275,18 @@ def draw_open_heart(d, cx, cy, size, color, lw, filled=False):
         for i in range(33):
             t=i/32;u=1-t
             points.append((u**3*a[0]+3*u*u*t*b[0]+3*u*t*t*c[0]+t**3*e[0],u**3*a[1]+3*u*u*t*b[1]+3*u*t*t*c[1]+t**3*e[1]))
+    # Rasterize the small icon at 4x, then downsample for continuous edges.
+    scale = 4
+    box = max(2, int(round(size * 2)))
+    mask = Image.new("L", (box * scale, box * scale), 0)
+    md = ImageDraw.Draw(mask)
+    shape = [((1+x)*size*scale, (1+y)*size*scale) for x,y in points]
     if filled:
-        d.polygon([(cx+x*size,cy+y*size) for x,y in points],fill=color)
+        md.polygon(shape, fill=255)
     else:
-        draw_reference_path(d,cx,cy,size,points,color,lw)
+        md.line(shape, fill=255, width=max(1, lw*scale), joint="curve")
+    mask = mask.resize((box, box), Image.Resampling.LANCZOS)
+    d.bitmap((round(cx-size), round(cy-size)), mask, fill=color)
 
 
 def draw_play_mode(d, cx, cy, r, color, lw, mode):
@@ -334,9 +342,17 @@ def draw_bubble(d, cx, cy, s, color, lw):
         for i in range(25):
             t=i/24;u=1-t
             points.append((u**3*a[0]+3*u*u*t*b[0]+3*u*t*t*c[0]+t**3*e[0],u**3*a[1]+3*u*u*t*b[1]+3*u*t*t*c[1]+t**3*e[1]))
-    draw_reference_path(d,cx,cy,s,points,color,lw)
+    scale = 4
+    box = max(2, int(round(s*2)))
+    mask = Image.new("L", (box*scale, box*scale), 0)
+    md = ImageDraw.Draw(mask)
+    shape = [((1+x)*s*scale, (1+y)*s*scale) for x,y in points]
+    md.line(shape, fill=255, width=max(1,lw*scale), joint="curve")
     for y, end in [(-.10,.03),(.12,.15)]:
-        d.line([(cx-s*.19,cy+s*y),(cx+s*end,cy+s*y)],fill=color,width=lw)
+        md.line([((1-.19)*s*scale,(1+y)*s*scale),((1+end)*s*scale,(1+y)*s*scale)],
+                fill=255,width=max(1,lw*scale))
+    mask = mask.resize((box,box), Image.Resampling.LANCZOS)
+    d.bitmap((round(cx-s),round(cy-s)),mask,fill=color)
 
 
 def fmt_time(sec):
