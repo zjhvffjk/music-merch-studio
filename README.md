@@ -15,10 +15,6 @@
 - 迷你 CD 三件套设计、高清预览、导出和生产印刷文件。
 - 作品库回看、下载 ZIP，以及将不需要的作品移入回收站。
 
-本仓库是当前工作台 `music-merch-studio`。如果同时看到
-[`music-keychain-studio`](https://github.com/zjhvffjk/music-keychain-studio)，
-在另一台电脑部署这里的工作台时，请使用下方的 `music-merch-studio` 克隆地址。
-
 ## 在另一台 Windows 电脑部署
 
 ### 1. 准备软件
