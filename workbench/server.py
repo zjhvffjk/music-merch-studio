@@ -1326,13 +1326,15 @@ def render_player_print_sheets(job, made, layout="landscape32", dpi=PRINT_DPI):
         if paired:
             # Outer trim guides sit in the white margin, one pixel beyond
             # the artwork; horizontal guides span the sheet for easy alignment.
-            outer = (95, 95, 95)
-            top, bottom = origin_y - 1, origin_y + grid_h
-            left, right = origin_x - 1, origin_x + grid_w
-            draw.line((0, top, page_w - 1, top), fill=outer, width=1)
-            draw.line((0, bottom, page_w - 1, bottom), fill=outer, width=1)
-            draw.line((left, top, left, bottom), fill=outer, width=1)
-            draw.line((right, top, right, bottom), fill=outer, width=1)
+            outer = (55, 55, 55)
+            mark = max(3, _mm_px(.15, dpi))
+            offset = mark + 2
+            top, bottom = origin_y - offset, origin_y + grid_h + offset
+            left, right = origin_x - offset, origin_x + grid_w + offset
+            draw.line((0, top, page_w - 1, top), fill=outer, width=mark)
+            draw.line((0, bottom, page_w - 1, bottom), fill=outer, width=mark)
+            draw.line((left, top, left, bottom), fill=outer, width=mark)
+            draw.line((right, top, right, bottom), fill=outer, width=mark)
         else:
             for row in range(rows):
                 for col in range(cols):
