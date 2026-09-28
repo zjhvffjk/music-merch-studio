@@ -263,13 +263,13 @@ def draw_reference_path(d, cx, cy, size, points, color, lw):
 
 
 def draw_open_heart(d, cx, cy, size, color, lw, filled=False):
-    # Open upper-right shoulder, leaving room for the superscript count.
-    curves = [((.10,-.36),(-.12,-.62),(-.52,-.40),(-.46,-.10)),
-              ((-.46,-.10),(-.42,.15),(-.16,.36),(0,.48)),
-              ((0,.48),(.18,.37),(.40,.15),(.44,-.04))]
+    # Reference: rounded left lobe, pointed base, short open right shoulder.
+    curves = [((.10,-.39),(-.04,-.59),(-.48,-.48),(-.49,-.13)),
+              ((-.49,-.13),(-.51,.15),(-.18,.40),(0,.51)),
+              ((0,.51),(.16,.40),(.45,.16),(.47,-.08))]
     if filled:
-        curves.extend([((.44,-.04),(.18,.02),(.10,-.20),(.20,-.43)),
-                       ((.20,-.43),(.17,-.47),(.12,-.40),(.10,-.36))])
+        curves.extend([((.47,-.08),(.24,-.02),(.10,-.13),(.21,-.40)),
+                       ((.21,-.40),(.18,-.44),(.13,-.42),(.10,-.39))])
     points=[]
     for a,b,c,e in curves:
         for i in range(33):
@@ -324,11 +324,19 @@ def draw_bar_icon(d, cx, cy, s, color, lw):
 
 
 def draw_bubble(d, cx, cy, s, color, lw):
-    d.arc([cx-s*.48,cy-s*.48,cx+s*.48,cy+s*.48],0,220,fill=color,width=lw)
-    d.arc([cx-s*.48,cy-s*.48,cx+s*.48,cy+s*.48],220,275,fill=color,width=lw)
-    draw_reference_path(d,cx,cy,s,[(-.37,.30),(-.46,.48),(0,.48)],color,lw)
-    for y, end in [(-.10,.04),(.13,.17)]:
-        d.line([(cx-s*.22,cy+s*y),(cx+s*end,cy+s*y)],fill=color,width=lw)
+    # Open top-right rim and the flat lower tail follow the supplied screenshot.
+    curves = [((.14,-.43),(-.25,-.57),(-.50,-.27),(-.48,.02)),
+              ((-.48,.02),(-.48,.22),(-.36,.29),(-.42,.46)),
+              ((-.42,.46),(-.23,.45),(.08,.46),(.18,.40)),
+              ((.18,.40),(.40,.31),(.47,.14),(.45,-.06))]
+    points=[]
+    for a,b,c,e in curves:
+        for i in range(25):
+            t=i/24;u=1-t
+            points.append((u**3*a[0]+3*u*u*t*b[0]+3*u*t*t*c[0]+t**3*e[0],u**3*a[1]+3*u*u*t*b[1]+3*u*t*t*c[1]+t**3*e[1]))
+    draw_reference_path(d,cx,cy,s,points,color,lw)
+    for y, end in [(-.10,.03),(.12,.15)]:
+        d.line([(cx-s*.19,cy+s*y),(cx+s*end,cy+s*y)],fill=color,width=lw)
 
 
 def fmt_time(sec):
