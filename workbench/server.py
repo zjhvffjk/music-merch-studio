@@ -1323,7 +1323,17 @@ def render_player_print_sheets(job, made, layout="landscape32", dpi=PRINT_DPI):
         # The 1px channels themselves show the cut. Do not draw rectangles
         # over card artwork or insert a line between cards in the same pair.
         draw = ImageDraw.Draw(page)
-        if not paired:
+        if paired:
+            # Outer trim guides sit in the white margin, one pixel beyond
+            # the artwork; horizontal guides span the sheet for easy alignment.
+            outer = (95, 95, 95)
+            top, bottom = origin_y - 1, origin_y + grid_h
+            left, right = origin_x - 1, origin_x + grid_w
+            draw.line((0, top, page_w - 1, top), fill=outer, width=1)
+            draw.line((0, bottom, page_w - 1, bottom), fill=outer, width=1)
+            draw.line((left, top, left, bottom), fill=outer, width=1)
+            draw.line((right, top, right, bottom), fill=outer, width=1)
+        else:
             for row in range(rows):
                 for col in range(cols):
                     x = origin_x + col_at(col)
