@@ -262,17 +262,23 @@ def draw_reference_path(d, cx, cy, size, points, color, lw):
     d.line([(cx+x*size, cy+y*size) for x,y in points], fill=color, width=lw, joint="curve")
 
 
-def draw_open_heart(d, cx, cy, size, color, lw):
+def draw_open_heart(d, cx, cy, size, color, lw, filled=False):
     # Open upper-right shoulder, leaving room for the superscript count.
     curves = [((.10,-.36),(-.12,-.62),(-.52,-.40),(-.46,-.10)),
               ((-.46,-.10),(-.42,.15),(-.16,.36),(0,.48)),
               ((0,.48),(.18,.37),(.40,.15),(.44,-.04))]
+    if filled:
+        curves.extend([((.44,-.04),(.18,.02),(.10,-.20),(.20,-.43)),
+                       ((.20,-.43),(.17,-.47),(.12,-.40),(.10,-.36))])
     points=[]
     for a,b,c,e in curves:
         for i in range(33):
             t=i/32;u=1-t
             points.append((u**3*a[0]+3*u*u*t*b[0]+3*u*t*t*c[0]+t**3*e[0],u**3*a[1]+3*u*u*t*b[1]+3*u*t*t*c[1]+t**3*e[1]))
-    draw_reference_path(d,cx,cy,size,points,color,lw)
+    if filled:
+        d.polygon([(cx+x*size,cy+y*size) for x,y in points],fill=color)
+    else:
+        draw_reference_path(d,cx,cy,size,points,color,lw)
 
 
 def draw_play_mode(d, cx, cy, r, color, lw, mode):
@@ -476,10 +482,10 @@ def make(cover_path, out_path, title, artist, duration, width=1200,
     icon_size = W*.047
     for cx, count, kind in [(W*.70, likes, "heart"),(W*.88, comments, "comment")]:
         if kind == "heart":
-            draw_open_heart(d,cx,icon_y,icon_size,TEXT_SUB+(255,),max(2,int(W*.0028)))
+            draw_open_heart(d,cx,icon_y,icon_size,ACCENT_RED+(255,),max(2,int(W*.0028)),filled=True)
         else:
             draw_bubble(d,cx,icon_y,icon_size,TEXT_SUB+(255,),max(2,int(W*.0028)))
-        d.text((cx+W*.012,icon_y-icon_size*.42),count,font=f_num,fill=TEXT_SUB,anchor="lm")
+        d.text((cx+W*.012,icon_y-icon_size*.42),count,font=f_num,fill=ACCENT_RED if kind == "heart" else TEXT_SUB,anchor="lm")
 
     # ---------- 5. 歌手 (+ 「关注」按钮 或 > 箭头) ----------
     art_y = H * ART_Y
