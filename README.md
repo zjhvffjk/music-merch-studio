@@ -98,6 +98,17 @@ git pull origin master
 ```
 
 更新代码后，关闭旧工作台窗口，再双击 `启动工作台.bat` 重新启动。
+如果旧实例仍占用端口，可在项目目录运行 `启动工作台.bat --force` 强制重启。
+
+## 仓库目录
+
+- `workbench/`：网页界面与本地服务。
+- `tools/`：生成图片、印刷文件及开发检查所用脚本。
+- `assets/`、`config/`：字体、钥匙扣贴片和画布配置；`assets/demo/` 是示例图片。
+- `tests/`、`docs/`、`design-system/`：自动化测试、技术说明和设计规范，供后续开发维护使用。
+- `start.sh`：macOS / Linux 启动脚本；Windows 使用 `启动工作台.bat`。
+
+以上是源码仓库内容。个人作品保存在本机 `outputs/`，不随 GitHub 更新。
 
 ## 可配置项
 

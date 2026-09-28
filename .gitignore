@@ -25,3 +25,11 @@ tools/test_qwen_locked_extension.py
 tools/test_qwen_official_edit_chain.py
 
 .superpowers/
+
+# 本机临时预览和调试产物
+/_tmp/
+/tmp-*
+/keychain-style-*.png
+
+# 代码旧版本由 Git 历史保存，不再跟踪编辑器备份
+*.py.bak-*
