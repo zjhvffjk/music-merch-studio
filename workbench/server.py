@@ -1289,8 +1289,13 @@ def render_player_print_sheets(job, made, layout="landscape32", dpi=PRINT_DPI):
     page_w, page_h = _mm_px(210, dpi), _mm_px(297, dpi)  # A4 portrait
     trim_w, trim_h = (_mm_px(n, dpi) for n in spec["trim_mm"])
     cols, rows, gap = spec["cols"], spec["rows"], _mm_px(spec["gap_mm"], dpi)
-    grid_w = trim_w * cols + gap * (cols - 1)
-    grid_h = trim_h * rows + gap * (rows - 1)
+    paired = layout == "landscape32"
+    # One-pixel vertical cut channel between cards.  Adjacent rows form
+    # a two-card strip; a one-pixel channel separates each strip.
+    col_at = lambda col: col * trim_w + (col if paired else col * gap)
+    row_at = lambda row: row * trim_h + (row // 2 if paired else row * gap)
+    grid_w = col_at(cols - 1) + trim_w
+    grid_h = row_at(rows - 1) + trim_h
     origin_x = (page_w - grid_w) // 2
     origin_y = (_mm_px(spec["top_mm"], dpi) if spec["top_mm"] is not None
                 else (page_h - grid_h) // 2)
@@ -1311,17 +1316,19 @@ def render_player_print_sheets(job, made, layout="landscape32", dpi=PRINT_DPI):
             card = ImageOps.fit(card, (trim_w, trim_h), method=Image.Resampling.LANCZOS)
         for row in range(rows):
             for col in range(cols):
-                x = origin_x + col * (trim_w + gap)
-                y = origin_y + row * (trim_h + gap)
+                x = origin_x + col_at(col)
+                y = origin_y + row_at(row)
                 page.paste(card, (x, y))
 
-        # 细裁切线只标示成品边缘，不占用卡面。
+        # The 1px channels themselves show the cut. Do not draw rectangles
+        # over card artwork or insert a line between cards in the same pair.
         draw = ImageDraw.Draw(page)
-        for row in range(rows):
-            for col in range(cols):
-                x = origin_x + col * (trim_w + gap)
-                y = origin_y + row * (trim_h + gap)
-                draw.rectangle((x, y, x + trim_w, y + trim_h), outline=cut, width=1)
+        if not paired:
+            for row in range(rows):
+                for col in range(cols):
+                    x = origin_x + col_at(col)
+                    y = origin_y + row_at(row)
+                    draw.rectangle((x, y, x + trim_w - 1, y + trim_h - 1), outline=cut, width=1)
         foot = (f"A4 · 30×50mm 播放界面 · {cols}×{rows} = {cols * rows} 张 · "
                 "请以 100% 原尺寸打印")
         draw.text((origin_x, origin_y + grid_h + _mm_px(8, dpi)), foot,
