@@ -1,4 +1,6 @@
 outputs/
+outputs/音乐库/
+config/playback-manifest.local.json
 .venv/
 workbench/*.log
 workbench/_selftest_*.txt
