@@ -4,6 +4,7 @@
 <meta charset="UTF-8" data-page-node-id="lLVyd1VDva7pFCmGMAibBN">
 <meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="jknk725HEfUUfYQSd8tcrn">
 <title>拾音工坊 · 音乐周边制作</title>
+<link rel="stylesheet" href="/static/player.css">
 <style>
 :root{
   --bg:#f4f5f7; --panel:#ffffff; --card:#ffffff; --card2:#f1f2f5;
@@ -1230,6 +1231,33 @@ html:not([data-theme="dark"]) .song-maker-replace:hover{color:#fffdf6;border-bot
   </aside>
 </div>
 
+<audio id="workbenchAudio" preload="metadata"></audio>
+<section class="workbench-player" id="workbenchPlayer" aria-label="音乐播放器" hidden>
+  <button class="player-track" id="playerExpand" type="button" aria-label="展开正在播放">
+    <span class="player-cover"><img id="playerCoverImage" src="" alt=""></span>
+    <span class="player-copy"><b id="playerTitle">未选择歌曲</b><small id="playerArtist">—</small></span>
+  </button>
+  <div class="player-center">
+    <div class="player-buttons">
+      <button class="player-button" id="playerMode" type="button" aria-label="播放模式：循环">循环</button>
+      <button class="player-button" id="playerPrevious" type="button" aria-label="上一首">‹</button>
+      <button class="player-button player-button--main" id="playerToggle" type="button" aria-label="播放">▶</button>
+      <button class="player-button" id="playerNext" type="button" aria-label="下一首">›</button>
+    </div>
+    <div class="player-timeline">
+      <span id="playerElapsed">00:00</span>
+      <input class="player-range" id="playerProgress" type="range" min="0" max="100" step="0.1" value="0" aria-label="播放进度">
+      <span id="playerDuration">--:--</span>
+    </div>
+  </div>
+  <div class="player-actions">
+    <button class="player-button" id="playerQueue" type="button" aria-label="播放队列">☷</button>
+    <span aria-hidden="true">🔊</span>
+    <input class="player-range player-volume" id="playerVolume" type="range" min="0" max="1" step="0.01" value="0.8" aria-label="音量">
+  </div>
+  <output class="player-status" id="playerStatus" aria-live="polite"></output>
+</section>
+
 <!-- 作品库：历史任务清单（数据来自后端 /api/jobs，读磁盘 meta.json） -->
 <div class="lib" id="lib" data-page-node-id="LibOv0Xq7Lm2NvB4tRw">
   <div class="libbox" data-page-node-id="LibBox1Dk9Wz3QmNr6sVb">
@@ -1584,10 +1612,10 @@ function renderArtistResultStage(data){
   const box=$('#albStage'); if(!box) return;
   const artist=data.artist||{}; const songs=(data.songs||[]).slice(0,18); const albums=(data.albumList||ALBUM_LIST||[]).slice(0,6);
   const fallbackPic=(albums[0]&&albums[0].pic)||''; const pic=artist.pic ? asset(artist.pic) : (fallbackPic ? asset(fallbackPic) : '');
-  const rows=songs.map((track,i)=>`<tr class="artist-track" data-track="${i}"><td class="no">${i+1}</td><td>${esc(track.name||'—')}</td><td>${esc(track.album||track.artist||'—')}</td><td class="duration">${esc(track.dur||'')}</td><td class="make"><button type="button" data-track="${i}">制作</button></td></tr>`).join('');
+  const rows=songs.map((track,i)=>`<tr class="artist-track" data-track="${i}"><td class="play-cell"><button class="play-track" type="button" data-play-context="artist" data-play-track="${i}" aria-label="播放《${esc(track.name||'歌曲')}》">▶</button></td><td>${esc(track.name||'—')}</td><td>${esc(track.album||track.artist||'—')}</td><td class="duration">${esc(track.dur||'')}</td><td class="make"><button type="button" data-track="${i}">制作</button></td></tr>`).join('');
   const albumRows=albums.map((album,i)=>`<div class="side-album" data-album="${i}"><img src="${esc(asset(album.pic||''))}" alt=""><span><b>${esc(album.name||'未命名专辑')}</b><small>${esc([album.date,album.type].filter(Boolean).join(' · ')||'专辑')}</small></span></div>`).join('');
   box.className='albStage music-search-stage';
-  box.innerHTML=`<div class="music-page"><section class="music-page__main"><div class="artist-info">${pic?`<img class="artist-info__cover" src="${esc(pic)}" alt="${esc(artist.name||'')}">`:'<div class="artist-info__cover"></div>'}<div class="artist-info__copy"><span class="artist-info__tag">歌手</span><h2>${esc(artist.name||ARTIST_Q||'搜索结果')}</h2><div class="artist-info__meta">热门单曲 ${songs.length} 首　·　专辑 ${ALBUM_LIST.length||data.albumCount||0} 张　·　来源 ${data.source==='qq'?'QQ音乐':'网易云音乐'}</div><div class="artist-info__actions"><button type="button" class="primary" id="artistMakeHot">按热门生成</button><button type="button" id="artistBrowseAlbums">查看全部专辑</button></div></div></div><div class="artist-summary"><b>音乐资料</b>从这里挑选一首单曲或一张专辑，再交给右侧的商品制作队列。封面、曲名和歌手信息会继续传入现有生成流程。</div><div class="track-head"><h3>热门歌曲</h3><span>${songs.length} 首</span><button type="button" id="artistSongMode">按关键词搜索更多单曲 →</button></div><table class="track-table"><thead><tr><th class="no">#</th><th>歌曲标题</th><th>专辑</th><th class="duration">时长</th><th></th></tr></thead><tbody>${rows||'<tr><td colspan="5">暂无歌曲数据</td></tr>'}</tbody></table></section><aside class="music-page__side"><div class="side-title">相关专辑</div>${albumRows||'<p class="search-popover__empty">暂无专辑数据</p>'}${ALBUM_LIST.length>albums.length?'<button class="side-more" id="artistSideMore" type="button">查看全部专辑 →</button>':''}</aside></div>`;
+  box.innerHTML=`<div class="music-page"><section class="music-page__main"><div class="artist-info">${pic?`<img class="artist-info__cover" src="${esc(pic)}" alt="${esc(artist.name||'')}">`:'<div class="artist-info__cover"></div>'}<div class="artist-info__copy"><span class="artist-info__tag">歌手</span><h2>${esc(artist.name||ARTIST_Q||'搜索结果')}</h2><div class="artist-info__meta">热门单曲 ${songs.length} 首　·　专辑 ${ALBUM_LIST.length||data.albumCount||0} 张　·　来源 ${data.source==='qq'?'QQ音乐':'网易云音乐'}</div><div class="artist-info__actions"><button type="button" class="primary" id="artistMakeHot">按热门生成</button><button type="button" id="artistBrowseAlbums">查看全部专辑</button></div></div></div><div class="artist-summary"><b>音乐资料</b>从这里可试听已绑定音源的歌曲，也可挑选一首单曲或一张专辑继续制作。封面、曲名和歌手信息会传入现有生成流程。</div><div class="track-head"><h3>热门歌曲</h3><span>${songs.length} 首</span><button type="button" id="artistSongMode">按关键词搜索更多单曲 →</button></div><table class="track-table"><thead><tr><th class="play-cell">播放</th><th>歌曲标题</th><th>专辑</th><th class="duration">时长</th><th></th></tr></thead><tbody>${rows||'<tr><td colspan="5">暂无歌曲数据</td></tr>'}</tbody></table></section><aside class="music-page__side"><div class="side-title">相关专辑</div>${albumRows||'<p class="search-popover__empty">暂无专辑数据</p>'}${ALBUM_LIST.length>albums.length?'<button class="side-more" id="artistSideMore" type="button">查看全部专辑 →</button>':''}</aside></div>`;
   const chooseSong=async i=>{
     const track=songs[i]; if(!track)return;
     box.className='albStage song-maker-stage';
@@ -1647,7 +1675,17 @@ function renderArtistResultStage(data){
       };
     }catch(e){status.textContent='封面匹配失败：'+(e.message||'请重试');}
   };
+  window.WorkbenchPlayer&&window.WorkbenchPlayer.registerContext('artist',songs);
+  window.openSongMakerTrack=(track,context)=>{
+    const key=track&&(track.trackKey||String(track.source||'').toLowerCase()+':'+String(track.id));
+    const index=songs.findIndex(item=>(item.trackKey||String(item.source||'').toLowerCase()+':'+String(item.id))===key);
+    if(index>=0)return chooseSong(index);
+    const fallback={artist:{name:(track&&track.artist)||''},source:(track&&track.source)||'163',songs:track?[track]:[],albumList:[]};
+    renderArtistResultStage(fallback);
+    return track&&window.openSongMakerTrack(track,fallback);
+  };
   box.querySelectorAll('.artist-track').forEach(row=>row.addEventListener('click',()=>chooseSong(Number(row.dataset.track))));
+  box.querySelectorAll('[data-play-context="artist"]').forEach(btn=>btn.addEventListener('click',e=>{e.stopPropagation();window.WorkbenchPlayer&&window.WorkbenchPlayer.playTrack(songs[Number(btn.dataset.playTrack)],songs);}));
   box.querySelectorAll('.track-table .make button').forEach(btn=>btn.addEventListener('click',e=>{e.stopPropagation();chooseSong(Number(btn.dataset.track));}));
   const browse=()=>showArtistAlbums();
   const browseBtn=$('#artistBrowseAlbums'),moreBtn=$('#artistSideMore');if(browseBtn)browseBtn.onclick=browse;if(moreBtn)moreBtn.onclick=browse;
@@ -2282,12 +2320,15 @@ $('#btnQuerySong').onclick = async ()=>{
     if(!d.songs.length){ $('#songBox').innerHTML=''; return toast('没搜到这首歌'); }
     const rows = d.songs.map((s,i)=>`
       <div class="srow" data-i="${i}">
+        <button class="play-track" type="button" data-play-context="single" data-play-track="${i}" aria-label="播放《${esc(s.name||'歌曲')}》">▶</button>
         <span class="i">${String(i+1).padStart(2,'0')}</span>
         <span class="t">${esc(s.name)}${s.source==='qq'?'<em class="src">QQ</em>':''}</span>
         <span class="a">${esc(s.artist)}</span>
         <span class="d">${esc(s.dur)}</span>
       </div>`).join('');
     $('#songBox').innerHTML = `<div class="slist">${rows}</div>`;
+    window.WorkbenchPlayer&&window.WorkbenchPlayer.registerContext('single',d.songs);
+    $$('#songBox [data-play-context="single"]').forEach(btn=>btn.addEventListener('click',e=>{e.stopPropagation();window.WorkbenchPlayer&&window.WorkbenchPlayer.playTrack(d.songs[Number(btn.dataset.playTrack)],d.songs);}));
     $$('#songBox .srow').forEach(r=>{
       r.onclick = ()=>{
         $$('#songBox .srow').forEach(x=>x.classList.toggle('on', x===r));
@@ -3268,7 +3309,7 @@ document.addEventListener('click', e=>{
   const input=$('#globalSearch'), pop=$('#searchPopover'), clear=$('#globalSearchClear');
   if(!input || !pop) return;
   const hot=['周杰伦','陈奕迅','林俊杰','薛之谦','邓紫棋','告五人','毛不易','张杰','孙燕姿','王菲'];
-  let timer=0, token=0;
+  let timer=0, token=0, quickSongs=[];
   const escape=esc;
   function history(){try{return JSON.parse(localStorage.getItem('fold-search-history')||'[]').slice(0,8)}catch(e){return []}}
   function save(q){const list=history().filter(x=>x!==q); list.unshift(q); try{localStorage.setItem('fold-search-history',JSON.stringify(list.slice(0,8)))}catch(e){}}
@@ -3281,7 +3322,8 @@ document.addEventListener('click', e=>{
     pop.innerHTML=`${h.length?`<div class="search-popover__history"><span>搜索历史</span><button type="button" data-search-clear-history>清空</button></div><div class="search-popover__chips">${h.map(x=>`<button type="button" data-search-artist="${escape(x)}">${escape(x)}</button>`).join('')}</div>`:''}<div class="search-popover__label">猜你想搜</div><div class="search-popover__chips">${hot.map(x=>`<button type="button" data-search-artist="${escape(x)}">${escape(x)}</button>`).join('')}</div><div class="search-popover__label">快速进入</div><div class="search-popover__actions"><button class="search-popover__action" type="button" data-search-mode="artist"><b>按歌手搜索</b><small>热门歌曲和全部专辑</small></button><button class="search-popover__action" type="button" data-search-mode="song"><b>按单曲搜索</b><small>从候选里选一首制作</small></button></div>`;
   }
   function renderResults(q,songs){
-    const rows=songs.slice(0,6).map(x=>`<button class="search-popover__row" type="button" data-search-song="${escape((x.name||'')+' '+(x.artist||''))}">${x.pic?`<img class="search-popover__cover" src="${escape(x.pic)}?param=80y80" alt="">`:'<i class="search-popover__cover"></i>'}<span><b>${escape(x.name)}</b><small>${escape(x.artist||'')} · ${escape(x.album||'')}</small></span><i>${escape(x.dur||'')}</i></button>`).join('');
+    quickSongs=songs.slice(0,6);window.WorkbenchPlayer&&window.WorkbenchPlayer.registerContext('quick-search',quickSongs);
+    const rows=quickSongs.map((x,i)=>`<div class="search-popover__row"><button class="play-track" type="button" data-play-context="quick-search" data-play-track="${i}" aria-label="播放《${escape(x.name||'歌曲')}》">▶</button><button class="search-popover__open" type="button" data-search-song="${escape((x.name||'')+' '+(x.artist||''))}">${x.pic?`<img class="search-popover__cover" src="${escape(x.pic)}?param=80y80" alt="">`:'<i class="search-popover__cover"></i>'}<span><b>${escape(x.name)}</b><small>${escape(x.artist||'')} · ${escape(x.album||'')}</small></span></button><i>${escape(x.dur||'')}</i></div>`).join('');
     const listMarkup = rows ? '<div class="search-popover__label">单曲联想</div>' + rows : '<div class="search-popover__empty">没有匹配的单曲，可直接按歌手或关键词搜索。</div>';
     pop.innerHTML=`<div class="search-popover__actions"><button class="search-popover__action" type="button" data-search-artist="${escape(q)}"><b>搜索歌手「${escape(q)}」</b><small>热门歌曲和专辑</small></button><button class="search-popover__action" type="button" data-search-song="${escape(q)}"><b>搜索单曲「${escape(q)}」</b><small>显示可选版本</small></button></div>${listMarkup}`;
   }
@@ -3289,7 +3331,7 @@ document.addEventListener('click', e=>{
   input.addEventListener('input',()=>{const q=input.value.trim(); clear.hidden=!q; clearTimeout(timer); if(!q){renderStart();return;} const mine=++token; timer=setTimeout(async()=>{try{const d=await jget('/api/song?name='+encodeURIComponent(q),7000);if(mine===token && !pop.hidden)renderResults(q,d.songs||[])}catch(e){if(mine===token)renderResults(q,[])}},260);});
   input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();artist(input.value)}else if(e.key==='Escape')close();});
   clear.addEventListener('click',()=>{input.value='';clear.hidden=true;input.focus();renderStart();});
-  pop.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;if(b.hasAttribute('data-search-clear-history')){try{localStorage.removeItem('fold-search-history')}catch(err){}renderStart();return;}if(b.dataset.searchArtist!==undefined){artist(b.dataset.searchArtist);return;}if(b.dataset.searchSong!==undefined){song(b.dataset.searchSong);return;}if(b.dataset.searchMode==='artist')artist(input.value);if(b.dataset.searchMode==='song')song(input.value);});
+  pop.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.playTrack!==undefined){e.stopPropagation();window.WorkbenchPlayer&&window.WorkbenchPlayer.playTrack(quickSongs[Number(b.dataset.playTrack)],quickSongs);return;}if(b.hasAttribute('data-search-clear-history')){try{localStorage.removeItem('fold-search-history')}catch(err){}renderStart();return;}if(b.dataset.searchArtist!==undefined){artist(b.dataset.searchArtist);return;}if(b.dataset.searchSong!==undefined){song(b.dataset.searchSong);return;}if(b.dataset.searchMode==='artist')artist(input.value);if(b.dataset.searchMode==='song')song(input.value);});
   document.addEventListener('pointerdown',e=>{if(!$('#globalSearchBox').contains(e.target))close();});
 })();
 
@@ -3394,6 +3436,7 @@ $('.brand h1').ondblclick = ()=> showConn(true);
   }
 })();
 </script>
+<script src="/static/player.js" defer></script>
 </body>
 </html>
 

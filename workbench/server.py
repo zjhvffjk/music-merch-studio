@@ -2188,6 +2188,10 @@ class Handler(BaseHTTPRequestHandler):
                 return self._file(os.path.join(HERE, "index.html"))
             if p == "/favicon.ico":
                 return self._json({}, 404)
+            if p in ("/static/player.js", "/static/player.css"):
+                return self._file(os.path.join(HERE, os.path.basename(p)))
+            if p.startswith("/static/"):
+                return self._json({"error": "not found"}, 404)
 
             if p == "/api/playback":
                 source = (q.get("source") or [""])[0]
