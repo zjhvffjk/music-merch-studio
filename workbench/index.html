@@ -1258,6 +1258,41 @@ html:not([data-theme="dark"]) .song-maker-replace:hover{color:#fffdf6;border-bot
   <output class="player-status" id="playerStatus" aria-live="polite"></output>
 </section>
 
+<section class="player-overlay" id="nowPlayingDialog" role="dialog" aria-modal="true" aria-labelledby="nowPlayingTitle" hidden>
+  <div class="now-playing-panel">
+    <header><span>NOW PLAYING / 拾音工坊</span><button type="button" id="nowPlayingClose" aria-label="关闭正在播放">×</button></header>
+    <div class="now-playing-grid">
+      <div class="now-playing-art"><img id="nowPlayingCover" src="" alt=""><span aria-hidden="true">♪</span></div>
+      <div class="now-playing-copy">
+        <small id="nowPlayingSource">本地授权音源</small>
+        <h2 id="nowPlayingTitle">未选择歌曲</h2>
+        <p id="nowPlayingArtist">—</p>
+        <div class="now-playing-lyrics" id="nowPlayingLyrics" tabindex="0">歌词将在获得合法歌词数据后显示。</div>
+        <button class="now-playing-maker" id="nowPlayingMaker" type="button" aria-label="用当前歌曲制作同款周边">制作同款周边 →</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="player-overlay player-overlay--drawer" id="queueDrawer" role="dialog" aria-modal="true" aria-labelledby="queueTitle" hidden>
+  <div class="queue-panel">
+    <header><div><small>PLAY QUEUE</small><h2 id="queueTitle">播放队列</h2></div><button type="button" id="queueClose" aria-label="关闭播放队列">×</button></header>
+    <div class="queue-list" id="queueList"></div>
+    <footer><button type="button" id="queueClear" aria-label="清空播放队列">清空队列</button></footer>
+  </div>
+</section>
+
+<section class="player-overlay" id="audioImportDialog" role="dialog" aria-modal="true" aria-labelledby="audioImportTitle" hidden>
+  <form class="audio-import-panel" id="audioImportForm">
+    <header><div><small>AUTHORIZED AUDIO</small><h2 id="audioImportTitle">为这首歌导入音频</h2></div><button type="button" id="audioImportClose" aria-label="关闭音频导入">×</button></header>
+    <div class="audio-import-track"><img id="audioImportCover" src="" alt=""><span><b id="audioImportTrackName">未选择歌曲</b><small id="audioImportTrackArtist">—</small></span></div>
+    <p>搜索结果只提供歌曲资料。请选择你拥有播放或使用权的本地音频；导入后会绑定到这首歌，下次可直接播放。</p>
+    <label class="audio-import-file"><span>选择音频文件</span><input id="audioImportFile" type="file" accept=".mp3,.wav,.m4a,.aac,.ogg,.flac,audio/*" required></label>
+    <output id="importAudioStatus" aria-live="polite"></output>
+    <button class="audio-import-submit" id="importAudioSubmit" type="submit" aria-label="导入并播放当前歌曲">导入并播放</button>
+  </form>
+</section>
+
 <!-- 作品库：历史任务清单（数据来自后端 /api/jobs，读磁盘 meta.json） -->
 <div class="lib" id="lib" data-page-node-id="LibOv0Xq7Lm2NvB4tRw">
   <div class="libbox" data-page-node-id="LibBox1Dk9Wz3QmNr6sVb">

@@ -100,6 +100,39 @@ class PlayerUiTests(unittest.TestCase):
         self.assertNotIn("autoplay", js.lower())
         self.assertIn("workbench-player-change", js)
 
+    def test_full_player_queue_and_import_dialogs_are_accessible(self):
+        html = (ROOT / "workbench" / "index.html").read_text(encoding="utf-8")
+        parser = PlayerMarkupParser()
+        parser.feed(html)
+
+        for dialog_id in ("nowPlayingDialog", "queueDrawer", "audioImportDialog"):
+            tag, attrs = parser.ids[dialog_id][0]
+            self.assertEqual(attrs.get("role"), "dialog", dialog_id)
+            self.assertEqual(attrs.get("aria-modal"), "true", dialog_id)
+            self.assertIn("hidden", attrs, dialog_id)
+        for button_id in ("nowPlayingClose", "queueClose", "queueClear", "nowPlayingMaker",
+                          "importAudioSubmit", "audioImportClose"):
+            self.assertTrue(parser.ids[button_id][0][1].get("aria-label"), button_id)
+        upload_attrs = parser.ids["audioImportFile"][0][1]
+        for extension in (".mp3", ".wav", ".m4a", ".aac", ".ogg", ".flac"):
+            self.assertIn(extension, upload_attrs.get("accept", ""))
+        self.assertEqual(parser.ids["importAudioStatus"][0][1].get("aria-live"), "polite")
+        for element_id in ("nowPlayingCover", "nowPlayingTitle", "nowPlayingArtist",
+                           "nowPlayingLyrics", "queueList"):
+            self.assertIn(element_id, parser.ids)
+
+    def test_player_supports_overlays_queue_import_and_current_track_handoff(self):
+        js = (ROOT / "workbench" / "player.js").read_text(encoding="utf-8")
+        for method in ("openNowPlaying", "closeNowPlaying", "openQueue", "importAudio"):
+            self.assertIn(method, js)
+        self.assertIn("/api/audio/upload", js)
+        self.assertIn("window.openSongMakerTrack(current()", js)
+        self.assertIn("removeQueueItem", js)
+        self.assertIn("clearQueue", js)
+        self.assertIn('event.key === " "', js)
+        self.assertIn('event.key === "Escape"', js)
+        self.assertIn("lastOverlayTrigger", js)
+
 
 if __name__ == "__main__":
     unittest.main()
