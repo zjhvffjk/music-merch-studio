@@ -87,7 +87,8 @@
     image.alt = track.name ? "《" + track.name + "》封面" : "歌曲封面";
     document.getElementById("nowPlayingTitle").textContent = track.name;
     document.getElementById("nowPlayingArtist").textContent = [track.artist, track.album].filter(Boolean).join(" · ");
-    document.getElementById("nowPlayingSource").textContent = track.source === "qq" ? "QQ 音乐资料 · 本地授权音源" : "网易云音乐资料 · 本地授权音源";
+    const sourceLabel = {qq: "QQ 音乐资料", "163": "网易云音乐资料", local: "本地歌曲资料"}[track.source] || "歌曲资料";
+    document.getElementById("nowPlayingSource").textContent = sourceLabel + " · 本地授权音源";
   }
 
   function renderQueue() {
@@ -175,6 +176,12 @@
   function playTrack(track, queue) {
     const normalized = cleanTrack(track);
     if (!normalized) return Promise.resolve(false);
+    const previousKey = current() && current().trackKey;
+    if (previousKey && previousKey !== normalized.trackKey) {
+      audio.pause();
+      audio.removeAttribute("src");
+      audio.load();
+    }
     if (Array.isArray(queue)) {
       const cleaned = queue.map(cleanTrack).filter(Boolean);
       const index = Math.max(0, cleaned.findIndex(item => item.trackKey === normalized.trackKey));
