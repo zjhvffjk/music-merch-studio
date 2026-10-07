@@ -13,6 +13,7 @@ import json
 import os
 from pathlib import Path
 import threading
+import urllib.request
 import uuid
 
 import requests
@@ -47,6 +48,15 @@ ASPECTS = {
     "tray": ("1536x1024", "4:3"),
 }
 _lock = threading.RLock()
+
+
+def _network_options() -> dict:
+    """Honor the user's current Windows proxy, including one enabled after startup."""
+    if os.name != "nt":
+        return {}
+    proxies = urllib.request.getproxies_registry()
+    chosen = {scheme: proxies[scheme] for scheme in ("http", "https") if proxies.get(scheme)}
+    return {"proxies": chosen} if chosen else {}
 
 
 class ModelError(ValueError):
@@ -184,13 +194,15 @@ def test_profile(ident: str) -> dict:
     try:
         if row["provider"] == "openai":
             url = "https://api.openai.com/v1/models/" + row["model"]
-            response = requests.get(url, headers={"Authorization": "Bearer " + key}, timeout=20)
+            response = requests.get(url, headers={"Authorization": "Bearer " + key},
+                                    timeout=(5, 12), **_network_options())
         else:
             url = "https://generativelanguage.googleapis.com/v1beta/models/" + row["model"]
-            response = requests.get(url, headers={"x-goog-api-key": key}, timeout=20)
+            response = requests.get(url, headers={"x-goog-api-key": key},
+                                    timeout=(5, 12), **_network_options())
         _json_response(response)
     except requests.RequestException as exc:
-        raise ModelError("连接失败：%s" % type(exc).__name__) from exc
+        raise ModelError("无法连接模型接口，请检查本机网络或代理设置（%s）" % type(exc).__name__) from exc
     return {"ok": True, "message": "密钥和模型查询成功；图片生成需实际调用时验证额度"}
 
 
@@ -264,7 +276,7 @@ def generate(ident: str, reference: Image.Image, target: str, instruction: str,
                 data={"model": row["model"], "prompt": prompt, "quality": "high",
                       "size": ASPECTS[target][0], "output_format": "png"},
                 files=[("image[]", ("reference-%d.png" % i, image_png(im), "image/png"))
-                       for i, im in enumerate(refs)], timeout=240)
+                       for i, im in enumerate(refs)], timeout=240, **_network_options())
             body = _json_response(response)
             item = (body.get("data") or [{}])[0]
             encoded = item.get("b64_json")
@@ -279,7 +291,8 @@ def generate(ident: str, reference: Image.Image, target: str, instruction: str,
                 headers={"x-goog-api-key": key, "Content-Type": "application/json"},
                 json={"model": row["model"], "input": inputs,
                       "response_format": {"type": "image", "aspect_ratio": aspect,
-                                          "image_size": "2K"}}, timeout=240)
+                                          "image_size": "2K"}}, timeout=240,
+                **_network_options())
             body = _json_response(response)
             encoded = (body.get("output_image") or {}).get("data")
             if not encoded:

@@ -11,19 +11,26 @@
   const defaults = {openai: 'gpt-image-2.5-sunburst', gemini: 'gemini-nano-banana-2.1'};
   let profiles = [], defaultId = '', running = false;
   const images = {};
-  const api = async (path, data) => {
-    const response = await fetch('/api/design/ai/' + path, {
-      method: data === undefined ? 'GET' : 'POST',
-      headers: data === undefined ? {} : {'Content-Type': 'application/json'},
-      body: data === undefined ? undefined : JSON.stringify(data),
-      cache: 'no-store'
-    });
-    const result = await response.json();
-    if (!response.ok || !result.ok) throw Error(result.error || ('HTTP ' + response.status));
-    return result;
+  const api = async (path, data, timeoutMs = 0) => {
+    const controller = new AbortController();
+    const timer = timeoutMs ? setTimeout(() => controller.abort(), timeoutMs) : null;
+    try {
+      const response = await fetch('/api/design/ai/' + path, {
+        method: data === undefined ? 'GET' : 'POST',
+        headers: data === undefined ? {} : {'Content-Type': 'application/json'},
+        body: data === undefined ? undefined : JSON.stringify(data),
+        cache: 'no-store', signal: controller.signal
+      });
+      const result = await response.json();
+      if (!response.ok || !result.ok) throw Error(result.error || ('HTTP ' + response.status));
+      return result;
+    } finally { if (timer) clearTimeout(timer); }
   };
   const status = message => { el('aiRunState').textContent = message; };
-  const configStatus = message => { el('aiConfigState').textContent = message; };
+  const configStatus = (message, error = false) => {
+    el('aiConfigState').textContent = message;
+    el('aiConfigState').dataset.error = error ? 'true' : 'false';
+  };
   const profileChoice = () => el('aiProfileSelect').value || defaultId;
   const selectedProfile = () => profiles.find(p => p.id === el('aiEditProfile').value);
 
@@ -72,6 +79,9 @@
     el('aiModel').value = profile?.model || defaults.openai;
     el('aiApiKey').value = '';
     el('aiApiKey').placeholder = profile?.hasKey ? '已保存密钥；留空则保留' : '输入 API Key';
+    el('aiKeyHint').textContent = profile?.hasKey
+      ? '✓ 密钥已安全保存在本机。这里不会回显；需要更换时输入新密钥再保存。'
+      : '新建配置时请填写密钥；保存后不会再次显示完整内容。';
     el('aiMakeDefault').checked = Boolean(profile?.default || !profiles.length);
     configStatus('');
   }
@@ -115,11 +125,17 @@
   };
   el('aiTestProfile').onclick = async () => {
     if (!el('aiEditProfile').value) return configStatus('请先保存配置，再测试连接。');
+    const button = el('aiTestProfile');
+    button.disabled = true;
     try {
-      configStatus('正在连接模型…');
-      const data = await api('test', {id: el('aiEditProfile').value});
+      configStatus('正在连接模型，通常需要几秒；网络异常时最多等待 30 秒…');
+      const data = await api('test', {id: el('aiEditProfile').value}, 30000);
       configStatus(data.message);
-    } catch (error) { configStatus('连接失败：' + error.message); }
+    } catch (error) {
+      configStatus(error.name === 'AbortError'
+        ? '连接超时：工作台未能访问模型接口，请检查本机代理或网络。'
+        : '连接失败：' + error.message, true);
+    } finally { button.disabled = false; }
   };
   el('aiDeleteProfile').onclick = async () => {
     const id = el('aiEditProfile').value;

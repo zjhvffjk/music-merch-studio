@@ -102,6 +102,15 @@ class DesignAiTests(unittest.TestCase):
         ai.delete_profile(ident)
         self.assertEqual(ai.list_profiles()["default"], "")
 
+    def test_connection_uses_current_windows_proxy(self):
+        ident = self.create("gemini")
+        with mock.patch.object(ai.urllib.request, "getproxies_registry",
+                               return_value={"https": "http://127.0.0.1:10808"}), \
+             mock.patch.object(ai.requests, "get", return_value=FakeResponse({"name": "model"})) as get:
+            self.assertTrue(ai.test_profile(ident)["ok"])
+        self.assertEqual(get.call_args.kwargs["proxies"],
+                         {"https": "http://127.0.0.1:10808"})
+
 
 if __name__ == "__main__":
     unittest.main()
