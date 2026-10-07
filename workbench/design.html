@@ -43,7 +43,12 @@ h2{font-size:16px;margin:0}h3{font-size:12px;margin:0;letter-spacing:1px;color:v
 .mod#mod-design{display:grid;grid-template-columns:minmax(390px,1fr) minmax(430px,.94fr);gap:0 16px;align-items:start}
 #mod-design>#dataCard,#mod-design>#aiCard{grid-column:1}
 #mod-design>#resCard{grid-column:1 / -1;grid-row:1;position:static;margin-bottom:16px}
-#mod-design>#dataCard{grid-row:2}#mod-design>#aiCard{grid-row:3}
+#mod-design>#dataCard{grid-row:2}#mod-design>#aiCard{grid-row:3;grid-column:1 / -1}
+.aiTopRow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}.aiTopRow select{flex:1;min-width:180px}
+.aiPrompt{width:100%;min-height:76px;resize:vertical;border:1px solid var(--line);border-radius:9px;padding:9px 11px;background:#fff;color:var(--ink)}
+.aiActions{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin:10px 0}.aiGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;margin-top:12px}
+.aiComp{border:1px solid var(--line);border-radius:10px;padding:9px;background:#fff;min-width:0}.aiComp img{width:100%;height:220px;object-fit:contain;background:#f2f1ee;border-radius:7px;display:block;margin-bottom:8px}.aiComp .aiBlank{height:220px;display:grid;place-items:center;color:var(--muted);background:#f2f1ee;border-radius:7px;margin-bottom:8px;font-size:12px}.aiComp b{display:block;font-size:12px}.aiComp small{display:block;color:var(--muted);min-height:18px}.aiComp .aiCompActions{display:flex;gap:7px;margin-top:7px}.aiComp .aiCompActions button,.aiComp .aiCompActions a{font-size:11px;padding:5px 7px}
+#aiConfigDialog{border:1px solid var(--line);border-radius:14px;box-shadow:0 20px 70px #15291f35;max-width:min(520px,calc(100vw - 24px));width:520px;padding:0;color:var(--ink)}#aiConfigDialog::backdrop{background:#111c17a8}.aiDlgHead{padding:18px 20px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}.aiDlgBody{padding:18px 20px}.aiDlgBody label{display:block;font-size:12px;color:var(--muted);margin-bottom:11px}.aiDlgBody input,.aiDlgBody select{display:block;width:100%;margin-top:4px;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink)}.aiDlgBody .aiCheck{display:flex;gap:7px;align-items:center}.aiDlgBody .aiCheck input{width:auto;margin:0}.aiDlgFoot{display:flex;flex-wrap:wrap;gap:7px;padding:0 20px 18px}.aiDlgFoot button{font-size:12px}.aiStatus{font-size:12px;color:var(--muted)}@media(max-width:720px){.aiGrid{grid-template-columns:1fr}}
 .rail,.insp{position:sticky;top:80px;display:flex;flex-direction:column;gap:14px;min-width:0}
 .rblk,.card{background:var(--card);border:1px solid var(--line);border-radius:14px}
 .rblk{padding:14px}
@@ -281,7 +286,7 @@ body.embed .proj .t small{display:none}   /* 外层已有专辑名，这里不�
 .ribbonTabs button{align-self:stretch;border:0;border-radius:5px;background:transparent;color:var(--muted);font:600 12px inherit;padding:3px 13px;white-space:nowrap;cursor:pointer}
 .ribbonTabs button:hover{background:#f1f5f1;color:var(--brand)}.ribbonTabs button.on{background:#eaf4ec;color:var(--brand)}
 /* “对象”工作区已包含资料确认和底图上传，移除重复入口。 */
-#btnProjectDataTab,#btnBackgroundTab{display:none}
+#btnProjectDataTab{display:none}
 .ribbonPanel{display:none;align-items:center;gap:0;min-width:0;padding:5px 12px;overflow-x:auto;overflow-y:hidden;background:transparent}.ribbonPanel.on{display:flex}.editorRibbon:has(.ribbonPanel[data-ribbon-panel="font"].on) .ribbonPanel,.editorRibbon:has(.ribbonPanel[data-ribbon-panel="layout"].on) .ribbonPanel{overflow-y:visible}
 .ribbonPanel::-webkit-scrollbar{height:4px}.ribbonPanel::-webkit-scrollbar-thumb{background:#d6ddd6;border-radius:4px}
 .editorRibbon .ribbonDock,.editorRibbon #spineEditorDock{align-self:stretch;flex:none;min-width:0;margin:0;padding:0 10px;border:0;border-right:1px solid #e2e6e1;background:transparent}
@@ -309,7 +314,7 @@ body.embed .proj .t small{display:none}   /* 外层已有专辑名，这里不�
     <button data-mod="export">导出</button>
   </nav>
   <div class="editorRibbon" id="editorRibbon" aria-label="设计工具栏">
-    <div class="ribbonTabs" role="tablist"><button type="button" class="on" data-ribbon-tab="side">侧封</button><button type="button" data-ribbon-tab="layout">排版</button><button type="button" data-ribbon-tab="font">字体</button><button type="button" data-ribbon-tab="object">对象</button><button type="button" data-ribbon-tab="view">预览</button><button type="button" id="btnProjectDataTab">资料</button><button type="button" id="btnStructureTab">结构</button><button type="button" id="btnRecentTab">最近</button><button type="button" id="btnBackgroundTab">底图</button></div>
+    <div class="ribbonTabs" role="tablist"><button type="button" class="on" data-ribbon-tab="side">侧封</button><button type="button" data-ribbon-tab="layout">排版</button><button type="button" data-ribbon-tab="font">字体</button><button type="button" data-ribbon-tab="object">对象</button><button type="button" data-ribbon-tab="view">预览</button><button type="button" id="btnProjectDataTab">资料</button><button type="button" id="btnStructureTab">结构</button><button type="button" id="btnRecentTab">最近</button><button type="button" id="btnBackgroundTab">AI 组件</button></div>
     <div class="ribbonPanel" data-ribbon-panel="object"><div class="ribbonDock ribbonObjects"><b>编辑对象</b><div class="ribbonObjectButtons"><button type="button" data-canvas-part="disc">① 盘面</button><button type="button" data-canvas-part="booklet">② 封面</button><button type="button" data-canvas-part="sleeve">③ 封底条</button></div></div></div>
     <div class="ribbonPanel" data-ribbon-panel="layout"></div>
     <div class="ribbonPanel" data-ribbon-panel="font"></div>
@@ -441,12 +446,21 @@ body.embed .proj .t small{display:none}   /* 外层已有专辑名，这里不�
       </section>
 
       <section class="card" id="aiCard">
-        <div class="head"><h2><em>③</em> 自定义底图（可选）</h2></div>
+        <div class="head"><h2><em>③</em> AI 生成组件</h2><button type="button" class="plain sm" id="btnAiSettings">模型配置</button></div>
         <div class="body">
-          <p class="muted" style="margin:0;font-size:12.5px">默认使用封面衍生的稳定生产版。你也可以上传已确认的底图，替换对应部件。</p>
+          <p class="muted" style="margin:0 0 10px;font-size:12.5px">上传一张封面，模型会参考它生成整套组件草图。你可以用文字要求只重绘其中一张。</p>
+          <div class="aiTopRow"><select id="aiProfileSelect" class="input" aria-label="图片模型"><option value="">先配置图片模型</option></select><button type="button" id="btnAiCoverUpload" class="plain sm">上传封面</button><input id="aiCoverFile" type="file" accept="image/png,image/jpeg,image/webp" hidden></div>
+          <label class="field" for="aiInstruction">告诉模型你的要求</label>
+          <textarea id="aiInstruction" class="aiPrompt" maxlength="1500" placeholder="例如：延续封面的粉色水晶与蝴蝶元素，字体优雅；内盘底增加晶透蝴蝶，人物保持一致。"></textarea>
+          <div class="aiActions"><button type="button" id="btnAiAll" class="btn">根据封面生成整套组件</button><span id="aiRunState" class="aiStatus"></span></div>
+          <p class="muted" style="font-size:11px;margin:0">整套生成会向所选图片模型发起 7 次请求，按该服务商的 API 计费。</p>
+          <div id="aiComponentGrid" class="aiGrid"></div>
+          <details class="adv" style="margin-top:16px"><summary>手动上传已确认底图（用于现有三件套打印）</summary>
+          <p class="muted" style="font-size:12px">这里保留原来的底图替换功能；AI 组件草图通过检查后再进入正式印刷流程。</p>
           <div class="aiSlot" data-key="aiDisc"><input type="file" accept="image/*" hidden><img class="pv" hidden><div class="t"><b>① 盘面（Ø40mm 方形底图）</b><small class="st">未上传</small></div><button class="plain sm up">上传</button><button class="plain sm clr" hidden>清除</button></div>
           <div class="aiSlot" data-key="aiFold"><input type="file" accept="image/*" hidden><img class="pv" hidden><div class="t"><b>② 封面折件（82×41 展开图）</b><small class="st">未上传</small></div><button class="plain sm up">上传</button><button class="plain sm clr" hidden>清除</button></div>
           <div class="aiSlot" data-key="aiStrip"><input type="file" accept="image/*" hidden><img class="pv" hidden><div class="t"><b>③ 封底条（111.2×38 展开图）</b><small class="st">未上传</small></div><button class="plain sm up">上传</button><button class="plain sm clr" hidden>清除</button></div>
+          </details>
         </div>
       </section>
 
@@ -679,16 +693,7 @@ function mountRailUtilityPopovers(){
 }
 function mountAssetPopover(){
   const card=$('#aiCard'),button=$('#btnBackgroundTab');if(!card||!button)return;
-  const popover=document.createElement('section');popover.id='assetPopover';popover.className='assetPopover';popover.hidden=true;
-  popover.append(card);document.body.append(popover);
-  button.onclick=e=>{
-    const r=e.currentTarget.getBoundingClientRect(),width=Math.min(620,innerWidth-24);
-    popover.style.left=Math.max(12,Math.min(innerWidth-width-12,r.right-width))+'px';
-    popover.style.top=Math.max(12,Math.min(innerHeight-390,r.bottom+8))+'px';
-    popover.hidden=!popover.hidden;
-  };
-  document.addEventListener('click',e=>{if(!e.target.closest('#assetPopover')&&!e.target.closest('#btnBackgroundTab'))popover.hidden=true;});
-  document.addEventListener('keydown',e=>{if(e.key==='Escape')popover.hidden=true;});
+  button.onclick=()=>card.scrollIntoView({behavior:'smooth',block:'start'});
 }
 mountProjectDataPopover();
 mountRailUtilityPopovers();
@@ -1357,4 +1362,19 @@ async function loadProject(jid){
   await loadRailProjects();
   if(JID) loadProject(JID);
 })();
-</script></body></html>
+</script>
+<dialog id="aiConfigDialog" aria-label="AI 模型配置">
+  <div class="aiDlgHead"><strong>AI 图片模型配置</strong><button type="button" class="plain sm" id="aiDialogClose">关闭</button></div>
+  <div class="aiDlgBody">
+    <p class="muted" style="margin:0 0 14px;font-size:12px">可保存多个配置。密钥只保存在本机；连接测试不生成图片。</p>
+    <label>已保存配置<select id="aiEditProfile"><option value="">新建配置</option></select></label>
+    <label>配置名称<input id="aiProfileName" placeholder="例如：高画质出图"></label>
+    <label>服务商<select id="aiProvider"><option value="openai">OpenAI Images</option><option value="gemini">Google Gemini Images</option></select></label>
+    <label>图片模型名称<input id="aiModel" placeholder="gpt-image-2.5-sunburst"></label>
+    <label>API Key<input id="aiApiKey" type="password" autocomplete="off" placeholder="新建时填写；编辑时留空则保留旧密钥"></label>
+    <label class="aiCheck"><input id="aiMakeDefault" type="checkbox"> 设为迷你 CD 默认模型</label>
+    <p id="aiConfigState" class="aiStatus" role="status"></p>
+  </div>
+  <div class="aiDlgFoot"><button type="button" id="aiSaveProfile" class="btn">保存配置</button><button type="button" id="aiTestProfile" class="plain">测试连接</button><button type="button" id="aiDeleteProfile" class="plain">删除配置</button></div>
+</dialog>
+<script src="/design-ai.js"></script></body></html>
