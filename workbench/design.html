@@ -1366,16 +1366,17 @@ async function loadProject(jid){
 <dialog id="aiConfigDialog" aria-label="AI 模型配置">
   <div class="aiDlgHead"><strong>AI 图片模型配置</strong><button type="button" class="plain sm" id="aiDialogClose">关闭</button></div>
   <div class="aiDlgBody">
-    <p class="muted" style="margin:0 0 14px;font-size:12px">可保存多个配置。密钥只保存在本机；连接测试不生成图片。</p>
+    <p class="muted" style="margin:0 0 14px;font-size:12px">可保存多个配置。密钥只保存在本机；验证密钥不出图，无法代替生成额度测试。</p>
     <label>已保存配置<select id="aiEditProfile"><option value="">新建配置</option></select></label>
     <label>配置名称<input id="aiProfileName" placeholder="例如：高画质出图"></label>
-    <label>服务商<select id="aiProvider"><option value="openai">OpenAI Images</option><option value="gemini">Google Gemini Images</option></select></label>
-    <label>图片模型名称<input id="aiModel" placeholder="gpt-image-2.5-sunburst"></label>
+    <label>服务商<select id="aiProvider"><option value="gemini">Google Gemini Images</option><option value="openai">OpenAI Images</option></select></label>
+    <label>图片模型名称<input id="aiModel" list="aiModelSuggestions" placeholder="gemini-nano-banana-2.1"></label>
+    <datalist id="aiModelSuggestions"></datalist><small id="aiModelHint" class="aiKeyHint"></small>
     <label>API Key<input id="aiApiKey" type="password" autocomplete="off" placeholder="新建时填写；编辑时留空则保留旧密钥"></label>
     <small id="aiKeyHint" class="aiKeyHint"></small>
     <label class="aiCheck"><input id="aiMakeDefault" type="checkbox"> 设为迷你 CD 默认模型</label>
     <p id="aiConfigState" class="aiStatus" role="status"></p>
   </div>
-  <div class="aiDlgFoot"><button type="button" id="aiSaveProfile" class="btn">保存配置</button><button type="button" id="aiTestProfile" class="plain">测试连接</button><button type="button" id="aiDeleteProfile" class="plain">删除配置</button></div>
+  <div class="aiDlgFoot"><button type="button" id="aiSaveProfile" class="btn">保存配置</button><button type="button" id="aiTestProfile" class="plain">验证密钥（不出图）</button><button type="button" id="aiDeleteProfile" class="plain">删除配置</button></div>
 </dialog>
 <script src="/design-ai.js"></script></body></html>

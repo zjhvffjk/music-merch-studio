@@ -56,6 +56,13 @@ class DesignAiTests(unittest.TestCase):
                          "model": "gpt-image-2.5-sunburst"})
         self.assertEqual(ai._profile(ident)[1], "test-private-key")
 
+    def test_switching_provider_requires_its_own_key(self):
+        ident = self.create("gemini")
+        with self.assertRaisesRegex(ai.ModelError, "新 API Key"):
+            ai.save_profile({"id": ident, "name": "换服务商", "provider": "openai",
+                             "model": "gpt-image-2.5-sunburst"})
+        self.assertEqual(ai._profile(ident)[0]["provider"], "gemini")
+
     def test_openai_receives_reference_and_natural_language(self):
         ident = self.create()
         encoded = base64.b64encode(sample_png()).decode("ascii")
@@ -90,6 +97,13 @@ class DesignAiTests(unittest.TestCase):
         with self.assertRaisesRegex(ai.ModelError, "配额与结算设置"):
             ai._json_response(response)
 
+    def test_zero_free_tier_quota_is_not_described_as_temporary(self):
+        response = FakeResponse({"error": {"message": "Rate limit exceeded (limit: 0 input tokens per minute on Free Tier)"}})
+        response.ok = False
+        response.status_code = 429
+        with self.assertRaisesRegex(ai.ModelError, "免费生成额度为 0"):
+            ai._json_response(response)
+
     def test_component_shapes_and_fixed_back_details(self):
         ident = self.create()
         encoded = base64.b64encode(sample_png()).decode("ascii")
@@ -118,6 +132,14 @@ class DesignAiTests(unittest.TestCase):
             self.assertTrue(ai.test_profile(ident)["ok"])
         self.assertEqual(get.call_args.kwargs["proxies"],
                          {"https": "http://127.0.0.1:10808"})
+
+    def test_text_model_is_not_reported_as_image_ready(self):
+        ident = self.create("gemini")
+        ai.save_profile({"id": ident, "provider": "gemini", "model": "gemini-3-flash"})
+        with mock.patch.object(ai.requests, "get", return_value=FakeResponse(
+                {"supportedGenerationMethods": ["generateContent"]})):
+            with self.assertRaisesRegex(ai.ModelError, "文本模型"):
+                ai.test_profile(ident)
 
 
 if __name__ == "__main__":

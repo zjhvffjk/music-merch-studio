@@ -9,7 +9,7 @@
     ['left-spine-back', '左侧封背面'], ['tray', '内盘底']
   ];
   const defaults = {openai: 'gpt-image-2.5-sunburst', gemini: 'gemini-nano-banana-2.1'};
-  let profiles = [], defaultId = '', running = false;
+  let profiles = [], defaultId = '', running = false, providerInfo = {};
   const images = {};
   const api = async (path, data, timeoutMs = 0) => {
     const controller = new AbortController();
@@ -33,6 +33,30 @@
   };
   const profileChoice = () => el('aiProfileSelect').value || defaultId;
   const selectedProfile = () => profiles.find(p => p.id === el('aiEditProfile').value);
+
+  function showModelChoices() {
+    const provider = el('aiProvider').value;
+    const list = el('aiModelSuggestions');
+    list.replaceChildren();
+    for (const model of providerInfo[provider]?.models || []) {
+      list.append(new Option(model, model));
+    }
+    el('aiModelHint').textContent = provider === 'gemini'
+      ? '选择 Gemini 图片模型，也可填其他模型 ID。Google AI 会员与 API Key 额度分开；具体出图额度以密钥所属项目为准。'
+      : '选择 OpenAI 图片模型，也可填其他支持图片编辑的模型 ID。';
+  }
+
+  function showKeyHint() {
+    const profile = selectedProfile();
+    const changedProvider = profile && profile.provider !== el('aiProvider').value;
+    el('aiApiKey').placeholder = changedProvider ? '切换服务商后须填写新 API Key'
+      : profile?.hasKey ? '已保存密钥；留空则保留' : '输入 API Key';
+    el('aiKeyHint').textContent = changedProvider
+      ? '不同服务商的密钥不能共用，请填写新服务商的 API Key。'
+      : profile?.hasKey
+        ? '✓ 密钥已安全保存在本机。这里不会回显；需要更换时输入新密钥再保存。'
+        : '新建配置时请填写密钥；保存后不会再次显示完整内容。';
+  }
 
   function drawCards() {
     const grid = el('aiComponentGrid');
@@ -75,13 +99,11 @@
   function fillEdit() {
     const profile = selectedProfile();
     el('aiProfileName').value = profile?.name || '';
-    el('aiProvider').value = profile?.provider || 'openai';
-    el('aiModel').value = profile?.model || defaults.openai;
+    el('aiProvider').value = profile?.provider || 'gemini';
+    el('aiModel').value = profile?.model || defaults.gemini;
+    showModelChoices();
     el('aiApiKey').value = '';
-    el('aiApiKey').placeholder = profile?.hasKey ? '已保存密钥；留空则保留' : '输入 API Key';
-    el('aiKeyHint').textContent = profile?.hasKey
-      ? '✓ 密钥已安全保存在本机。这里不会回显；需要更换时输入新密钥再保存。'
-      : '新建配置时请填写密钥；保存后不会再次显示完整内容。';
+    showKeyHint();
     el('aiMakeDefault').checked = Boolean(profile?.default || !profiles.length);
     configStatus('');
   }
@@ -89,6 +111,7 @@
   async function loadProfiles(preferred = '') {
     const data = await api('profiles');
     profiles = data.profiles || []; defaultId = data.default || '';
+    providerInfo = data.providers || {};
     const select = el('aiProfileSelect');
     select.replaceChildren(new Option('选择图片模型', ''));
     for (const profile of profiles) {
@@ -98,7 +121,7 @@
     const edit = el('aiEditProfile');
     edit.replaceChildren(new Option('新建配置', ''));
     for (const profile of profiles) edit.add(new Option(profile.name + ' · ' + profile.model, profile.id));
-    edit.value = preferred && profiles.some(p => p.id === preferred) ? preferred : '';
+    edit.value = preferred && profiles.some(p => p.id === preferred) ? preferred : defaultId;
     fillEdit();
   }
 
@@ -106,7 +129,9 @@
   el('aiDialogClose').onclick = () => el('aiConfigDialog').close();
   el('aiEditProfile').onchange = fillEdit;
   el('aiProvider').onchange = () => {
-    if (!selectedProfile()) el('aiModel').value = defaults[el('aiProvider').value];
+    el('aiModel').value = providerInfo[el('aiProvider').value]?.model || defaults[el('aiProvider').value];
+    showModelChoices();
+    showKeyHint();
   };
   el('aiSaveProfile').onclick = async () => {
     try {
@@ -124,11 +149,11 @@
     } catch (error) { configStatus('保存失败：' + error.message); }
   };
   el('aiTestProfile').onclick = async () => {
-    if (!el('aiEditProfile').value) return configStatus('请先保存配置，再测试连接。');
+    if (!el('aiEditProfile').value) return configStatus('请先保存配置，再验证密钥。');
     const button = el('aiTestProfile');
     button.disabled = true;
     try {
-      configStatus('正在连接模型，通常需要几秒；网络异常时最多等待 30 秒…');
+      configStatus('正在验证密钥和模型；此操作不生成图片，最多等待 30 秒…');
       const data = await api('test', {id: el('aiEditProfile').value}, 30000);
       configStatus(data.message);
     } catch (error) {

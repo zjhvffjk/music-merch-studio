@@ -24,8 +24,11 @@ ROOT = Path(__file__).resolve().parent.parent
 PROFILE_FILE = ROOT / "outputs" / "工作台" / "_ai_profiles.json"
 UPLOAD_DIR = ROOT / "outputs" / "工作台" / "_uploads"
 PROVIDERS = {
-    "openai": {"name": "OpenAI Images", "model": "gpt-image-2.5-sunburst"},
-    "gemini": {"name": "Google Gemini Images", "model": "gemini-nano-banana-2.1"},
+    "openai": {"name": "OpenAI Images", "model": "gpt-image-2.5-sunburst",
+               "models": ["gpt-image-2.5-sunburst", "gpt-image-2.5-flare", "gpt-image-2"]},
+    "gemini": {"name": "Google Gemini Images", "model": "gemini-nano-banana-2.1",
+               "models": ["gemini-nano-banana-2.1", "gemini-3.1-flash-lite-image",
+                          "gemini-3.1-flash-image", "gemini-3-pro-image"]},
 }
 TARGETS = {
     "disc": "40mm 迷你 CD 盘面艺术，圆形构图，中心 5mm 圆孔区域不得有脸或重要文字",
@@ -136,6 +139,8 @@ def save_profile(payload: dict) -> dict:
         existing = next((row for row in data["profiles"] if row["id"] == ident), None)
         if ident and existing is None:
             raise ModelError("配置不存在")
+        if existing and provider != existing["provider"] and not key:
+            raise ModelError("切换服务商时请填写该服务商的新 API Key")
         row = existing or {"id": uuid.uuid4().hex[:16]}
         row.update({"name": name, "provider": provider, "model": model})
         if key:
@@ -186,6 +191,8 @@ def _json_response(response: requests.Response) -> dict:
         error = body.get("error") if isinstance(body, dict) else None
         message = error.get("message") if isinstance(error, dict) else str(error or "请求失败")
         if response.status_code == 429:
+            if "limit: 0" in message and "Free Tier" in message:
+                raise ModelError("密钥有效，但所属项目对该图片模型的免费生成额度为 0；请选择有图片额度的项目或模型。")
             raise ModelError("图片生成额度不足或已触发限速；请检查此 API Key 所属项目的配额与结算设置，稍后重试。")
         raise ModelError("模型接口 HTTP %s：%s" % (response.status_code, message[:300]))
     return body
@@ -205,9 +212,11 @@ def test_profile(ident: str) -> dict:
         body = _json_response(response)
         if row["provider"] == "gemini" and "generateContent" not in body.get("supportedGenerationMethods", []):
             raise ModelError("此模型没有开放图片生成接口，请在配置里选择可用的图片模型")
+        if row["provider"] == "gemini" and not any(word in row["model"].lower() for word in ("image", "banana")):
+            raise ModelError("这是文本模型名称；请选择 Gemini 图片模型（名称通常含 image 或 banana）")
     except requests.RequestException as exc:
         raise ModelError("无法连接模型接口，请检查本机网络或代理设置（%s）" % type(exc).__name__) from exc
-    return {"ok": True, "message": "密钥和模型生成接口可用；实际出图仍需验证账户额度"}
+    return {"ok": True, "message": "密钥和模型可访问。此验证不生成图片，也不代表有出图额度；请单独生成一张验证。"}
 
 
 def _normalized_png(image_bytes: bytes) -> bytes:
