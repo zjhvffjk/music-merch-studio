@@ -20,7 +20,6 @@ class SelectedSongTests(unittest.TestCase):
         self.assertEqual(seen[0]['id'], 102)
         self.assertEqual(seen[0]['dur_ms'], 252000)
         self.assertEqual(seen[0]['name'], 'chosen')
-        self.assertEqual(seen[0].get('source'), '163')
 
     def test_two_qq_tracks_in_same_album_keep_their_own_identity(self):
         seen = []

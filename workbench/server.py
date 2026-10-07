@@ -63,7 +63,6 @@ import urllib.request
 import uuid
 import zipfile
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from pathlib import Path
 from urllib.parse import parse_qs, quote, unquote, urlparse
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -110,12 +109,6 @@ from make_set import (  # noqa: E402
     LEAD_MIN, comment_total, contact_sheet, fmt_dur, hot_songs, hot_songs_ex,
     human, is_placeholder, lead_rate, norm, normalize_cover, save_retry, FONT_BD,
 )
-from playback_service import (  # noqa: E402
-    MAX_UPLOAD_BYTES as MAX_AUDIO_UPLOAD_BYTES,
-    PlaybackLibrary,
-    PlaybackValidationError,
-    track_key,
-)
 
 # 钥匙扣商品图（5 层合成）。缺贴片/曲线时只让这一项功能不可用，
 # 不让整个工作台起不来 —— 封面和播放界面本来就能独立工作。
@@ -156,9 +149,6 @@ except Exception:
 OUT_ROOT = os.path.join(ROOT, "outputs", "工作台")
 UPLOAD_DIR = os.path.join(OUT_ROOT, "_uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
-AUDIO_ROOT = Path(ROOT) / "outputs" / "音乐库"
-PLAYBACK_MANIFEST = Path(ROOT) / "config" / "playback-manifest.local.json"
-PLAYBACK = PlaybackLibrary(AUDIO_ROOT, PLAYBACK_MANIFEST)
 
 # ---------------- 身份与日志 ----------------
 # APP_ID 用于「单实例检测」：启动时先问端口上是不是自己，
@@ -245,13 +235,6 @@ MIME = {
     ".ttf": "font/ttf",
     ".otf": "font/otf",
 }
-
-
-def playback_track_fields(source, track_id):
-    """Stable player identity and the currently known local availability."""
-    key = track_key(source, track_id)
-    return {"source": str(source).lower(), "trackKey": key,
-            "playbackState": PLAYBACK.state(source, track_id)}
 
 
 # ---------------------------------------------------------------- 任务管理
@@ -1803,7 +1786,6 @@ def run_song(job, opt):
             if not exact:
                 return fail(job, "选中歌曲的详情暂不可用，请重试")
             one, src = norm(exact), "163"
-        one["source"] = src
         opt["_src"] = src
         item, why = render_song(job, one, 1, opt)
         if item is None:
@@ -2078,64 +2060,6 @@ class Handler(BaseHTTPRequestHandler):
         n = int(self.headers.get("Content-Length") or 0)
         return self.rfile.read(n) if n else b""
 
-    def _audio_file(self, path, mime_type):
-        """Stream an authorized audio file with single-range support."""
-        path = Path(path)
-        if not path.is_file():
-            return self._json({"error": "音频文件不存在"}, 404)
-        size = path.stat().st_size
-        range_header = (self.headers.get("Range") or "").strip()
-        start, end, code = 0, max(0, size - 1), 200
-        if range_header:
-            try:
-                unit, value = range_header.split("=", 1)
-                if unit.strip().lower() != "bytes" or "," in value:
-                    raise ValueError("unsupported range")
-                left, right = value.strip().split("-", 1)
-                if not left:
-                    amount = int(right)
-                    if amount <= 0:
-                        raise ValueError("bad suffix")
-                    start = max(0, size - amount)
-                    end = size - 1
-                else:
-                    start = int(left)
-                    end = int(right) if right else size - 1
-                if start < 0 or start >= size or end < start:
-                    raise ValueError("unsatisfiable")
-                end = min(end, size - 1)
-                code = 206
-            except (ValueError, TypeError):
-                self.send_response(416)
-                self.send_header("Content-Range", f"bytes */{size}")
-                self.send_header("Content-Length", "0")
-                self.send_header("Accept-Ranges", "bytes")
-                self._cors()
-                self.end_headers()
-                self._sent = True
-                return
-
-        length = max(0, end - start + 1)
-        self.send_response(code)
-        self.send_header("Content-Type", mime_type or "application/octet-stream")
-        self.send_header("Content-Length", str(length))
-        self.send_header("Accept-Ranges", "bytes")
-        self.send_header("Cache-Control", "private, max-age=3600")
-        if code == 206:
-            self.send_header("Content-Range", f"bytes {start}-{end}/{size}")
-        self._cors()
-        self.end_headers()
-        self._sent = True
-        with path.open("rb") as stream:
-            stream.seek(start)
-            remaining = length
-            while remaining:
-                chunk = stream.read(min(262144, remaining))
-                if not chunk:
-                    break
-                self.wfile.write(chunk)
-                remaining -= len(chunk)
-
     # ---------- OPTIONS（跨来源预检） ----------
     def do_OPTIONS(self):
         self._sent = False
@@ -2188,34 +2112,6 @@ class Handler(BaseHTTPRequestHandler):
                 return self._file(os.path.join(HERE, "index.html"))
             if p == "/favicon.ico":
                 return self._json({}, 404)
-            if p in ("/static/player.js", "/static/player.css"):
-                return self._file(os.path.join(HERE, os.path.basename(p)))
-            if p.startswith("/static/"):
-                return self._json({"error": "not found"}, 404)
-
-            if p == "/api/playback":
-                source = (q.get("source") or [""])[0]
-                track_id = (q.get("id") or [""])[0]
-                try:
-                    asset_info = PLAYBACK.resolve(source, track_id)
-                except PlaybackValidationError as e:
-                    return self._json({"error": str(e)}, 400)
-                if not asset_info:
-                    return self._json({
-                        "playable": False,
-                        "trackKey": track_key(source, track_id),
-                        "reason": "已找到歌曲资料，但当前没有可播放音源",
-                    })
-                asset_info = dict(asset_info)
-                asset_info["url"] = "/media/audio/" + asset_info["assetId"]
-                return self._json({"playable": True, "asset": asset_info})
-
-            if p.startswith("/media/audio/"):
-                asset_id = unquote(p[len("/media/audio/"):])
-                audio_path = PLAYBACK.asset_path(asset_id)
-                if not audio_path:
-                    return self._json({"error": "音频文件不存在"}, 404)
-                return self._audio_file(audio_path, PLAYBACK.asset_mime(asset_id))
 
             # 工作台内置的开源字体也供浏览器字体选择器使用；只允许访问
             # assets/fonts 目录，不能借 URL 读取项目中的其他文件。
@@ -2294,7 +2190,6 @@ class Handler(BaseHTTPRequestHandler):
                         "pic": (cover_url_q(s.get("pic") or "") if src == "qq"
                                 else cover_url(s.get("pic") or "", 800)),
                         "albummid": ((s.get("pic") or "") if src == "qq" else ""),
-                        **playback_track_fields(src, s["id"]),
                     } for s in pool],
                 }
                 # albums=1：搜一次歌手，顺手把「全部专辑」也带回来，前端两个出口
@@ -2369,8 +2264,7 @@ class Handler(BaseHTTPRequestHandler):
                                 "album": alb, "dur": dur, "source": src,
                                 "albummid": amid,
                                 "pic": (cover_url_q(amid) if src == "qq"
-                                        else cover_url(pic, 800)),
-                                **playback_track_fields(src, sid)})
+                                        else cover_url(pic, 800))})
 
                 # QQ 音乐排前面：版权曲目（周杰伦等）只有这里有，用户多半要点它
                 if mode in ("auto", "qq"):
@@ -2483,23 +2377,6 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if DESIGN.handle(self, p, q, "POST"):
                 return
-            if p == "/api/audio/upload":
-                source = (q.get("source") or [""])[0]
-                track_id = (q.get("id") or [""])[0]
-                name = (q.get("name") or ["audio.mp3"])[0]
-                try:
-                    declared = int(self.headers.get("Content-Length") or 0)
-                except ValueError:
-                    return self._json({"error": "文件大小无效"}, 400)
-                if declared > MAX_AUDIO_UPLOAD_BYTES:
-                    return self._json({"error": "音频文件超过 200 MiB"}, 413)
-                try:
-                    asset_info = PLAYBACK.bind_upload(source, track_id, name, self._body())
-                except PlaybackValidationError as e:
-                    return self._json({"error": str(e)}, 400)
-                asset_info = dict(asset_info)
-                asset_info["url"] = "/media/audio/" + asset_info["assetId"]
-                return self._json({"playable": True, "asset": asset_info})
             if p == "/api/upload":
                 raw = self._body()
                 if len(raw) < 100:
