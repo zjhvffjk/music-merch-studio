@@ -185,6 +185,8 @@ def _json_response(response: requests.Response) -> dict:
     if not response.ok:
         error = body.get("error") if isinstance(body, dict) else None
         message = error.get("message") if isinstance(error, dict) else str(error or "请求失败")
+        if response.status_code == 429:
+            raise ModelError("图片生成额度不足或已触发限速；请检查此 API Key 所属项目的配额与结算设置，稍后重试。")
         raise ModelError("模型接口 HTTP %s：%s" % (response.status_code, message[:300]))
     return body
 
@@ -200,10 +202,12 @@ def test_profile(ident: str) -> dict:
             url = "https://generativelanguage.googleapis.com/v1beta/models/" + row["model"]
             response = requests.get(url, headers={"x-goog-api-key": key},
                                     timeout=(5, 12), **_network_options())
-        _json_response(response)
+        body = _json_response(response)
+        if row["provider"] == "gemini" and "generateContent" not in body.get("supportedGenerationMethods", []):
+            raise ModelError("此模型没有开放图片生成接口，请在配置里选择可用的图片模型")
     except requests.RequestException as exc:
         raise ModelError("无法连接模型接口，请检查本机网络或代理设置（%s）" % type(exc).__name__) from exc
-    return {"ok": True, "message": "密钥和模型查询成功；图片生成需实际调用时验证额度"}
+    return {"ok": True, "message": "密钥和模型生成接口可用；实际出图仍需验证账户额度"}
 
 
 def _normalized_png(image_bytes: bytes) -> bytes:
@@ -283,20 +287,33 @@ def generate(ident: str, reference: Image.Image, target: str, instruction: str,
             if not encoded:
                 raise ModelError("OpenAI 未返回图片数据")
         else:
-            inputs = [{"type": "text", "text": prompt}]
-            inputs.extend({"type": "image", "mime_type": "image/png",
-                           "data": base64.b64encode(image_png(im)).decode("ascii")} for im in refs)
+            parts = [{"text": prompt}]
+            parts.extend({"inline_data": {"mime_type": "image/png",
+                                           "data": base64.b64encode(image_png(im)).decode("ascii")}}
+                         for im in refs)
             response = requests.post(
-                "https://generativelanguage.googleapis.com/v1beta/interactions",
+                "https://generativelanguage.googleapis.com/v1beta/models/" + row["model"] + ":generateContent",
                 headers={"x-goog-api-key": key, "Content-Type": "application/json"},
-                json={"model": row["model"], "input": inputs,
-                      "response_format": {"type": "image", "aspect_ratio": aspect,
-                                          "image_size": "2K"}}, timeout=240,
+                json={"contents": [{"parts": parts}],
+                      "generationConfig": {"responseModalities": ["TEXT", "IMAGE"],
+                                           "imageConfig": {"aspectRatio": aspect,
+                                                           "imageSize": "2K"}}},
+                timeout=240,
                 **_network_options())
             body = _json_response(response)
-            encoded = (body.get("output_image") or {}).get("data")
+            encoded = None
+            for candidate in body.get("candidates") or []:
+                for part in (candidate.get("content") or {}).get("parts") or []:
+                    if part.get("thought"):
+                        continue
+                    inline = part.get("inlineData") or part.get("inline_data") or {}
+                    if inline.get("data") and str(inline.get("mimeType") or inline.get("mime_type") or "").startswith("image/"):
+                        encoded = inline["data"]
+                        break
+                if encoded:
+                    break
             if not encoded:
-                raise ModelError("Gemini 未返回图片数据")
+                raise ModelError("Gemini 未返回图片；请检查模型额度或换一个图片模型")
     except requests.RequestException as exc:
         raise ModelError("模型连接失败：%s" % type(exc).__name__) from exc
     try:

@@ -40,7 +40,7 @@
     for (const [key, name] of targets) {
       const card = document.createElement('article');
       card.className = 'aiComp';
-      if (images[key]) {
+      if (images[key]?.url) {
         const img = document.createElement('img');
         img.src = images[key].url;
         img.alt = name + ' AI 草图';
@@ -57,11 +57,11 @@
       const actions = document.createElement('div'); actions.className = 'aiCompActions';
       const button = document.createElement('button');
       button.type = 'button'; button.className = 'plain sm';
-      button.textContent = images[key] ? '按描述重绘' : '单独生成';
+      button.textContent = images[key]?.url ? '按描述重绘' : '单独生成';
       button.disabled = running;
       button.onclick = () => generateOne(key, true);
       actions.append(button);
-      if (images[key]) {
+      if (images[key]?.url) {
         const link = document.createElement('a');
         link.href = images[key].url; link.download = '迷你CD-' + key + '.png';
         link.textContent = '下载图片'; link.className = 'plain sm';
@@ -202,14 +202,20 @@
     if (!PIC) return status('先上传或选择专辑封面。');
     if (!profileChoice()) return status('先点“模型配置”保存图片模型和 API Key。');
     running = true; el('btnAiAll').disabled = true; drawCards();
-    let done = 0, failed = 0;
+    let done = 0, failed = 0, firstError = '';
     for (const [target, name] of targets) {
       status('正在生成 ' + name + ' · ' + (done + failed + 1) + '/' + targets.length);
       try { await callGenerate(target, false); done++; }
-      catch (error) { images[target] = {message: '失败：' + error.message}; failed++; drawCards(); }
+      catch (error) {
+        firstError = error.message;
+        images[target] = {message: '失败：' + firstError}; failed++; drawCards();
+        break;
+      }
     }
     running = false; el('btnAiAll').disabled = false; drawCards();
-    status('AI 草图完成 ' + done + '/' + targets.length + (failed ? '；失败的组件可单独重试。' : '。'));
+    status(firstError
+      ? '已停止，避免继续产生失败请求。' + firstError
+      : 'AI 草图完成 ' + done + '/' + targets.length + '。');
   };
 
   drawCards();

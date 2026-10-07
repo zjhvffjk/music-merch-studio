@@ -74,13 +74,21 @@ class DesignAiTests(unittest.TestCase):
     def test_gemini_receives_reference_image_and_prompt(self):
         ident = self.create("gemini")
         encoded = base64.b64encode(sample_png()).decode("ascii")
-        with mock.patch.object(ai.requests, "post", return_value=FakeResponse({"output_image": {"data": encoded}})) as post:
+        body = {"candidates": [{"content": {"parts": [{"inlineData": {"mimeType": "image/png", "data": encoded}}]}}]}
+        with mock.patch.object(ai.requests, "post", return_value=FakeResponse(body)) as post:
             ai.generate(ident, Image.new("RGB", (600, 600)), "inside", "增加蝴蝶")
         kwargs = post.call_args.kwargs
-        self.assertEqual(kwargs["json"]["model"], "gemini-nano-banana-2.1")
-        self.assertEqual(kwargs["json"]["input"][1]["type"], "image")
-        self.assertIn("增加蝴蝶", kwargs["json"]["input"][0]["text"])
-        self.assertEqual(kwargs["json"]["response_format"]["aspect_ratio"], "1:1")
+        self.assertIn("/v1beta/models/gemini-nano-banana-2.1:generateContent", post.call_args.args[0])
+        self.assertIn("inline_data", kwargs["json"]["contents"][0]["parts"][1])
+        self.assertIn("增加蝴蝶", kwargs["json"]["contents"][0]["parts"][0]["text"])
+        self.assertEqual(kwargs["json"]["generationConfig"]["imageConfig"]["aspectRatio"], "1:1")
+
+    def test_quota_error_is_clear(self):
+        response = FakeResponse({"error": {"message": "You exceeded your current quota"}})
+        response.ok = False
+        response.status_code = 429
+        with self.assertRaisesRegex(ai.ModelError, "配额与结算设置"):
+            ai._json_response(response)
 
     def test_component_shapes_and_fixed_back_details(self):
         ident = self.create()
@@ -106,7 +114,7 @@ class DesignAiTests(unittest.TestCase):
         ident = self.create("gemini")
         with mock.patch.object(ai.urllib.request, "getproxies_registry",
                                return_value={"https": "http://127.0.0.1:10808"}), \
-             mock.patch.object(ai.requests, "get", return_value=FakeResponse({"name": "model"})) as get:
+             mock.patch.object(ai.requests, "get", return_value=FakeResponse({"name": "model", "supportedGenerationMethods": ["generateContent"]})) as get:
             self.assertTrue(ai.test_profile(ident)["ok"])
         self.assertEqual(get.call_args.kwargs["proxies"],
                          {"https": "http://127.0.0.1:10808"})
