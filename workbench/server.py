@@ -97,12 +97,20 @@ from design_service import SERVICE as DESIGN  # noqa: E402
 import design_service as DSDESIGN  # noqa: E402
 
 from fetch163 import (  # noqa: E402
-    API, cover_url, download, get_json, resolve_picurl, safe_name, search,
+    API, artist_top_songs, album_songs, cover_url, download, get_json,
+    resolve_picurl, safe_name, search,
 )
 from fetch_qq import (  # noqa: E402
     MAX_COVER as QQ_MAX_COVER, comment_total_q, cover_url_q,
-    download as download_q, hot_songs_q, search_singer_mid,
-    search_song as search_song_q,
+    download as download_q, hot_songs_q, search_album_q,
+    search_singer_mid, search_song as search_song_q,
+)
+from fetch_kugou import (  # noqa: E402
+    album_cover_url as kugou_cover_url,
+    search_album as search_album_kg,
+    search_singer as search_singer_kg,
+    search_song as search_song_kg,
+    singer_hot_songs as hot_songs_kg,
 )
 from make_player import make as make_player  # noqa: E402
 from make_set import (  # noqa: E402
@@ -1139,6 +1147,11 @@ def render_song(job, s, rank, opt):
     elif src == "qq":
         c_url = cover_url_q(s["pic"], QQ_MAX_COVER)      # QQ 源最大 800x800
         got = download_q(c_url, tmp)
+    elif src == "kugou":
+        # 酷狗给的是专辑封面直链（已把 {size} 占位符换成真实尺寸），
+        # 直接下载即可，不能再拼 ?param=（那是网易云 CDN 的参数）。
+        c_url = s.get("pic") or ""
+        got = download_q(c_url, tmp) if c_url else 0
     else:
         # 🔴 请求 2000：网易云 CDN 只能降采样、不能超分，实测母版普遍 1400~2000
         #    （幻听/素颜 = 2000、晴天 1500、Always Online = 1400）。
@@ -1646,7 +1659,7 @@ def pick_source(artist, mode, want):
     """
     src_used, ar, pool, notes = None, None, [], []
     fallback_ar, fallback_pool = None, []
-    if mode not in ("auto", "163", "qq"):
+    if mode not in ("auto", "163", "qq", "kugou"):
         mode = "auto"
 
     if mode in ("auto", "163"):
@@ -1700,7 +1713,239 @@ def pick_source(artist, mode, want):
                 else:
                     notes.append("QQ音乐暂不可用；已拒绝展示网易云混入的合唱／创作歌曲")
 
+    # 酷狗兜底：QQ 和网易云都拿不到池子时（接口限流/歌手只在这边有），再试酷狗。
+    # 注意它必须在 QQ 的「保留网易云主唱匹配」之后 —— 那条路有经过核对的歌曲，
+    # 优先级更高；酷狗是没得选时的第三选择。
+    if not pool and mode in ("auto", "kugou"):
+        try:
+            rows = search_singer_kg(artist, 10)
+            exact = next((r for r in rows if r["name"] == artist), None)
+            row = exact or (rows[0] if rows else None)
+            if row:
+                kg_pool = hot_songs_kg(row["id"], want)
+                if kg_pool:
+                    # 封面懒解析：只解析即将进入制作的条目，避免一次打几十个专辑接口。
+                    for s in kg_pool[:want + 5]:
+                        s["pic"] = kugou_cover_url(s.get("album_id"))
+                    ar = {"id": row["id"], "name": row["name"]}
+                    pool = kg_pool
+                    src_used = "kugou"
+                    if not exact:
+                        notes.append(f"酷狗侧按近似名匹配到歌手「{row['name']}」")
+            if not pool:
+                notes.append("酷狗音乐也没找到可用歌曲")
+        except Exception as e:
+            notes.append(f"⚠ 酷狗接口异常：{type(e).__name__}: {e}")
+
     return src_used, ar, pool or [], notes
+
+
+def multi_search_songs(name, mode="auto"):
+    """单曲多平台聚合搜索：QQ → 酷狗 → 网易云，同名去重，来源打标。
+
+    顺序即优先级：QQ 的版权曲目最全、封面是母版；酷狗补 QQ 限流/缺曲；
+    网易云垫底（缺版权歌手会混入翻唱，但翻唱有时也是用户想要的版本）。
+    /api/song 和 /api/search 共用这一份逻辑。
+    """
+    out, seen = [], set()
+
+    def push(nm, arts, alb, dur, sid, amid, src, pic="", extra=None):
+        key = (nm or "").strip()
+        if not key or key in seen:
+            return
+        seen.add(key)
+        row = {"id": sid, "name": nm, "artist": arts,
+               "album": alb, "dur": dur, "source": src,
+               "albummid": amid,
+               "pic": (cover_url_q(amid) if src == "qq"
+                       else (pic if src == "kugou" else cover_url(pic, 800)))}
+        if extra:
+            row.update(extra)
+        out.append(row)
+
+    # QQ 音乐排前面：版权曲目（周杰伦等）只有这里有，用户多半要点它
+    if mode in ("auto", "qq"):
+        try:
+            for s in search_song_q(name, 15):
+                push(s.get("songname"),
+                     "/".join(x.get("name", "?") for x in (s.get("singer") or [])),
+                     s.get("albumname") or "",
+                     fmt_dur((s.get("interval") or 0) * 1000),
+                     s.get("songid"), s.get("albummid") or "", "qq")
+        except Exception as e:
+            print(f"[qq search] {type(e).__name__}: {e}")
+
+    if mode in ("auto", "kugou"):
+        try:
+            for s in search_song_kg(name, 15):
+                # 酷狗搜索结果没有封面直链，生成时再按 album_id 懒解析，
+                # 不能在这里逐条打专辑接口 —— 联想框每敲一个字都会调到这里。
+                push(s["name"], s["artists"], s["album"],
+                     fmt_dur(s["dur_ms"]), s["id"], "", "kugou", "",
+                     extra={"albumId": s.get("album_id")})
+        except Exception as e:
+            print(f"[kugou search] {type(e).__name__}: {e}")
+
+    if mode in ("auto", "163"):
+        try:
+            res = search(name, "song", 20)
+            for s in (res.get("songs") or [])[:20]:
+                # 网易云搜索接口通常只给 album.picId，需补查详情才有 picUrl。
+                # 不补这一步，直接搜索单曲进入制作页仍会退回音符占位。
+                pic = resolve_picurl(s)
+                arts = "/".join(x.get("name", "?") for x in s.get("artists", []))
+                push(s.get("name"), arts,
+                     (s.get("album") or {}).get("name", ""),
+                     fmt_dur(s.get("duration") or 0),
+                     s.get("id"), "", "163",
+                     pic)
+        except Exception as e:
+            print(f"[163 search] {type(e).__name__}: {e}")
+
+    return out[:30]
+
+
+def multi_search_artists(name, songs=None):
+    """歌手候选：QQ（从单曲结果的 singer 数组投票）→ 酷狗 → 网易云。
+
+    QQ 没有可用的歌手搜索接口，只能从歌曲结果里挑；酷狗有独立歌手搜索；
+    网易云的 artist 搜索补最后一批。同名去重，精确命中排最前。
+    """
+    cands, seen = [], set()
+
+    def add(nm, extra):
+        nm = (nm or "").strip()
+        if not nm or nm in seen:
+            return
+        seen.add(nm)
+        row = {"name": nm}
+        row.update(extra)
+        cands.append(row)
+
+    try:
+        votes = {}
+        for s in search_song_q(name, 15):
+            for sg in (s.get("singer") or []):
+                nm = (sg.get("name") or "").strip()
+                mid = sg.get("mid")
+                if not nm or not mid:
+                    continue
+                v = votes.setdefault(mid, {"name": nm, "w": 0})
+                v["w"] += 10 if nm == name else (2 if (name in nm or nm in name) else 1)
+        for mid, v in sorted(votes.items(), key=lambda kv: -kv[1]["w"])[:5]:
+            add(v["name"], {"source": "qq", "mid": mid})
+    except Exception as e:
+        print(f"[qq artist] {type(e).__name__}: {e}")
+
+    try:
+        kg_rows = search_singer_kg(name, 20)
+        # 酷狗歌手搜索是模糊匹配，会混进大量"XX周杰伦"式蹭名歌手，
+        # 只保留与查询词有包含关系的，避免候选区被垃圾填满。
+        fuzzy = [r for r in kg_rows
+                 if r["name"] == name or name in r["name"] or r["name"] in name]
+        for r in fuzzy[:4]:
+            add(r["name"], {"source": "kugou", "id": r["id"]})
+    except Exception as e:
+        print(f"[kugou artist] {type(e).__name__}: {e}")
+
+    try:
+        res = search(name, "artist", 8)
+        for a in (res.get("artists") or [])[:8]:
+            add(a.get("name"), {"source": "163", "id": a.get("id"),
+                                "pic": cover_url(a.get("img1v1Url") or "", 300)})
+    except Exception as e:
+        print(f"[163 artist] {type(e).__name__}: {e}")
+
+    # 精确命中（用户输的就是歌手名）排最前，其余保持各源顺序
+    cands.sort(key=lambda c: 0 if c["name"] == name else 1)
+    return cands[:8]
+
+
+def multi_search_albums(name):
+    """专辑多平台聚合搜索：QQ → 酷狗 → 网易云，同名去重，来源打标。
+
+    搜索框提示词写着「搜专辑」，此前实际没有专辑通道；这里补上。
+    封面直接给可访问的直链（QQ 由 albummid 拼 URL，酷狗搜索结果自带，
+    网易云 picUrl 现成），前端联想框可以直接缩略图展示。
+    """
+    key = (name or "").strip()
+    out, seen = [], set()
+
+    def push(nm, singer, src, aid, pic, date="", count=0, extra=None):
+        nm = (nm or "").strip()
+        row_key = (nm, (singer or "").split("/")[0].strip())
+        if not nm or row_key in seen:
+            return
+        seen.add(row_key)
+        row = {"id": aid, "name": nm, "singer": singer or "",
+               "source": src, "pic": pic or "", "date": date,
+               "count": count}
+        if extra:
+            row.update(extra)
+        out.append(row)
+
+    try:
+        for a in search_album_q(key, 8):
+            push(a.get("albumname"), a.get("singer"), "qq",
+                 a.get("albummid"), cover_url_q(a.get("albummid") or ""),
+                 a.get("date") or "", a.get("count") or 0,
+                 extra={"albummid": a.get("albummid") or ""})
+    except Exception as e:
+        print(f"[qq album] {type(e).__name__}: {e}")
+
+    try:
+        for a in search_album_kg(key, 8):
+            push(a["name"], a["singer"], "kugou", a["id"], a["pic"],
+                 a["date"], a["count"])
+    except Exception as e:
+        print(f"[kugou album] {type(e).__name__}: {e}")
+
+    try:
+        res = search(key, "album", 10)
+        for a in (res.get("albums") or [])[:10]:
+            push(a.get("name"), (a.get("artist") or {}).get("name") or "",
+                 "163", a.get("id"), cover_url(a.get("picUrl") or "", 800),
+                 (a.get("publishTime") or "")[:10])
+    except Exception as e:
+        print(f"[163 album] {type(e).__name__}: {e}")
+
+    return out[:12]
+
+
+def _tracklist_pool(raw):
+    """专辑详情页「勾选批量制作」：前端送来的曲目整包 → render_song 可用的池。
+
+    前端行数据是 /api/album_songs 的形状（artist 字符串、dur 是 mm:ss 文本），
+    这里统一收敛成内部规范（artists 字符串、dur_ms 毫秒数），缺时长的按 0 处理。
+    """
+    pool = []
+    for s in raw if isinstance(raw, list) else []:
+        if not isinstance(s, dict):
+            continue
+        name = (s.get("name") or "").strip()
+        if not name:
+            continue
+        dur_ms = s.get("dur_ms")
+        if not dur_ms:
+            parts = [p for p in str(s.get("dur") or "").strip().split(":") if p != ""]
+            try:
+                if len(parts) == 2:
+                    dur_ms = (int(parts[0]) * 60 + int(parts[1])) * 1000
+                elif len(parts) == 3:
+                    dur_ms = (int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])) * 1000
+            except Exception:
+                dur_ms = 0
+        pool.append({
+            "id": s.get("id"),
+            "name": name,
+            "no": s.get("no") or 0,
+            "dur_ms": int(dur_ms or 0),
+            "artists": s.get("artists") or s.get("artist") or "",
+            "album": s.get("album") or "",
+            "pic": s.get("pic") or "",
+            "source": s.get("source") or "",
+        })
+    return pool
 
 
 def run_artist(job, opt):
@@ -1708,6 +1953,35 @@ def run_artist(job, opt):
     want = int(opt["top"])
     mode = opt.get("source", "auto") or "auto"
     log(job, f"搜索歌手：{artist}")
+
+    # 勾选批量制作（专辑详情页复选框）：曲目已由前端定死，跳过搜索直接逐首制作。
+    if isinstance(opt.get("trackList"), list) and opt["trackList"]:
+        pool = _tracklist_pool(opt["trackList"])
+        if not pool:
+            return fail(job, "勾选的曲目没有可用数据")
+        src_used = (pool[0].get("source") or "").strip() \
+                   or opt.get("trackSource") or "163"
+        opt["_src"] = src_used
+        name = artist or (pool[0].get("artists") or "").split("/")[0].strip() or "勾选曲目"
+        job["title"] = f"{name} · 勾选{len(pool)}首"
+        log(job, f"勾选批量制作：{len(pool)} 首（使用前端勾选结果，不再搜索）")
+        job["total"] = len(pool)
+
+        rank = 0
+        for s in pool:
+            job["phase"] = f"第 {rank + 1}/{len(pool)} 首"
+            item, why = render_song(job, s, rank + 1, opt)
+            if item is None:
+                log(job, f"跳过「{s['name']}」：{why}", "warn")
+                job["skipped"].append(f"{s['name']}（{why}）")
+                continue
+            rank += 1
+            job["items"].append(item)
+            job["done"] = rank
+            time.sleep(0.2)
+        if rank == 0:
+            return fail(job, "勾选的曲目都没有可用封面")
+        return finish(job, job["items"], name, f"勾选{len(job['items'])}首", src_used)
 
     src_used, ar, pool, notes = pick_source(artist, mode, want + 25)
     for nt in notes:
@@ -1721,7 +1995,7 @@ def run_artist(job, opt):
 
     opt["_src"] = src_used
     name = ar.get("name", artist)
-    src_tag = "QQ音乐" if src_used == "qq" else "网易云"
+    src_tag = {"qq": "QQ音乐", "163": "网易云", "kugou": "酷狗音乐"}.get(src_used, src_used)
     job["title"] = f"{name} · 热门前{want}首"
     log(job, f"歌手 {name}（id={ar.get('id')}）· 数据源 {src_tag}，"
              f"备用池 {len(pool)} 首，目标 {want} 首（无封面自动跳过补位）")
@@ -1779,6 +2053,20 @@ def run_song(job, opt):
             one = {"id": opt["songId"], "name": selected.get("name") or kw,
                    "artists": selected.get("artist") or "", "album": selected.get("album") or "",
                    "pic": selected["pic"], "dur_ms": ms}
+        elif src == "kugou":
+            # 酷狗点选：封面不在搜索结果里（搜索阶段不解析，避免每敲一个字
+            # 就打一串专辑接口），生成时按 album_id 查一次专辑直链。
+            duration = str(selected.get("dur") or "0:00").split(":")
+            try:
+                ms = (int(duration[-2]) * 60 + int(duration[-1])) * 1000
+            except (ValueError, IndexError):
+                ms = 0
+            pic = str(selected.get("pic") or "")
+            if not pic.startswith(("https://", "http://")):
+                pic = kugou_cover_url(opt.get("kugouAlbumId"))
+            one = {"id": opt["songId"], "name": selected.get("name") or kw,
+                   "artists": selected.get("artist") or "", "album": selected.get("album") or "",
+                   "pic": pic, "dur_ms": ms}
         else:
             sid = int(opt["songId"])
             detail = get_json(f"{API}/song/detail/", {"id": sid, "ids": json.dumps([sid])})
@@ -2255,44 +2543,78 @@ class Handler(BaseHTTPRequestHandler):
                 if not name:
                     return self._json({"error": "缺少歌名"}, 400)
                 mode = (q.get("source") or ["auto"])[0]
-                out, seen = [], set()
+                return self._json({"songs": multi_search_songs(name, mode)})
 
-                def push(nm, arts, alb, dur, sid, amid, src, pic=""):
-                    key = (nm or "").strip()
-                    if not key or key in seen:
-                        return
-                    seen.add(key)
-                    out.append({"id": sid, "name": nm, "artist": arts,
-                                "album": alb, "dur": dur, "source": src,
-                                "albummid": amid,
-                                "pic": (cover_url_q(amid) if src == "qq"
-                                        else cover_url(pic, 800))})
+            if p == "/api/search":
+                # 统一搜索：单曲（多平台聚合）+ 歌手候选 + 专辑候选。
+                # 搜索栏回车/联想走这里 —— 关键词既可能是歌名、歌手名
+                # 也可能是专辑名，一次把三类候选都给前端，由用户点选。
+                name = (q.get("name") or [""])[0].strip()
+                if not name:
+                    return self._json({"error": "缺少关键词"}, 400)
+                songs = multi_search_songs(name, "auto")
+                artists = multi_search_artists(name, songs)
+                albums = multi_search_albums(name)
+                return self._json({"query": name, "songs": songs,
+                                   "artists": artists, "albums": albums})
 
-                # QQ 音乐排前面：版权曲目（周杰伦等）只有这里有，用户多半要点它
-                if mode in ("auto", "qq"):
-                    try:
-                        for s in search_song_q(name, 15):
-                            push(s.get("songname"),
-                                 "/".join(x.get("name", "?") for x in (s.get("singer") or [])),
-                                 s.get("albumname") or "",
-                                 fmt_dur((s.get("interval") or 0) * 1000),
-                             s.get("songid"), s.get("albummid") or "", "qq")
-                    except Exception as e:
-                        print(f"[qq search] {type(e).__name__}: {e}")
+            if p == "/api/album_songs":
+                # 专辑详情页：一张专辑的全部曲目（有多少给多少）。
+                # 侧栏点专辑 → 先看曲目清单再决定做哪首/整张设计。
+                aid = (q.get("id") or [""])[0].strip()
+                if not aid.isdigit():
+                    return self._json({"error": "缺少专辑 id"}, 400)
+                try:
+                    info, songs = album_songs(int(aid))
+                except Exception as e:
+                    slog("WARN", f"album_songs/{aid}: {type(e).__name__}: {e}")
+                    return self._json({"error": f"专辑曲目查询失败：{type(e).__name__}"}, 502)
+                if not songs:
+                    return self._json({"error": "这张专辑没有可用曲目"}, 404)
+                return self._json({
+                    "album": {
+                        "id": info["id"], "name": info["name"],
+                        "pic": cover_url(info["pic"], 1200),
+                        "date": info["date"], "company": info["company"],
+                        "type": info["type"], "count": len(songs),
+                    },
+                    "songs": [{
+                        "id": s["id"], "name": s["name"], "no": s["no"],
+                        "artist": s["artists"], "album": s["album"],
+                        "dur": fmt_dur(s["dur_ms"]),
+                        "pic": cover_url(s["pic"], 800), "source": "163",
+                    } for s in songs],
+                })
 
-                if mode in ("auto", "163"):
-                    res = search(name, "song", 20)
-                    for s in (res.get("songs") or [])[:20]:
-                        # 网易云搜索接口通常只给 album.picId，需补查详情才有 picUrl。
-                        # 不补这一步，直接搜索单曲进入制作页仍会退回音符占位。
-                        pic = resolve_picurl(s)
-                        arts = "/".join(x.get("name", "?") for x in s.get("artists", []))
-                        push(s.get("name"), arts,
-                             (s.get("album") or {}).get("name", ""),
-                             fmt_dur(s.get("duration") or 0),
-                             s.get("id"), "", "163",
-                             pic)
-                return self._json({"songs": out[:30]})
+            if p == "/api/artist_songs":
+                # 歌手全部歌曲（网易云 hotSongs，最多 50 首）。
+                # 歌手页「载入全部歌曲」按钮用 —— 热门表默认只给 18 首。
+                name = (q.get("name") or [""])[0].strip()
+                if not name:
+                    return self._json({"error": "缺少歌手名"}, 400)
+                try:
+                    res = search(name, "artist", 5)
+                    ars = res.get("artists") or []
+                except Exception as e:
+                    return self._json({"error": f"歌手解析失败：{type(e).__name__}"}, 502)
+                if not ars:
+                    return self._json({"error": f"网易云没找到歌手「{name}」"}, 404)
+                ar = ars[0]
+                try:
+                    songs = artist_top_songs(ar["id"], 50)
+                except Exception as e:
+                    slog("WARN", f"artist_songs/{name}: {type(e).__name__}: {e}")
+                    return self._json({"error": "歌曲列表查询失败"}, 502)
+                return self._json({
+                    "artist": {"id": ar.get("id"), "name": ar.get("name"),
+                               "pic": cover_url(ar.get("img1v1Url") or "", 300)},
+                    "songs": [{
+                        "id": s["id"], "name": s["name"],
+                        "artist": s["artists"], "album": s["album"],
+                        "dur": fmt_dur(s["dur_ms"]),
+                        "pic": cover_url(s["pic"], 800), "source": "163",
+                    } for s in songs],
+                })
 
             if p == "/api/state":
                 jid = (q.get("id") or [""])[0]
@@ -2357,6 +2679,76 @@ class Handler(BaseHTTPRequestHandler):
                     return self._json({"error": "job not found"}, 404)
                 z = build_zip(d, m.get("title"), (q.get("format") or ["jpg"])[0])
                 return self._file(z, name=f"{m.get('title') or '作品'}.zip")
+
+            if p == "/api/jobs/zip":
+                # 作品库批量下载：把勾选的多条作品合并成一个大 ZIP 一次下走。
+                # 每条先按常规 build_zip 打包（迷你CD 直接用磁盘上现成的 zip），
+                # 再逐个塞进合并包，条目名「序号 标题-id.zip」——同名标题也不互覆。
+                # 全部走临时文件，发完即删，不在 outputs/ 里留垃圾。
+                ids_param = (q.get("ids") or [""])[0]
+                cats_param = (q.get("cats") or [""])[0]
+                fmt = (q.get("format") or ["jpg"])[0]
+                ids = [s for s in (x.strip() for x in ids_param.split(",")) if s]
+                cats = [x.strip() for x in cats_param.split(",")] if cats_param else []
+                if not ids:
+                    return self._json({"error": "缺少 ids"}, 400)
+                if len(ids) > 100:
+                    return self._json({"error": "一次最多打包 100 条"}, 400)
+                items, missing = [], []
+                for i, jid in enumerate(ids):
+                    cat = cats[i] if i < len(cats) and cats[i] else "work"
+                    if cat == CAT_MINI:
+                        zj = _safe_jid(jid)
+                        zp = os.path.join(os.path.realpath(str(DSDESIGN.OUT_DIR)),
+                                          zj + ".zip") if zj else ""
+                        if zp and os.path.isfile(zp):
+                            title = ""
+                            dd = design_dir_of(jid)
+                            if dd:
+                                try:
+                                    with open(os.path.join(dd, "meta.json"),
+                                              encoding="utf-8") as fh:
+                                        mm = json.load(fh)
+                                    title = mm.get("album") or mm.get("title") or ""
+                                except Exception:
+                                    title = ""
+                            items.append((zp, safe_name(title or f"迷你CD设计-{jid}")))
+                        else:
+                            missing.append(jid)
+                        continue
+                    d = jobs_dir_of(jid)
+                    m = load_meta(jid) if d else None
+                    if not d or not m:
+                        missing.append(jid)
+                        continue
+                    zp = build_zip(d, m.get("title"), fmt)
+                    items.append((zp, safe_name(f"{m.get('title') or '作品'}-{jid}")))
+                if not items:
+                    return self._json(
+                        {"error": "勾选的作品都没有可下载的产出："
+                                  + "、".join(missing[:5]) + ("…" if len(missing) > 5 else "")},
+                        404)
+                combined = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                        "_batch_%s.zip" % uuid.uuid4().hex[:10])
+                try:
+                    with zipfile.ZipFile(combined, "w", zipfile.ZIP_DEFLATED) as z:
+                        for i, (zp, label) in enumerate(items, 1):
+                            z.write(zp, "%02d %s.zip" % (i, label))
+                        if missing:
+                            # 部分失败必须让用户看见：下载完的人不会去看服务端日志，
+                            # 就在包里放一份说明，写清哪几条没打进来、为什么可能没有。
+                            note = ("以下勾选的作品没有打进这个压缩包（目录缺失或已移入回收站）：\n\n"
+                                    + "\n".join("- " + x for x in missing)
+                                    + "\n\n其余 %d 条为完整 ZIP，解压后每条一个文件夹。" % len(items))
+                            z.writestr("说明-有%d条未打包.txt" % len(missing), note)
+                    return self._file(
+                        combined, name="作品库勾选%d条-%s.zip"
+                        % (len(items), time.strftime("%Y%m%d-%H%M%S")))
+                finally:
+                    try:
+                        os.remove(combined)
+                    except OSError:
+                        pass
 
             return self._json({"error": "bad path"}, 404)
         except BrokenPipeError:
@@ -2474,7 +2866,8 @@ class Handler(BaseHTTPRequestHandler):
                 opt = dict(DEFAULTS)
                 for k, v in req.items():
                     if k in DEFAULTS or k in ("artist", "song", "pick", "songId",
-                                              "songSource", "albummid", "coverUpload", "selectedSong"):
+                                              "songSource", "albummid", "kugouAlbumId", "coverUpload", "selectedSong",
+                                              "trackList"):
                         opt[k] = v
                 # 类型收敛, 防止前端传字符串把算术搞崩
                 for k in ("top", "width", "dpi", "pick", "duration"):

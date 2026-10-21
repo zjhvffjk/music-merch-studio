@@ -7,7 +7,7 @@ PAGE = Path(__file__).resolve().parents[1] / 'workbench' / 'index.html'
 
 def hot_maker_source():
     html = PAGE.read_text(encoding='utf-8')
-    match = re.search(r'function openHotMaker\(data\)\{([\s\S]*?)\n\}\n\n/\* 搜索结果', html)
+    match = re.search(r'function openHotMaker\(data[^)]*\)\{([\s\S]*?)\n\}\n\n/\* 搜索结果', html)
     assert match, 'openHotMaker 未找到'
     return match.group(1)
 

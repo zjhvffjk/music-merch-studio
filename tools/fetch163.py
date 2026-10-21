@@ -224,6 +224,65 @@ def album_detail(album_id):
     return alb, songs
 
 
+def _norm163_song(s, fallback_pic="", fallback_album=""):
+    """网易云单曲条目规范化。兼容两套字段名：
+    老接口 duration/artists/album；v1 接口 dt/ar/al。"""
+    dur = s.get("duration") or s.get("dt") or 0
+    arts = s.get("artists") or s.get("ar") or []
+    alb = s.get("album") or s.get("al") or {}
+    return {
+        "id": s.get("id"),
+        "name": (s.get("name") or "").strip(),
+        "no": s.get("no") or 0,
+        "dur_ms": dur,
+        "artists": "/".join(a.get("name", "?") for a in arts),
+        "album": alb.get("name") or fallback_album,
+        "pic": alb.get("picUrl") or fallback_pic,
+    }
+
+
+def album_songs(album_id):
+    """专辑曲目（规范化版 album_detail）。
+
+    返回 (专辑摘要 dict, 曲目列表)。曲目带序号/时长/歌手/封面，
+    前端「专辑详情页」直接渲染，不需要再查任何接口。
+    """
+    alb, raw = album_detail(album_id)
+    ts = alb.get("publishTime") or 0
+    info = {
+        "id": alb.get("id") or album_id,
+        "name": alb.get("name") or "",
+        "pic": alb.get("picUrl") or "",
+        "date": time.strftime("%Y-%m-%d", time.localtime(ts / 1000)) if ts else "",
+        "company": alb.get("company") or "",
+        "type": alb.get("type") or "",
+    }
+    songs = []
+    for s in raw:
+        row = _norm163_song(s, fallback_pic=info["pic"], fallback_album=info["name"])
+        if not row["name"]:
+            continue
+        songs.append(row)
+    return info, songs
+
+
+def artist_top_songs(artist_id, limit=50):
+    """歌手热门歌曲（/api/artist/{id} 的 hotSongs，最多 50 首）。
+
+    ⚠️ /api/artist/songs/{id} 现在匿名返回 code 0 但无数据（实测），
+    只能走这个老接口；hotSongs 条目字段直接平铺（album/artists/duration）。
+    """
+    d = get_json(f"{API}/artist/{int(artist_id)}")
+    out = []
+    for x in (d.get("hotSongs") or [])[:max(1, limit)]:
+        s = x.get("song") if isinstance(x.get("song"), dict) else x
+        row = _norm163_song(s)
+        if not row["name"]:
+            continue
+        out.append(row)
+    return out
+
+
 _LRC_TAG = re.compile(r"\[\d{1,3}:\d{1,2}(?:[.:]\d{1,3})?\]")
 
 

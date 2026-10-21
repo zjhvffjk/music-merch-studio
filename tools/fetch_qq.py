@@ -12,7 +12,10 @@ QQ音乐抓取工具  (fetch_qq.py)
   所以：**要谁的歌，先看版权在哪个平台。**
 
 接口（均为公开 web 接口，无需登录）
-  搜索歌曲  c.y.qq.com/soso/fcgi-bin/client_search_cp
+  搜索歌曲  u.y.qq.com/cgi-bin/musicu.fcg  主通道
+            module=music.search.SearchCgiService / DoSearchForQQMusicDesktop
+            （旧接口 c.y.qq.com/soso/fcgi-bin/client_search_cp 已整包 500，
+              仅作 search_song 里的兜底）
   歌手歌曲  u.y.qq.com/cgi-bin/musicu.fcg
             module=music.web_singer_info_svr / get_singer_detail_info
   封面      y.gtimg.cn/music/photo_new/T002R{size}M000{albummid}.jpg
@@ -46,9 +49,11 @@ COVER = "https://y.gtimg.cn/music/photo_new/T002R{size}M000{amid}.jpg"
 
 MAX_COVER = 800          # 实测上限，别改 1000（404）
 
-# QQ 的旧搜索接口偶尔会直接返回 500，但歌手详情接口仍然可用。对版权高度
-# 集中的头部歌手，保留官方歌手 MID，避免错误退回到网易云的合唱／创作曲列表。
-# 未命中的歌手仍按下面的搜索逻辑处理。
+# QQ 的旧搜索接口 client_search_cp 自 2026-10 起长期整包 HTTP 500（不再是
+# 「偶尔」），但 musicu.fcg 的新版桌面搜索接口仍然可用，所以 search_song
+# 已改为：先走新版接口，失败再退回旧接口。对版权高度集中的头部歌手，仍保留
+# 官方歌手 MID，避免错误退回到网易云的合唱／创作曲列表。未命中的歌手仍按
+# 下面的搜索逻辑处理。
 KNOWN_SINGER_MIDS = {
     "周杰伦": ("0025NhlN2yWrP4", "周杰伦"),
 }
@@ -75,11 +80,101 @@ def musicu(payload):
     return _json(f"{MUSICU}?format=json&data={data}")
 
 
+def search_song_musicu(kw, n=10):
+    """新版搜索接口（y.qq.com 桌面网页端正在用的那个，走 musicu.fcg）。
+
+    旧接口 client_search_cp 整包 500 后，这是目前唯一稳定的歌曲搜索通道。
+    返回值统一映射成旧接口的字段名（songname/songid/albumname/albummid/
+    albumid/interval），server.py 与本模块的调用方无需感知换了通道。
+    """
+    payload = {
+        "comm": {"ct": 19, "cv": 1859, "uin": 0},
+        "req": {"method": "DoSearchForQQMusicDesktop",
+                "module": "music.search.SearchCgiService",
+                "param": {"search_type": 0, "query": kw,
+                          "page_num": 1,
+                          "num_per_page": min(max(n, 1), 100)}},
+    }
+    d = (musicu(payload).get("req") or {}).get("data") or {}
+    songs = (((d.get("body") or {}).get("song") or {}).get("list")) or []
+    out = []
+    for s in songs:
+        alb = s.get("album") or {}
+        out.append({
+            "songid": s.get("id"),
+            "songmid": s.get("mid"),
+            "songname": s.get("name"),
+            "singer": s.get("singer") or [],
+            "albumname": alb.get("name") or "",
+            "albummid": alb.get("mid") or "",
+            "albumid": alb.get("id"),
+            "interval": s.get("interval") or 0,
+        })
+    return out
+
+
+_SEARCH_CACHE = {}          # (kw, n) -> (时间戳, 结果)
+_SEARCH_CACHE_TTL = 8.0     # 秒。匿名搜索短时间高频会被静默限流
+                            # （code=0 但 0 条命中），短缓存挡住同一关键词
+                            # 在一秒内被 /api/song 和 /api/search 各打一次。
+
 def search_song(kw, n=10):
+    key = (kw, n)
+    hit = _SEARCH_CACHE.get(key)
+    now = time.time()
+    if hit and now - hit[0] < _SEARCH_CACHE_TTL:
+        return hit[1]
+    # 主通道：新版桌面搜索。只要它正常应答（哪怕 0 条），就直接采用——
+    # 不能因为 0 条就再去撞旧接口，旧接口现在只会白白多等一个 500。
+    try:
+        songs = search_song_musicu(kw, n)
+        if songs:
+            _SEARCH_CACHE[key] = (now, songs)
+        return songs
+    except Exception:
+        pass
+    # 兜底：旧接口。哪天它恢复了，这条路径仍能工作。
     q = urllib.parse.quote(kw)
     j = _json(f"{SEARCH}?p=1&n={n}&w={q}&format=json"
               "&inCharset=utf8&outCharset=utf-8&platform=yqq")
-    return (((j.get("data") or {}).get("song") or {}).get("list")) or []
+    songs = (((j.get("data") or {}).get("song") or {}).get("list")) or []
+    _SEARCH_CACHE[key] = (now, songs)
+    return songs
+
+
+def search_album_q(kw, n=8):
+    """搜索专辑（search_type=2，与网页端「专辑」标签同一通道）。
+
+    返回统一字段：albummid/albumid/albumname/singer(字符串)/date/count。
+    一次限流探测时发现 search_type=2 偶发 0 条，隔几秒重试即恢复，
+    所以与 search_song 共用短缓存挡高频。
+    """
+    key = ("album", kw, n)
+    hit = _SEARCH_CACHE.get(key)
+    now = time.time()
+    if hit and now - hit[0] < _SEARCH_CACHE_TTL:
+        return hit[1]
+    payload = {
+        "comm": {"ct": 19, "cv": 1859, "uin": 0},
+        "req": {"method": "DoSearchForQQMusicDesktop",
+                "module": "music.search.SearchCgiService",
+                "param": {"search_type": 2, "query": kw,
+                          "page_num": 1,
+                          "num_per_page": min(max(n, 1), 100)}},
+    }
+    d = (musicu(payload).get("req") or {}).get("data") or {}
+    albums = (((d.get("body") or {}).get("album") or {}).get("list")) or []
+    out = [{
+        "albummid": a.get("albumMID") or "",
+        "albumid": a.get("albumID"),
+        "albumname": a.get("albumName") or "",
+        "singer": a.get("singerName") or "",
+        "date": a.get("publicTime") or "",
+        "count": a.get("song_count") or 0,
+    } for a in albums]
+    if out:                     # 限流瞬间的空结果不缓存，避免把 0 条放大成 8 秒
+        _SEARCH_CACHE[key] = (now, out)
+    return out
 
 
 def search_singer_mid(name):
@@ -88,6 +183,11 @@ def search_singer_mid(name):
     QQ音乐没有好用的「歌手搜索」接口（search_type=1 返回空），
     所以退一步：搜单曲，从结果的 singer 数组里挑与查询名一致的 mid。
     同名歌手用出现频次兜底。
+
+    完全同名的歌手挑不到时（查询其实是歌名/专辑名，比如「范特西」），
+    退而取结果里出现频次最高的歌手 —— 用户搜「范特西」想要的就是
+    周杰伦的歌，这时把《范特西》的演唱者当歌手继续走歌手流程，
+    比直接报「没找到」有用得多。
     """
     name = (name or "").strip()
     known = KNOWN_SINGER_MIDS.get(name)
@@ -107,8 +207,17 @@ def search_singer_mid(name):
             elif name and (name in n or n in name):
                 votes[mid] += 2
     if not votes:
-        return None, ""
-    mid = votes.most_common(1)[0][0]
+        # 没有同名/近名歌手：取结果里出现最多的歌手当候选
+        loose = Counter()
+        for s in songs:
+            for sg in (s.get("singer") or []):
+                if sg.get("mid") and (sg.get("name") or "").strip():
+                    loose[sg["mid"]] += 1
+        if not loose:
+            return None, ""
+        mid = loose.most_common(1)[0][0]
+    else:
+        mid = votes.most_common(1)[0][0]
     # 回查名字
     for s in songs:
         for sg in (s.get("singer") or []):
