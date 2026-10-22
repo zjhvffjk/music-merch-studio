@@ -3528,7 +3528,11 @@ document.addEventListener('click', e=>{
     const exactQQ=artists.find(a=>a.source==='qq'&&a.name===q);
     const exactAny=artists.find(a=>a.name===q);
     if(exactQQ || (exactAny && !songs.length)) return artist((exactQQ||exactAny).name);
-    if(songs.length) return song(q);
+    if(songs.length){
+      save(q,'song'); uiMode('song'); $('#songKw').value=q;
+      PICK=null; SEL=null; close();
+      return showSongSearchStage(q,songs);
+    }
     const albExact=albums.find(a=>a.name===q);
     if(albExact){ ALBUMS=albums; return openAlbumFromSearch(albums.indexOf(albExact)); }
     if(albums.length===1){ ALBUMS=albums; return openAlbumFromSearch(0); }
