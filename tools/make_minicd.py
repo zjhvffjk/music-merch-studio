@@ -160,13 +160,18 @@ def fb_back(cover_im, w, h, album, artist):
 
 
 # ---------------- 三大部件 ----------------
-def make_cover_fold(inner_im, cover_im, w_px, h_px, D=None, copy_settings=None):
-    """左内页 + 右封面，中间有对折线；正封面叠加真实字体短标签。"""
+def make_cover_fold(inner_im, cover_im, w_px, h_px, D=None, copy_settings=None,
+                    front_is_upload=False):
+    """左内页 + 右封面，中间有对折线；正封面叠加真实字体短标签。
+
+    front_is_upload：封面半边是用户上传的实拍/成品图时为 True —— 原样使用，
+    不再叠加程序短标签（2026-10-28 约定：上传过的面不加任何程序字）。
+    """
     half = w_px // 2
     out = Image.new("RGB", (w_px, h_px), "white")
     out.paste(cover_crop(inner_im, half, h_px), (0, 0))
     out.paste(cover_crop(cover_im, w_px - half, h_px), (half, 0))
-    if DP is not None and copy_settings:
+    if DP is not None and copy_settings and not front_is_upload:
         _primary, _secondary, short = DP._copy_text(copy_settings)
         tag = short or _secondary
         if tag:
@@ -211,12 +216,16 @@ def _solid_block(cover_im, w_px, h_px, album, artist):
 
 def make_back_strip(back_im, tray_im, w_px, h_px, cover_im, album, artist,
                     D=None, tracks=None, seed=0, company="", inner_copy="",
-                    barcode_code="", copyright_text="", release_year="", back_layout="auto", copy_settings=None):
+                    barcode_code="", copyright_text="", release_year="", back_layout="auto", copy_settings=None,
+                    side_right_im=None, side_left_im=None, side_back_im=None):
     """[右侧封][封底][左侧封][背脊][内盘底] 一条连续展开图。
 
     封底与内盘底缺件时走**封面衍生设计**（design_back / design_tray）；
     4mm 级侧封条从相邻段的边缘延展 —— 这样整条展开图色彩是连贯的，
     像一张真实印刷展开图，而不是几块拼贴。
+
+    side_right_im / side_left_im / side_back_im：右侧封 / 左侧封 / 左侧封背面
+    的用户上传图 —— 原样裁到段尺寸使用，不走边缘延展、不叠程序文字。
     """
     p = [mm(s, _dpi[0]) for s in BACK_SEGS]
     total = sum(p)
@@ -247,13 +256,25 @@ def make_back_strip(back_im, tray_im, w_px, h_px, cover_im, album, artist,
     # --- 三条窄封：画面都从相邻面板延展，文字职责各不相同 ---
     # 右侧封 = 外侧识别（标题＋歌手）；左侧封 = 封底与内盘底间的纯画面收边；
     # 左侧封背面 = 面向盒内的标题/短文案。这样不会出现三根一模一样的竖排文字。
-    right_spine = _edge_stretch(b, p[0], h_px)
-    left_spine = _edge_stretch(t, p[2], h_px)
-    left_spine_back = _edge_stretch(t, p[3], h_px)
-    if use_dp:
-        right_spine = DP.spine_overlay(right_spine, "right", album, artist, company, copy_settings)
-        left_spine = DP.spine_overlay(left_spine, "left", album, artist, company, copy_settings)
-        left_spine_back = DP.spine_overlay(left_spine_back, "left-back", album, artist, company, copy_settings)
+    # 上传过实拍图的段：原样使用（裁到段尺寸），不延展、不叠字。
+    if side_right_im is not None:
+        right_spine = cover_crop(side_right_im, p[0], h_px)
+    else:
+        right_spine = _edge_stretch(b, p[0], h_px)
+        if use_dp:
+            right_spine = DP.spine_overlay(right_spine, "right", album, artist, company, copy_settings)
+    if side_left_im is not None:
+        left_spine = cover_crop(side_left_im, p[2], h_px)
+    else:
+        left_spine = _edge_stretch(t, p[2], h_px)
+        if use_dp:
+            left_spine = DP.spine_overlay(left_spine, "left", album, artist, company, copy_settings)
+    if side_back_im is not None:
+        left_spine_back = cover_crop(side_back_im, p[3], h_px)
+    else:
+        left_spine_back = _edge_stretch(t, p[3], h_px)
+        if use_dp:
+            left_spine_back = DP.spine_overlay(left_spine_back, "left-back", album, artist, company, copy_settings)
     out.paste(right_spine, (0, 0))
     out.paste(left_spine, (p[0] + p[1], 0))
     out.paste(left_spine_back, (p[0] + p[1] + p[2], 0))
@@ -408,6 +429,129 @@ def build_page(parts_meta, dpi, page="a4l", max_sets=0, artist="", album="",
     draw.text((m + ruler_w + mm(3, dpi), ruler_y - f.size // 2),
               "50mm 校验尺", font=f, fill=(120, 120, 120))
     return page_im, sets, {"disc": disc, "cover": fold, "back": strip}
+
+
+def build_page_portrait7(fold_im, strip_im, dpi, artist="", album="", sets=7):
+    """竖版 A4 一页 7 套：严格复刻用户手作 A4 的排版（实测范特西-A4.jpg）。
+
+    实测几何（300dpi，2480×3508）：
+      · 左块 = 封面+封面背面拼在一起的折件 82×41mm（968×484px），共 7 行；
+      · 右块 = 封底条整条 111.2×38mm（1313×449px），共 7 行，首行与左块
+        顶部对齐；条带行各自独立以 1px 缝堆叠（行距 451px，实测如此）；
+      · 两块之间缝隙 1px，行与行之间缝隙 1px —— 除此之外不留任何间隔；
+      · 左右边距各 100px（8.5mm）、上边距 57px（4.8mm），内容整体居中；
+      · 裁剪线只画在空白处（2026-10-28 定稿）：页边距里不放贴图竖线；
+        最后一行图片下方的空白里，按封面左右边缘位置各留一条 1px 竖线
+        延伸到页底（顶端与图片底边相接）；页边留首行顶线、末行条带
+        底线的水平延长线（对位用）；
+      · 折线与段线用浅灰点线（对折参考，不干扰裁切）。
+    盘面不进这页（用 build_disc_page 单独出）。
+    返回 page_im（RGB）。
+    """
+    W, H = mm(210.0, dpi), mm(297.0, dpi)
+    gap = max(1, int(round(dpi / 300.0)))          # 用户约定：缝隙 = 1px@300dpi
+    x0 = max(gap, (W - (fold_im.width + gap + strip_im.width)) // 2)
+    y0 = max(gap, int(round(57.0 * dpi / 300.0)))  # 上边距 4.8mm，与手作版一致
+    pitch = fold_im.height + gap                   # 行距 = 件高 + 1px 缝
+
+    page_im = Image.new("RGB", (W, H), "white")
+    draw = ImageDraw.Draw(page_im)
+
+    n = max(1, min(int(sets), 8))
+    for i in range(n):
+        yf = y0 + i * pitch                          # 左块行距 = 折件高 + 1px
+        page_im.paste(fold_im, (x0, yf))             # 封面+背面拼件
+        # 右块独立堆叠：同样 1px 缝，仅首行与左块顶部对齐（实测手作版如此）
+        ys = y0 + i * (strip_im.height + gap)
+        page_im.paste(strip_im, (x0 + fold_im.width + gap, ys))
+        # 对折参考线（浅灰点线）：折件中线 + 封底条段界
+        fx = x0 + fold_im.width // 2
+        for yy in range(yf, yf + fold_im.height, 8):
+            draw.line([fx, yy, fx, min(yy + 4, yf + fold_im.height)], fill=(190, 190, 190))
+        px = 0
+        for s in BACK_SEGS[:-1]:
+            px += mm(s, dpi)
+            sx = x0 + fold_im.width + gap + px
+            for yy in range(ys, ys + strip_im.height, 8):
+                draw.line([sx, yy, sx, min(yy + 4, ys + strip_im.height)], fill=(190, 190, 190))
+
+    x_right = x0 + fold_im.width + gap + strip_im.width      # 内容右缘
+    y_last_strip = y0 + (n - 1) * (strip_im.height + gap) + strip_im.height
+    y_fold_bottom = y0 + (n - 1) * pitch + fold_im.height    # 左块最后一行底缘
+
+    # 裁剪线只画空白处（2026-10-28 用户两轮反馈定稿）：
+    #   · 页边距里不再放贴着图片的竖线（会被看成素材黑边）；
+    #   · 只在最后一行图片下方的空白里，按封面左右边缘的位置各留一条
+    #     1px 竖线延伸到页底 —— 左缘对齐封面左边缘、右缘对齐封面右边缘，
+    #     顶端与图片底边相接（不悬空、不偏移）；
+    #   · 首行顶线与末行条带底线：只在左右页边距里留水平延长线。
+    draw.line([x0, y_fold_bottom, x0, H - 1], fill=(0, 0, 0), width=1)
+    draw.line([x0 + fold_im.width - 1, y_fold_bottom, x0 + fold_im.width - 1, H - 1],
+              fill=(0, 0, 0), width=1)
+    # 水平延长线：与竖线同一标准 —— 与图片边缘相接（不悬空）、
+    # 端点对齐内容边缘（左端到封面左边缘前一列、右端从封底条右缘起）。
+    draw.line([0, y0 - 1, x0 - 1, y0 - 1], fill=(0, 0, 0), width=1)
+    draw.line([x_right, y0 - 1, W - 1, y0 - 1], fill=(0, 0, 0), width=1)
+    draw.line([x_right, y_last_strip, W - 1, y_last_strip], fill=(0, 0, 0), width=1)
+
+    # 顶部小字说明（放在 57px 上边距内，不占排版空间）
+    f = _font(max(14, mm(2.0, dpi)))
+    who = " · ".join([s for s in (artist, album) if s]) or "（未填歌手/专辑）"
+    draw.text((x0, mm(1.0, dpi)),
+              "%s ｜ 实体专辑拼版 · 竖版 %d 套/页 ｜ %ddpi ｜ 缝隙即裁线（1px）· 灰点线对折 ｜ "
+              "打印选「实际大小/100%%」，折件宽 = 82mm" % (who, n, dpi),
+              font=f, fill=(130, 130, 130))
+    return page_im
+
+
+def build_disc_page(disc_im, dpi, artist="", album="", cols=4, rows=6):
+    """盘面单独页：A4 竖版密排 Ø40 圆盘（默认 4×6=24 个）。
+
+    用户排版约定：A4 拼版不放盘面，盘面用这页单独出。每个盘带裁切圆、
+    内孔参考圈与十字对位（同 build_page 的盘面标注风格）。返回 page_im。
+    """
+    W, H = mm(210.0, dpi), mm(297.0, dpi)
+    m = mm(10.0, dpi)
+    d_px = disc_im.size[0]
+    cols, rowsN = max(1, int(cols)), max(1, int(rows))
+    gap_x = (W - 2 * m - cols * d_px) // max(1, cols - 1) if cols > 1 else 0
+    gap_y = (H - 2 * m - rowsN * d_px) // max(1, rowsN - 1) if rowsN > 1 else 0
+
+    page_im = Image.new("RGB", (W, H), "white")
+    draw = ImageDraw.Draw(page_im)
+    mask = disc_im.split()[3] if disc_im.mode == "RGBA" else None
+    hole_r = mm(DISC_HOLE, dpi) // 2
+
+    for r in range(rowsN):
+        for c in range(cols):
+            x = m + c * (d_px + gap_x)
+            y = m + r * (d_px + gap_y)
+            page_im.paste(disc_im, (x, y), mask)
+            cx, cy = x + d_px // 2, y + d_px // 2
+            draw.ellipse([x, y, x + d_px - 1, y + d_px - 1], outline=LINE, width=2)
+            rr = hole_r + mm(1.2, dpi)
+            draw.ellipse([cx - rr, cy - rr, cx + rr, cy + rr], outline=LINE_SOFT, width=1)
+            draw.line([cx - 8, cy, cx + 8, cy], fill=LINE_SOFT, width=1)
+            draw.line([cx, cy - 8, cx, cy + 8], fill=LINE_SOFT, width=1)
+
+    f = _font(max(16, mm(2.6, dpi)))
+    who = " · ".join([s for s in (artist, album) if s]) or "（未填歌手/专辑）"
+    draw.text((m, mm(2.5, dpi)),
+              "%s ｜ 盘面拼版 · Ø%gmm（内孔 Ø%gmm 打穿） ｜ 本页 %d 个 ｜ %ddpi ｜ "
+              "打印选「实际大小/100%%」" % (who, DISC_D, DISC_HOLE, cols * rowsN, dpi),
+              font=f, fill=(120, 120, 120))
+    # 50mm 校验尺（右下角）
+    ruler_y = H - mm(6.0, dpi)
+    ruler_w = mm(50.0, dpi)
+    lw = max(3, mm(0.6, dpi))
+    rx = W - m - ruler_w
+    draw.line([rx, ruler_y, rx + ruler_w, ruler_y], fill=(0, 0, 0), width=lw)
+    for i in range(6):
+        tx = rx + mm(i * 10.0, dpi)
+        draw.line([tx, ruler_y - mm(2, dpi), tx, ruler_y + mm(2, dpi)],
+                  fill=(0, 0, 0), width=max(2, mm(0.4, dpi)))
+    draw.text((rx - mm(24, dpi), ruler_y - f.size // 2), "50mm", font=f, fill=(120, 120, 120))
+    return page_im
 
 
 # ---------------- 批量 ----------------

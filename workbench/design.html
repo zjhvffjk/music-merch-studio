@@ -314,7 +314,7 @@ body.embed .proj .t small{display:none}   /* 外层已有专辑名，这里不�
     <button data-mod="export">导出</button>
   </nav>
   <div class="editorRibbon" id="editorRibbon" aria-label="设计工具栏">
-    <div class="ribbonTabs" role="tablist"><button type="button" class="on" data-ribbon-tab="side">侧封</button><button type="button" data-ribbon-tab="layout">排版</button><button type="button" data-ribbon-tab="font">字体</button><button type="button" data-ribbon-tab="object">对象</button><button type="button" data-ribbon-tab="view">预览</button><button type="button" id="btnProjectDataTab">资料</button><button type="button" id="btnStructureTab">结构</button><button type="button" id="btnRecentTab">最近</button><button type="button" id="btnBackgroundTab">AI 组件</button></div>
+    <div class="ribbonTabs" role="tablist"><button type="button" class="on" data-ribbon-tab="side">侧封</button><button type="button" data-ribbon-tab="layout">排版</button><button type="button" data-ribbon-tab="font">字体</button><button type="button" data-ribbon-tab="object">对象</button><button type="button" data-ribbon-tab="view">预览</button><button type="button" id="btnProjectDataTab">资料</button><button type="button" id="btnStructureTab">结构</button><button type="button" id="btnRecentTab">最近</button></div>
     <div class="ribbonPanel" data-ribbon-panel="object"><div class="ribbonDock ribbonObjects"><b>编辑对象</b><div class="ribbonObjectButtons"><button type="button" data-canvas-part="disc">① 盘面</button><button type="button" data-canvas-part="booklet">② 封面</button><button type="button" data-canvas-part="sleeve">③ 封底条</button></div></div></div>
     <div class="ribbonPanel" data-ribbon-panel="layout"></div>
     <div class="ribbonPanel" data-ribbon-panel="font"></div>
@@ -458,8 +458,13 @@ body.embed .proj .t small{display:none}   /* 外层已有专辑名，这里不�
           <details class="adv" style="margin-top:16px"><summary>手动上传已确认底图（用于现有三件套打印）</summary>
           <p class="muted" style="font-size:12px">这里保留原来的底图替换功能；AI 组件草图通过检查后再进入正式印刷流程。</p>
           <div class="aiSlot" data-key="aiDisc"><input type="file" accept="image/*" hidden><img class="pv" hidden><div class="t"><b>① 盘面（Ø40mm 方形底图）</b><small class="st">未上传</small></div><button class="plain sm up">上传</button><button class="plain sm clr" hidden>清除</button></div>
-          <div class="aiSlot" data-key="aiFold"><input type="file" accept="image/*" hidden><img class="pv" hidden><div class="t"><b>② 封面折件（82×41 展开图）</b><small class="st">未上传</small></div><button class="plain sm up">上传</button><button class="plain sm clr" hidden>清除</button></div>
-          <div class="aiSlot" data-key="aiStrip"><input type="file" accept="image/*" hidden><img class="pv" hidden><div class="t"><b>③ 封底条（111.2×38 展开图）</b><small class="st">未上传</small></div><button class="plain sm up">上传</button><button class="plain sm clr" hidden>清除</button></div>
+          <div class="aiSlot" data-key="aiCover"><input type="file" accept="image/*" hidden><img class="pv" hidden><div class="t"><b>② 封面（41×41，原样使用不加文字）</b><small class="st">未上传</small></div><button class="plain sm up">上传</button><button class="plain sm clr" hidden>清除</button></div>
+          <div class="aiSlot" data-key="aiFold"><input type="file" accept="image/*" hidden><img class="pv" hidden><div class="t"><b>③ 封面背面 / 内页（41×41，原样使用不加文字）</b><small class="st">未上传</small></div><button class="plain sm up">上传</button><button class="plain sm clr" hidden>清除</button></div>
+          <div class="aiSlot" data-key="aiSideR"><input type="file" accept="image/*" hidden><img class="pv" hidden><div class="t"><b>④ 右侧封（4.4×38，原样使用）</b><small class="st">未上传</small></div><button class="plain sm up">上传</button><button class="plain sm clr" hidden>清除</button></div>
+          <div class="aiSlot" data-key="aiBack"><input type="file" accept="image/*" hidden><img class="pv" hidden><div class="t"><b>⑤ 底封 / 封底（49×38 实拍图，自带曲目/条码则原样使用）</b><small class="st">未上传</small></div><button class="plain sm up">上传</button><button class="plain sm clr" hidden>清除</button></div>
+          <div class="aiSlot" data-key="aiSideL"><input type="file" accept="image/*" hidden><img class="pv" hidden><div class="t"><b>⑥ 左侧封（4.4×38，原样使用）</b><small class="st">未上传</small></div><button class="plain sm up">上传</button><button class="plain sm clr" hidden>清除</button></div>
+          <div class="aiSlot" data-key="aiSpine"><input type="file" accept="image/*" hidden><img class="pv" hidden><div class="t"><b>⑦ 左侧封背面（4.4×38，原样使用）</b><small class="st">未上传</small></div><button class="plain sm up">上传</button><button class="plain sm clr" hidden>清除</button></div>
+          <div class="aiSlot" data-key="aiTray"><input type="file" accept="image/*" hidden><img class="pv" hidden><div class="t"><b>⑧ 内盘底（49×38 实拍图，原样使用）</b><small class="st">未上传</small></div><button class="plain sm up">上传</button><button class="plain sm clr" hidden>清除</button></div>
           </details>
         </div>
       </section>
@@ -486,8 +491,8 @@ body.embed .proj .t small{display:none}   /* 外层已有专辑名，这里不�
           <div id="printEmpty" class="empty">还没有生成物 —— 先去「设计」模块生成三件套。</div>
           <div id="printBody" hidden>
             <div class="dlRow">
-              <a id="lnkPrint" class="btn" target="_blank">打开 A4 打印拼版 (PNG)</a>
-              <a id="lnkPdf" class="plain" target="_blank">印刷 PDF（含裁切/折线/出血/安全区）</a>
+              <a id="lnkPrint" class="btn" target="_blank">打开 A4 竖版拼版（7套/页 PNG）</a>
+              <a id="lnkPdf" class="plain" target="_blank">竖版拼版 PDF（含裁切/折线）</a>
             </div>
             <div class="printTip">
               🖨️ 打印设置务必选「<b>实际大小 / 100%</b>」（默认「适合页面」会把 40mm 缩成 38mm）。
@@ -561,7 +566,7 @@ body.embed .proj .t small{display:none}   /* 外层已有专辑名，这里不�
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const rgb=c=>'rgb('+(Array.isArray(c)?c.join(','):c)+')';
-let ai={aiDisc:'',aiFold:'',aiStrip:''},building=false,read=false;
+let ai={aiDisc:'',aiCover:'',aiFold:'',aiBack:'',aiTray:'',aiSideR:'',aiSideL:'',aiSpine:''},building=false,read=false;
 let SPEC=null,LAST=null;
 function err(s){$('#error').hidden=!s;$('#error').textContent=s||''}
 function jparse(u){return fetch(u,{cache:'no-store'}).then(async r=>{const d=await r.json();if(!r.ok)throw Error(d.error||('HTTP '+r.status));return d})}
@@ -691,13 +696,9 @@ function mountRailUtilityPopovers(){
   document.addEventListener('click',e=>{if(!e.target.closest('.railUtilityPopover')&&!e.target.closest('#btnStructureTab,#btnRecentTab'))document.querySelectorAll('.railUtilityPopover').forEach(x=>x.hidden=true);});
   document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelectorAll('.railUtilityPopover').forEach(x=>x.hidden=true);});
 }
-function mountAssetPopover(){
-  const card=$('#aiCard'),button=$('#btnBackgroundTab');if(!card||!button)return;
-  button.onclick=()=>card.scrollIntoView({behavior:'smooth',block:'start'});
-}
 mountProjectDataPopover();
 mountRailUtilityPopovers();
-mountAssetPopover();
+/* AI 组件卡片在“对象”工作区中，保留完整生成和手动上传入口。 */
 function dockPrimaryActions(){
   const editor=$('#spineEditorDock'),row=$('#dataCard .row2');
   if(!editor||!row||$('#ribbonActionDock'))return;
@@ -1121,9 +1122,11 @@ $('#btnBuild').onclick=async()=>{
     const fu=(n)=>'/api/design/file?jid='+encodeURIComponent(d.jid)+'&name='+encodeURIComponent(n);
     $('#imDisc').src=fu('part-disc.png');$('#imCover').src=fu('part-cover.png');$('#imStrip').src=fu('part-strip.png');updateSpineCanvas();
     $('#imSheet').src=fu('★版面总览-1比1.png');
-    $('#lnkPrint').href=d.printUrl;$('#lnkPdf').href=d.printPdfUrl;$('#lnkZip').href=d.zipUrl;
+    $('#lnkPrint').href=d.printPortraitUrl||d.printUrl;$('#lnkPdf').href=d.printPortraitPdfUrl||d.printPdfUrl;$('#lnkZip').href=d.zipUrl;
     const part=n=>(d.parts||[]).find(p=>p.file.includes(n))||{};
-    LAST={jid:d.jid,parts:d.parts||[],printUrl:d.printUrl,printPdfUrl:d.printPdfUrl,zipUrl:d.zipUrl,
+    LAST={jid:d.jid,parts:d.parts||[],printUrl:d.printPortraitUrl||d.printUrl,printPdfUrl:d.printPortraitPdfUrl||d.printPdfUrl,
+          printLandscapeUrl:d.printUrl,printLandscapePdfUrl:d.printPdfUrl,discPageUrl:d.discPageUrl,discPagePdfUrl:d.discPagePdfUrl,
+          splitFiles:d.splitFiles||[],zipUrl:d.zipUrl,
           album,artist,mm:{disc:part('disc').mm,cover:part('cover').mm,strip:part('strip').mm}};
     renderDownloads();
     $('#resCard').hidden=false;$('#printBody').hidden=false;$('#printEmpty').hidden=true;
@@ -1142,14 +1145,18 @@ function renderDownloads(){
   const fu=(n)=>'/api/design/file?jid='+encodeURIComponent(LAST.jid)+'&name='+encodeURIComponent(n);
   const P=(SPEC&&SPEC.parts)||{};
   const rows=[
-    {ic:'PNG',t:'① 盘面',s:(LAST.mm.disc||(P.disc?('Ø'+P.disc.w+'mm'):''))+' · 300DPI',u:fu('part-disc.png')},
-    {ic:'PNG',t:'② 封面折件',s:(LAST.mm.cover||'')+' · 300DPI',u:fu('part-cover.png')},
-    {ic:'PNG',t:'③ 封底条',s:(LAST.mm.strip||'')+' · 300DPI',u:fu('part-strip.png')},
+    /* 旧三件套（盘面/封面折件/封底条）已移除：与素材拆件、拼版页重复 */
     {ic:'PNG',t:'1:1 版面总览',s:'含裁切/折线/尺寸标注/50mm 校验尺',u:fu('★版面总览-1比1.png')},
-    {ic:'A4',t:'A4 打印拼版',s:'3508 × 2480 px（A4 横向 · 4 套/页）',u:LAST.printUrl},
-    {ic:'PDF',t:'印刷 PDF',s:'带裁切线 / 折线 / 出血 / 安全区',u:LAST.printPdfUrl},
+    {ic:'A4',t:'A4 竖版拼版 · 7套/页',s:'2480 × 3508 px（封面折件+封底条 · 无盘面）· 推荐',u:LAST.printUrl},
+    {ic:'PDF',t:'竖版拼版 PDF',s:'与 PNG 同源，可直接送打印',u:LAST.printPdfUrl},
+    {ic:'A4',t:'A4 横版拼版（备用）',s:'297×210mm · 3列带盘面',u:LAST.printLandscapeUrl||''},
+    {ic:'A4',t:'盘面拼版',s:'A4 竖版 · 独立盘面',u:LAST.discPageUrl||''},
+    {ic:'PDF',t:'盘面拼版 PDF',s:'与盘面拼版 PNG 同源',u:LAST.discPagePdfUrl||''},
   ];
-  $('#dlList').innerHTML=rows.map(r=>`
+  (LAST.splitFiles||[]).forEach((sf,i)=>{
+    rows.push({ic:'PNG',t:'素材·'+sf.name,s:'与素材库命名一致 · 300DPI',u:sf.url});
+  });
+  $('#dlList').innerHTML=rows.filter(r=>r.u).map(r=>`
     <div class="dlItem"><div class="ic">${r.ic}</div>
       <div class="t"><b>${esc(r.t)}</b><small>${esc(r.s)}</small></div>
       <a class="plain sm" href="${r.u}" target="_blank" rel="noopener">打开</a></div>`).join('');
@@ -1331,12 +1338,17 @@ async function loadProject(jid){
   $('#imCover').src = f('cover', 'part-cover.png');
   $('#imStrip').src = f('strip', 'part-strip.png');
   $('#imSheet').src = f('sheet', '★版面总览-1比1.png');
-  $('#lnkPrint').href = f('print', '打印拼版-A4.png');
-  $('#lnkPdf').href   = f('printPdf', '打印拼版-A4.pdf');
+  $('#lnkPrint').href = f('printPortrait', '打印拼版-A4竖版7套.png');
+  $('#lnkPdf').href   = f('printPortraitPdf', '打印拼版-A4竖版7套.pdf');
   $('#lnkZip').href   = '/api/design/zip?jid=' + encodeURIComponent(jid);
 
   LAST = {jid: jid, parts: [], album: m.album || '', artist: m.artist || '',
           printUrl: $('#lnkPrint').href, printPdfUrl: $('#lnkPdf').href,
+          printLandscapeUrl: f('print', '打印拼版-A4.png'),
+          discPageUrl: (pr.discPage || pr['盘面拼版-A4.png']) ? f('discPage', '盘面拼版-A4.png') : '',
+          discPagePdfUrl: (pr.discPagePdf || pr['盘面拼版-A4.pdf']) ? f('discPagePdf', '盘面拼版-A4.pdf') : '',
+          splitFiles: ['封面.png','封面背面.png','右侧封.png','左侧封.png','左侧封背面.png','封底.png','内盘底.png','盘面.png']
+            .filter(n => pr[n]).map(n => ({name: n, url: fu(n)})),
           zipUrl: $('#lnkZip').href, mm: mm};
   renderDownloads();
   $('#resCard').hidden = false; $('#printBody').hidden = false;

@@ -280,6 +280,13 @@ def plan_albums(artist_name, limit=0):
     res = fetch163.search(artist_name, "artist", 20)
     ars = (res.get("artists") or [])
     if not ars:
+        # 主搜索接口被限流时（实测 /api/search/get/web 的歌手类型会整批返回空，
+        # 连"周杰伦"都查不到），降级用联想接口 /api/search/suggest/web 定位歌手：
+        # 它限流更松，返回的 artist 带 id，足够 artist_albums 继续拉专辑列表。
+        d = fetch163.get_json("https://music.163.com/api/search/suggest/web",
+                              {"s": artist_name, "limit": 10})
+        ars = (d.get("result") or {}).get("artists") or []
+    if not ars:
         return None, []
     ar = ars[0]
     raw = fetch163.artist_albums(ar["id"], 400)

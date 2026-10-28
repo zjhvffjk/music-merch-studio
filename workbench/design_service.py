@@ -6,14 +6,17 @@
 design_back2 / design_tray2）+ spec_minicd 尺寸真源，按 **111.2 固定结构** 出
 ①②③ 三件套 + 1:1 印刷版面总览；并导出打印文件（A4 300dpi PNG + PDF）+ ZIP。
 
-AI 增强走「程序衍生打底 + 可选上传覆盖」：build 接口接受 aiDisc/aiFold/aiStrip
-三个已上传图片路径（来自 /api/upload），给了就用它替代对应程序衍生件。
+AI 增强走「程序衍生打底 + 可选上传覆盖」：build 接口接受 aiDisc / aiCover /
+aiFold / aiBack / aiTray / aiSideR / aiSideL / aiSpine（八个可上传区域，
+来自 /api/upload），给了就原样替代对应程序衍生件；aiStrip（整条封底条
+展开图）仍兼容旧前端。上传件一律原样使用，不叠加程序文字/条码。
 
 接口契约同 packaging_service.handle（handler 为 server 的 BaseHTTPRequestHandler）：
   GET  /api/design/album   ?artist=&album=&pic=&tracks=&company=&mood=&style=
         → 拉封面 + 读设计语言 + 返回 notes（不落盘）
   POST /api/design/build   body{artist,album,pic,tracks,company,mood,style,id,
-                                aiDisc,aiFold,aiStrip}
+                                aiDisc,aiCover,aiFold,aiBack,aiTray,
+                                aiSideR,aiSideL,aiSpine,aiStrip(兼容)}
         → 出三件套 + 总览 + A4 打印页，存 outputs/迷你CD设计/<jid>/
         → 返回 {ok, jid, parts, sheetUrl, printUrl, notes, design, zipUrl}
   POST /api/design/batch   body{artist,albums:[{album,artist,pic,company,date}],
@@ -237,8 +240,19 @@ def _release_metadata(data, artist, album, company=""):
 
 def build_parts(cover, album, artist, D, tracks, company, ai=None, dpi=DPI,
                 inner_copy="", barcode_code="", copyright_text="", release_year="", back_layout="auto", copy_settings=None):
-    """出 ①②③ 三件（override-aware）。返回 (disc, fold, strip)。"""
+    """出 ①②③ 三件（override-aware）。返回 (disc, fold, strip)。
+    ai 可覆盖：disc 盘面 / cover 封面 / fold 封面背面 / backArt 封底 /
+    trayArt 内盘底 / sideR 右侧封 / sideL 左侧封 / spineBack 左侧封背面；
+    strip（整条封底条展开图）仍兼容旧前端。上传件一律原样使用不加程序字。
+    """
     MC._dpi[0] = dpi  # make_back_strip 用模块级 _dpi
+
+    # 上传的封面：归一到原封面尺寸后，作为全部衍生设计（盘面/封底/侧封延展）的画面源
+    if ai and ai.get("cover"):
+        try:
+            cover = MC.cover_crop(ai["cover"], cover.width, cover.height)
+        except Exception:
+            pass
 
     title_state = TT.title_typography_state(copy_settings or {}, D, album, artist)
     selected_title_asset = title_state.get("selectedTitleAssetId") if title_state.get("titleMode") == "artistic" else None
@@ -253,7 +267,8 @@ def build_parts(cover, album, artist, D, tracks, company, ai=None, dpi=DPI,
     disc_d = mm(SP.DISC_D, dpi)
     hole_d = mm(SP.DISC_HOLE, dpi)
     if ai and ai.get("disc"):
-        disc = MC.cover_crop(ai["disc"], disc_d, disc_d)
+        # 上传的盘面底图：裁到 Ø40 后套圆形遮罩 + 内孔（实体盘面照片也是这个处理）
+        disc = MC.disc_face(MC.cover_crop(ai["disc"], disc_d, disc_d), disc_d, hole_d)
     else:
         disc = DP.design_disc2((ai or {}).get("discArt") or cover, disc_d, hole_d, D, rendered_album, artist, company, copy_settings=copy_settings)
 
@@ -262,12 +277,14 @@ def build_parts(cover, album, artist, D, tracks, company, ai=None, dpi=DPI,
     fold_h = mm(SP.COVER_H, dpi)
     if ai and ai.get("fold"):
         inner_im = MC.cover_crop(ai["fold"], fold_w // 2, fold_h)
-        fold = MC.make_cover_fold(inner_im, cover, fold_w, fold_h, D, copy_settings)
+        fold = MC.make_cover_fold(inner_im, cover, fold_w, fold_h, D, copy_settings,
+                                  front_is_upload=bool(ai.get("cover")))
     else:
         inner_im = DP.design_inner2((ai or {}).get("insideArt") or cover, fold_w // 2, fold_h, D, rendered_album, artist,
                                     tracks, quote=(copy_settings or {}).get("conceptCopy", {}).get("primaryChinese") or inner_copy or None,
                                     copy_settings=copy_settings)
-        fold = MC.make_cover_fold(inner_im, cover, fold_w, fold_h, D, copy_settings)
+        fold = MC.make_cover_fold(inner_im, cover, fold_w, fold_h, D, copy_settings,
+                                  front_is_upload=bool(ai and ai.get("cover")))
 
     # ③ 封底条（封底 + 内盘底 + 侧封边缘延展）
     strip_w = mm(SP.BACK_W, dpi)
@@ -279,7 +296,10 @@ def build_parts(cover, album, artist, D, tracks, company, ai=None, dpi=DPI,
                                    artist, D, tracks, 0, company,
                                    barcode_code=barcode_code,
                                    copyright_text=copyright_text,
-                                   release_year=release_year, back_layout=back_layout, copy_settings=copy_settings)
+                                   release_year=release_year, back_layout=back_layout, copy_settings=copy_settings,
+                                   side_right_im=(ai or {}).get("sideR"),
+                                   side_left_im=(ai or {}).get("sideL"),
+                                   side_back_im=(ai or {}).get("spineBack"))
     if title_asset_image is not None:
         reports = {}
         disc, reports["disc"] = TC.place_title_asset(disc, title_asset_image, TC.resolve_title_placement("disc", SP), SP.title_protected_rects_mm("disc"), dpi)
@@ -377,8 +397,14 @@ def build_preview(data):
     copy_settings["resolvedLayout"] = CT.recommend_copy_layout(copy_settings, D)
     title_state = _title_state(data, D, album, artist, cover)
     ai = {"disc": _load_ai(data.get("aiDisc")),
+          "cover": _load_ai(data.get("aiCover")),
           "fold": _load_ai(data.get("aiFold")),
-          "strip": _load_ai(data.get("aiStrip"))}
+          "strip": _load_ai(data.get("aiStrip")),
+          "backArt": _load_ai(data.get("aiBack")),
+          "trayArt": _load_ai(data.get("aiTray")),
+          "sideR": _load_ai(data.get("aiSideR")),
+          "sideL": _load_ai(data.get("aiSideL")),
+          "spineBack": _load_ai(data.get("aiSpine"))}
     requested_dpi = data.get("previewDpi", PREVIEW_DPI)
     try:
         preview_dpi = max(PREVIEW_DPI, min(DPI, int(requested_dpi)))
@@ -428,8 +454,14 @@ def build_job(data):
 
     ai = {
         "disc": _load_ai(data.get("aiDisc")),
+        "cover": _load_ai(data.get("aiCover")),
         "fold": _load_ai(data.get("aiFold")),
         "strip": _load_ai(data.get("aiStrip")),
+        "backArt": _load_ai(data.get("aiBack")),
+        "trayArt": _load_ai(data.get("aiTray")),
+        "sideR": _load_ai(data.get("aiSideR")),
+        "sideL": _load_ai(data.get("aiSideL")),
+        "spineBack": _load_ai(data.get("aiSpine")),
     }
     title_state = _title_state(data, D, album, artist, cover)
     has_ai = any(ai.values())
@@ -453,6 +485,34 @@ def build_job(data):
     fold.save(str(d / "part-cover.png"))
     strip.save(str(d / "part-strip.png"))
 
+    # ---- 实体专辑素材拆件（用户素材库命名约定，2026-10-28 拍板）----
+    # 封面折件 = [封面背面 | 封面]，封底条 = [右侧封|封底|左侧封|左侧封背面|内盘底]。
+    # 按段裁开存成 8 张独立 PNG，右侧封与左侧封各自导出，避免遗漏上传的素材。
+    hw = fold.width // 2
+    cover_front = fold.crop((fold.width - hw, 0, fold.width, fold.height))
+    cover_back = fold.crop((0, 0, hw, fold.height))
+    cuts = [0]
+    for s in SP.BACK_SEGS:
+        cuts.append(min(strip.width, cuts[-1] + mm(s, DPI)))
+    cuts[-1] = strip.width
+    seg_right_spine = strip.crop((cuts[0], 0, cuts[1], strip.height))
+    seg_back = strip.crop((cuts[1], 0, cuts[2], strip.height))
+    seg_left_spine = strip.crop((cuts[2], 0, cuts[3], strip.height))
+    seg_spine_back = strip.crop((cuts[3], 0, cuts[4], strip.height))
+    seg_tray = strip.crop((cuts[4], 0, cuts[5], strip.height))
+    split_files = {
+        "封面.png": cover_front,
+        "封面背面.png": cover_back,
+        "右侧封.png": seg_right_spine,
+        "左侧封.png": seg_left_spine,
+        "左侧封背面.png": seg_spine_back,
+        "封底.png": seg_back,
+        "内盘底.png": seg_tray,
+        "盘面.png": disc,
+    }
+    for name, im in split_files.items():
+        im.save(str(d / name))
+
     # 1:1 总览
     sheet_path = str(d / "★版面总览-1比1.png")
     rendered = {"rendered_disc": (disc, False), "rendered_fold": (fold, False),
@@ -465,6 +525,14 @@ def build_job(data):
                                           artist, album, D, tracks, 0, company)
     page_im.save(str(d / "打印拼版-A4.png"), quality=95)
     page_im.save(str(d / "打印拼版-A4.pdf"), "PDF", resolution=DPI)
+
+    # 实体专辑打印拼版（默认版式）：竖版 7套/页（封面折件+封底条，无盘面）+ 盘面单独页
+    p7 = MC.build_page_portrait7(fold, strip, DPI, artist, album, sets=7)
+    p7.save(str(d / "打印拼版-A4竖版7套.png"))
+    p7.save(str(d / "打印拼版-A4竖版7套.pdf"), "PDF", resolution=DPI)
+    dpage = MC.build_disc_page(disc, DPI, artist, album)
+    dpage.save(str(d / "盘面拼版-A4.png"))
+    dpage.save(str(d / "盘面拼版-A4.pdf"), "PDF", resolution=DPI)
 
     notes = DP.design_notes(D, album, artist, tracks, has_lyrics=False)
     meta = {
@@ -489,15 +557,23 @@ def build_job(data):
             "disc": "part-disc.png", "cover": "part-cover.png",
             "strip": "part-strip.png", "sheet": "★版面总览-1比1.png",
             "print": "打印拼版-A4.png", "printPdf": "打印拼版-A4.pdf",
+            "printPortrait": "打印拼版-A4竖版7套.png",
+            "printPortraitPdf": "打印拼版-A4竖版7套.pdf",
+            "discPage": "盘面拼版-A4.png", "discPagePdf": "盘面拼版-A4.pdf",
+            **{name: name for name in split_files},
         },
     }
     (d / "meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
 
     # 打包 ZIP
     zip_path = OUT_DIR / ("%s.zip" % jid)
+    _zip_members = ("★版面总览-1比1.png", "打印拼版-A4.png", "打印拼版-A4.pdf",
+                    "打印拼版-A4竖版7套.png", "打印拼版-A4竖版7套.pdf",
+                    "盘面拼版-A4.png", "盘面拼版-A4.pdf",
+                    "封面.png", "封面背面.png", "右侧封.png", "左侧封.png",
+                    "左侧封背面.png", "封底.png", "内盘底.png", "盘面.png")
     with zipfile.ZipFile(str(zip_path), "w", zipfile.ZIP_DEFLATED) as z:
-        for f in ("part-disc.png", "part-cover.png", "part-strip.png",
-                  "★版面总览-1比1.png", "打印拼版-A4.png", "打印拼版-A4.pdf", "meta.json"):
+        for f in _zip_members:
             p = d / f
             if p.is_file():
                 z.write(str(p), f)
@@ -505,13 +581,29 @@ def build_job(data):
     return {
         "ok": True, "jid": jid,
         "parts": [
-            {"name": "盘面", "file": "part-disc.png", "mm": "%g×%g" % (SP.DISC_D, SP.DISC_D)},
-            {"name": "封面折件", "file": "part-cover.png", "mm": "%g×%g" % (SP.COVER_W, SP.COVER_H)},
-            {"name": "封底条", "file": "part-strip.png", "mm": "%g×%g" % (SP.BACK_W, SP.BACK_H)},
+            # 旧三件套（part-disc/part-cover/part-strip）已从导出清单移除：
+            # 与下面的素材拆件、两页拼版完全重复（2026-10-28 用户拍板）。
+            # 磁盘上仍落盘 part-*.png，供作品库回看（PROJ_FILES）。
+            {"name": "封面", "file": "封面.png", "mm": "%g×%g" % (SP.COVER_W / 2, SP.COVER_H)},
+            {"name": "封面背面", "file": "封面背面.png", "mm": "%g×%g" % (SP.COVER_W / 2, SP.COVER_H)},
+            {"name": "右侧封", "file": "右侧封.png", "mm": "%g×%g" % (SP.BACK_SEGS[0], SP.BACK_H)},
+            {"name": "左侧封", "file": "左侧封.png", "mm": "%g×%g" % (SP.BACK_SEGS[2], SP.BACK_H)},
+            {"name": "左侧封背面", "file": "左侧封背面.png", "mm": "%g×%g" % (SP.BACK_SEGS[3], SP.BACK_H)},
+            {"name": "封底", "file": "封底.png", "mm": "%g×%g" % (SP.BACK_SEGS[1], SP.BACK_H)},
+            {"name": "内盘底", "file": "内盘底.png", "mm": "%g×%g" % (SP.BACK_SEGS[4], SP.BACK_H)},
+            {"name": "盘面（素材）", "file": "盘面.png", "mm": "%g×%g" % (SP.DISC_D, SP.DISC_D)},
         ],
         "sheetUrl": "/api/design/file?jid=%s&name=%s" % (jid, quote("★版面总览-1比1.png")),
         "printUrl": "/api/design/file?jid=%s&name=%s" % (jid, quote("打印拼版-A4.png")),
         "printPdfUrl": "/api/design/file?jid=%s&name=%s" % (jid, quote("打印拼版-A4.pdf")),
+        "printPortraitUrl": "/api/design/file?jid=%s&name=%s" % (jid, quote("打印拼版-A4竖版7套.png")),
+        "printPortraitPdfUrl": "/api/design/file?jid=%s&name=%s" % (jid, quote("打印拼版-A4竖版7套.pdf")),
+        "discPageUrl": "/api/design/file?jid=%s&name=%s" % (jid, quote("盘面拼版-A4.png")),
+        "discPagePdfUrl": "/api/design/file?jid=%s&name=%s" % (jid, quote("盘面拼版-A4.pdf")),
+        "splitFiles": [
+            {"name": name, "url": "/api/design/file?jid=%s&name=%s" % (jid, quote(name))}
+            for name in split_files
+        ],
         "zipUrl": "/api/design/zip?jid=%s" % jid,
         "notes": notes,
         "titleTypography": title_state,
@@ -697,8 +789,14 @@ def build_batch(data):
             D = _read_design(cover, mood, style, bands)
 
             ai = {"disc": _load_ai(alb.get("aiDisc")),
+                  "cover": _load_ai(alb.get("aiCover")),
                   "fold": _load_ai(alb.get("aiFold")),
-                  "strip": _load_ai(alb.get("aiStrip"))}
+                  "strip": _load_ai(alb.get("aiStrip")),
+                  "backArt": _load_ai(alb.get("aiBack")),
+                  "trayArt": _load_ai(alb.get("aiTray")),
+                  "sideR": _load_ai(alb.get("aiSideR")),
+                  "sideL": _load_ai(alb.get("aiSideL")),
+                  "spineBack": _load_ai(alb.get("aiSpine"))}
             has_ai = any(ai.values())
             disc, fold, strip = build_parts(cover, album, artist, D, tracks,
                                             company, ai if has_ai else None, DPI,
@@ -713,11 +811,18 @@ def build_batch(data):
             written += list(fn.values())
 
             page_im, _sets, _prev = MC.build_page(
-                {"cover": (cover, False)}, DPI, "a4l", 1, artist, album, D,
-                tracks, 0, company)
+                {"cover": (cover, False), "rendered_disc": (disc, False),
+                 "rendered_fold": (fold, False), "rendered_strip": (strip, False)},
+                DPI, "a4l", 1, artist, album, D, tracks, 0, company)
             pn = tag + "-打印拼版-A4.png"
             page_im.save(str(d / pn))
             written.append(pn)
+
+            # 竖版 7套/页（实体专辑排版，无盘面）
+            p7 = MC.build_page_portrait7(fold, strip, DPI, artist, album, sets=7)
+            p7n = tag + "-打印拼版-A4竖版7套.png"
+            p7.save(str(d / p7n))
+            written.append(p7n)
 
             rows.append({"no": tag, "album": album, "artist": artist,
                          "date": str(alb.get("date") or ""),
@@ -732,6 +837,7 @@ def build_batch(data):
                 "mood": D["mood"], "style": D["style"], "hasAi": has_ai,
                 "parts": [_u(fn["disc"]), _u(fn["cover"]), _u(fn["strip"])],
                 "printUrl": _u(pn),
+                "printPortraitUrl": _u(p7n),
             })
             _slog("batch %s ok: %s" % (tag, album))
         except Exception as e:
