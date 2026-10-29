@@ -1726,11 +1726,18 @@ def design_postcard(cover, w, h, D, album="", artist="", quote=None):
 
 def _vertical_spine_text(draw, x, y, text, font, fill, max_h, leading=1.08, bold=False, italic=False,
                          char_styles=None, pixels_per_mm=0):
-    """在 4.4mm 窄封内逐字竖排，超出安全高度时以省略号收束。"""
+    """在 4.4mm 窄封内逐字竖排，超出安全高度时以省略号收束。
+
+    加粗 = 描边重绘（stroke_width），斜体 = 字符图层水平错切——
+    两者都必须肉眼可辨（2026-10-29 修复：旧版斜体只是右移 1px、
+    加粗只是偏移 1px 重画，字号小时完全看不出差别）。
+    """
     text = str(text or "").strip()
     if not text:
         return y
-    step = max(1, int(font.size * leading))
+    base_im = getattr(draw, "_image", None)   # 斜体错切后要贴回原图
+    stroke_w = max(1, int(round(font.size * 0.05)))
+    shear = 0.25
     limit = int(y + max_h)
     for index, char in enumerate(text):
         char_style = (char_styles or {}).get(str(index), {})
@@ -1745,12 +1752,29 @@ def _vertical_spine_text(draw, x, y, text, font, fill, max_h, leading=1.08, bold
             char = "…"
         width = draw.textlength(char, font=char_font)
         px = x - width / 2.0
-        if char_italic:
-            # 在没有对应 italic 字形的个人字体上保留可见的倾斜效果。
-            px += max(1, int(char_font.size * 0.12))
-        draw.text((px, y), char, font=char_font, fill=char_fill)
-        if char_bold:
-            draw.text((px + 1, y), char, font=char_font, fill=char_fill)
+        if char_italic and base_im is not None:
+            # 真斜体：字符画进临时 RGBA 图层，做水平错切（顶部向右倾）后贴回。
+            pad = max(2, int(char_font.size * 0.25))
+            cw, ch = int(width) + pad * 2, int(char_font.size * 1.4) + pad * 2
+            layer = Image.new("RGBA", (cw, ch), (0, 0, 0, 0))
+            layer_draw = ImageDraw.Draw(layer)
+            if char_bold:
+                layer_draw.text((pad, pad), char, font=char_font,
+                                fill=tuple(char_fill[:3]) + (255,),
+                                stroke_width=stroke_w, stroke_fill=tuple(char_fill[:3]) + (255,))
+            else:
+                layer_draw.text((pad, pad), char, font=char_font, fill=tuple(char_fill[:3]) + (255,))
+            extra = int(ch * shear)
+            sheared = layer.transform((cw + extra, ch), Image.AFFINE,
+                                      (1, shear, -extra, 0, 1, 0),
+                                      resample=Image.Resampling.BICUBIC)
+            # 底边对齐原位：图层贴回 (px-pad, y-pad) 后，字符底部落在原基线
+            base_im.paste(sheared, (int(px) - pad, int(y) - pad), sheared)
+        elif char_bold:
+            draw.text((px, y), char, font=char_font, fill=char_fill,
+                      stroke_width=stroke_w, stroke_fill=char_fill)
+        else:
+            draw.text((px, y), char, font=char_font, fill=char_fill)
         y += step
         if char == "…":
             break
@@ -1825,8 +1849,12 @@ def spine_overlay(base, variant, album="", artist="", company="", copy_settings=
     custom_text = str(((copy_settings or {}).get("spineText") or {}).get(zone_key) or "").strip()
     character_styles = ((copy_settings or {}).get("spineCharacterStyles") or {}).get(zone_key) or {}
     if custom_text:
-        # 自定义文字始终保持用户选定的字号，向下使用延长后的侧封可用区域。
-        custom_font = _spine_font(appearance.get("font"), size_px, custom_text)
+        # 自定义文字的字号：优先「全部(sizeMm)」，其次「标题(titleSizeMm)」。
+        # 工具栏的字号作用对象默认是「标题」，改动落在 titleSizeMm 里——
+        # 旧版只读 sizeMm，导致改字号永远不生效（2026-10-29 修复）。
+        eff_mm = appearance.get("sizeMm") or appearance.get("titleSizeMm") or 1.7
+        eff_px = max(7, int(w * max(0.8, min(2.6, float(eff_mm))) / 4.4))
+        custom_font = _spine_font(appearance.get("font"), eff_px, custom_text)
         _vertical_spine_text(d, x, top, custom_text, custom_font, custom_fill, usable, 1.10,
                               bold=style in {"bold", "boldItalic"},
                               italic=style in {"italic", "boldItalic"})

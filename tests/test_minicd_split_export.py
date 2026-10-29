@@ -38,7 +38,10 @@ class MiniCdSplitExportTest(unittest.TestCase):
                 self.assertEqual(image.getpixel((image.width // 2, image.height // 2)), (32, 64, 208))
             with zipfile.ZipFile(base / "test-minicd.zip") as bundle:
                 names = set(bundle.namelist())
-            self.assertTrue({"右侧封.png", "左侧封.png", "盘面拼版-A4.png", "盘面拼版-A4.pdf"} <= names)
+            self.assertTrue({"右侧封.png", "左侧封.png", "左侧封背面.png", "盘面.png"} <= names)
+            # 盘面拼版页不进交付包：用户 2026-10-28 拍板不要（磁盘仍落盘供作品库回看）
+            self.assertNotIn("盘面拼版-A4.png", names)
+            self.assertNotIn("盘面拼版-A4.pdf", names)
             self.assertEqual(len(result["splitFiles"]), 8)
 
 
