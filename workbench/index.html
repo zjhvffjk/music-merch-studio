@@ -2029,12 +2029,19 @@ function renderAlbumStage(){
   if(sa) sa.onclick = ()=>{ ALBUM_LIST.forEach((_,i)=>ALBUM_SEL.add(i)); syncSel(); };
   if(sn) sn.onclick = ()=>{ ALBUM_SEL.clear(); syncSel(); };
   if(bd) bd.onclick = ()=>{
-    const picked = [...ALBUM_SEL].sort((x,y)=>x-y).map(i=>{
+    const picked=[],skipped=[];
+    [...ALBUM_SEL].sort((x,y)=>x-y).forEach(i=>{
       const a = ALBUM_LIST[i] || {};
-      return {album:a.name||'', artist:ARTIST_Q||'', id:a.id||'',
-              pic:a.pic||'', company:a.company||'', date:a.date||''};
-    }).filter(x=>x.album && x.pic);
+      if(a.name && a.pic)
+        picked.push({album:a.name, artist:ARTIST_Q||'', id:a.id||'',
+                     pic:a.pic, company:a.company||'', date:a.date||''});
+      else skipped.push(a.name || ('第'+(i+1)+'张'));
+    });
     if(!picked.length) return toast('选中的专辑缺封面，换几张再试');
+    if(skipped.length) toast('已跳过 '+skipped.length+' 张没有封面的：'+skipped.slice(0,3).join('、'));
+    // 每张约 5~8 秒（实测 3 张用时 16 秒）；量太大先让用户确认，避免点下去干等几分钟。
+    if(picked.length>24 && !confirm('选了 '+picked.length+' 张，预计要 '+
+        Math.ceil(picked.length*8/60)+' 分钟以上。确定现在就开始吗？')) return;
     try{ sessionStorage.setItem('minuet_design_batch', JSON.stringify(picked)); }catch(e){}
     openStudio({batch:'1'});
   };

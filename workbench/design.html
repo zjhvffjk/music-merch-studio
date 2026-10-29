@@ -355,12 +355,6 @@ body.embed .proj .t small{display:none}   /* 外层已有专辑名，这里不�
       <summary>封底条结构与内容区域</summary>
       <div id="segNav"><p class="muted" style="margin:10px 0 0;font-size:12.5px">加载规格中…</p></div>
     </details>
-    <div class="rblk" id="batchBlk" hidden>
-      <h3>批量队列 <b id="batchCount">0</b></h3>
-      <div id="batchList" class="batchList"></div>
-      <button id="btnBatch" class="btn wide" disabled>开始批量生成</button>
-      <div id="batchState" class="muted" style="font-size:12px;margin-top:8px"></div>
-    </div>
     <details class="rblk railDetails" id="railProjBlk">
       <summary>最近设计 <b id="railProjCount">0</b></summary>
       <div id="railProj"><p class="muted" style="margin:10px 0 0;font-size:12px">读取中…</p></div>
@@ -509,7 +503,20 @@ body.embed .proj .t small{display:none}   /* 外层已有专辑名，这里不�
 
     <!-- ---- 模块：导出 ---- -->
     <section class="mod" id="mod-export" hidden>
-      <section class="card">
+      <section class="card" id="batchBlk" hidden>
+        <div class="head"><h2>批量队列 <b id="batchCount">0</b></h2>
+          <span class="muted" style="font-size:12px">进页面自动开始，不用再点按钮</span>
+        </div>
+        <div class="body">
+          <div id="batchList" class="batchList"></div>
+          <div class="dlRow" style="margin-top:10px">
+            <button id="btnBatch" class="btn" disabled>重新生成</button>
+          </div>
+          <div id="batchState" class="muted" style="font-size:12.5px;margin-top:8px"></div>
+          <p class="cap">服务端一次上限 12 张；选多了会分组跑完再合并展示（每组分批对照图 + ZIP）。</p>
+        </div>
+      </section>
+      <section class="card" id="singleExportCard">
         <div class="head"><h2>导出 · 单张</h2></div>
         <div class="body">
           <div id="exportEmpty" class="empty">还没有生成物 —— 先去「设计」模块生成三件套。</div>
@@ -1237,6 +1244,8 @@ $('#btnSpec').onclick=()=>{
 
 /* ---------------- 批量模式（?batch=1）---------------- */
 const BATCH=q.get('batch')==='1';
+/* 与 design_service.MAX_BATCH 一致：服务端一次只吃 12 张，选多了要分组跑。 */
+const BATCH_CHUNK=12;
 let batchList=[],batchRunning=false;
 function loadBatch(){
   try{batchList=JSON.parse(sessionStorage.getItem('minuet_design_batch')||'[]')}catch(e){batchList=[]}
@@ -1253,42 +1262,75 @@ function renderBatch(){
       <button class="plain sm bx" data-i="${i}">移除</button></div>`).join('')
     :'<p class="muted" style="margin:0;font-size:12.5px">没有选中专辑 —— 回专辑列表勾选后重进。</p>';
   $('#btnBatch').disabled=!n||batchRunning;
+  $('#btnBatch').textContent=batchRunning?'生成中…':'重新生成';
   document.querySelectorAll('#batchList .bx').forEach(b=>{
     b.onclick=()=>{batchList.splice(parseInt(b.dataset.i,10),1);renderBatch();};
   });
 }
-$('#btnBatch').onclick=async()=>{
+function batchBody(group){
+  return {artist:(group[0]||{}).artist||'',
+    // 🔴 id 必带：服务端靠它按专辑取**这张专辑自己的**曲目。带上歌手的 6 首热门，
+    // 一张只有 1 首的单曲会被印成别人的歌（2026-10-30）。
+    albums:group.map(a=>({album:a.album,artist:a.artist,id:a.id||'',
+                          pic:a.pic,company:a.company||'',date:a.date||''})),
+    safeBands:$('#safeBands').value.trim()};
+}
+function batchGalleryHtml(items){
+  return (items||[]).map(it=>`
+    <div class="bcell"><div class="bh">${esc(it.no)} ${esc(it.album)}<small>${esc(it.artist)} · ${esc(it.mood)} / ${esc(it.style)}${it.hasAi?' · AI 底图':''}</small></div>
+      <div class="bparts">${it.parts.map(p=>`<a href="${p}" target="_blank" rel="noopener"><img src="${p}" alt=""></a>`).join('')}</div>
+      <div class="bfoot"><a href="${it.printUrl}" target="_blank" rel="noopener">A4 打印拼版</a></div></div>`).join('');
+}
+/* 进页面自动开始（用户要求：像单张一样「一点就出」），不再依赖那只 **看不见** 的按钮。
+   🔴 批量队列原先整块放在 <aside class="rail"> 里，而全站有一条
+   `.rail{display:none!important}` 全局规则 —— 按钮永远不可见也不报错，
+   表现为「点了设计选中的却什么都没发生」。现在面板搬进主区，且这里自动跑。 */
+async function runBatch(){
   if(batchRunning||!batchList.length)return;
   batchRunning=true;renderBatch();err('');
-  $('#batchState').innerHTML='<span class="spin dk"></span>逐张衍生中…（'+batchList.length+' 张）';
-  showMod('export');
+  const groups=[];
+  for(let i=0;i<batchList.length;i+=BATCH_CHUNK) groups.push(batchList.slice(i,i+BATCH_CHUNK));
+  const items=[],failed=[],sheets=[];
+  $('#batchRes').hidden=false;
+  $('#batchGallery').innerHTML='';
   try{
-    const body={artist:batchList[0].artist||'',
-      albums:batchList.map(a=>({album:a.album,artist:a.artist,pic:a.pic,company:a.company||'',date:a.date||''})),
-      safeBands:$('#safeBands').value.trim()};
-    const r=await fetch('/api/design/batch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-    const d=await r.json();if(!r.ok)throw Error(d.error||('HTTP '+r.status));
-    $('#batchSheet').src=d.sheetUrl;
-    $('#lnkBatchSheet').href=d.sheetUrl;$('#lnkBatchZip').href=d.zipUrl;
-    $('#batchGallery').innerHTML=(d.items||[]).map(it=>`
-      <div class="bcell"><div class="bh">${esc(it.no)} ${esc(it.album)}<small>${esc(it.artist)} · ${esc(it.mood)} / ${esc(it.style)}${it.hasAi?' · AI 底图':''}</small></div>
-        <div class="bparts">${it.parts.map(p=>`<a href="${p}" target="_blank" rel="noopener"><img src="${p}" alt=""></a>`).join('')}</div>
-        <div class="bfoot"><a href="${it.printUrl}" target="_blank" rel="noopener">A4 打印拼版</a></div></div>`).join('');
-    $('#batchRes').hidden=false;
-    const bad=(d.failed||[]);
-    $('#batchState').textContent='完成 ✓ '+d.count+' 张'
-      +(bad.length?('；失败 '+bad.length+' 张（'+bad.map(f=>f.album||'?').join('、')+'）'):'')+'  任务 '+d.jid;
+    for(let gi=0;gi<groups.length;gi++){
+      $('#batchState').innerHTML='<span class="spin dk"></span>正在生成第 '
+        +(gi+1)+'/'+groups.length+' 组（'+groups[gi].length+' 张）…';
+      const r=await fetch('/api/design/batch',{method:'POST',
+        headers:{'Content-Type':'application/json'},body:JSON.stringify(batchBody(groups[gi]))});
+      const d=await r.json();
+      if(!r.ok)throw Error(d.error||('HTTP '+r.status));
+      sheets.push({no:gi+1,sheetUrl:d.sheetUrl,zipUrl:d.zipUrl});
+      $('#batchSheet').src=d.sheetUrl;$('#lnkBatchSheet').href=d.sheetUrl;$('#lnkBatchZip').href=d.zipUrl;
+      items.push(...(d.items||[]));
+      failed.push(...(d.failed||[]));
+      $('#batchGallery').innerHTML=batchGalleryHtml(items);
+    }
+    const links=sheets.map(s=>`<a href="${s.sheetUrl}" target="_blank" rel="noopener">第 ${s.no} 组对照图</a>`
+      +` <a href="${s.zipUrl}" target="_blank" rel="noopener">ZIP</a>`).join('　|　');
+    $('#batchState').innerHTML='完成 ✓ 共 '+items.length+' 张'
+      +(failed.length?('；失败 '+failed.length+' 张（'+failed.map(f=>esc(f.album||'?')).join('、')+'）'):'')
+      +(sheets.length>1?'<br>'+links:'');
     $('#batchRes').scrollIntoView({behavior:'smooth',block:'start'});
-  }catch(e){err(e.message);$('#batchState').textContent='';}
+  }catch(e){
+    err(e.message);
+    $('#batchState').innerHTML='<span style="color:var(--red,#c8102e)">生成失败：'+esc(e.message)+'</span>'
+      +(items.length?('（已完成 '+items.length+' 张的部分结果仍可用）'):'');
+  }
   finally{batchRunning=false;renderBatch();}
-};
+}
+$('#btnBatch').onclick=()=>runBatch();
 if(BATCH){
   $('#dataCard').hidden=true;$('#aiCard').hidden=true;$('#resCard').hidden=true;
+  $('#singleExportCard').hidden=true;
   $('#batchBlk').hidden=false;
   loadBatch();renderBatch();
   $('#railAlbum').textContent=batchList.length?batchList[0].artist||'批量':'批量';
   $('#railArtist').textContent='共 '+batchList.length+' 张待设计';
   showMod('export');
+  if(batchList.length) runBatch();
+  else $('#batchState').textContent='没有选中专辑 —— 回专辑列表勾选后重进。';
 }
 /* ---------------- 作品库 / 历史项目回看（?jid=）----------------
    从首页「作品库」点进来：读回那次项目的 meta，把已生成的成果直接铺出来。
