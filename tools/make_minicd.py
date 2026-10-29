@@ -217,7 +217,7 @@ def _solid_block(cover_im, w_px, h_px, album, artist):
 def make_back_strip(back_im, tray_im, w_px, h_px, cover_im, album, artist,
                     D=None, tracks=None, seed=0, company="", inner_copy="",
                     barcode_code="", copyright_text="", release_year="", back_layout="auto", copy_settings=None,
-                    side_right_im=None, side_left_im=None, side_back_im=None):
+                    side_right_im=None, side_left_im=None, side_back_im=None, side_elements=None):
     """[右侧封][封底][左侧封][背脊][内盘底] 一条连续展开图。
 
     封底与内盘底缺件时走**封面衍生设计**（design_back / design_tray）；
@@ -227,7 +227,15 @@ def make_back_strip(back_im, tray_im, w_px, h_px, cover_im, album, artist,
     side_right_im / side_left_im / side_back_im：右侧封 / 左侧封 / 左侧封背面
     的用户上传图 —— 裁到段尺寸当底图，画面不走边缘延展；但侧封文字层
     照常叠加（2026-10-29 约定：上传件也要能自定义文字/字体，走侧封工具栏）。
+
+    side_elements：三条窄封各自的图层开关 {"right": {...}, "left": {...},
+    "left-back": {...}} —— 用户上传了自带文字的实拍侧封时，可以整层关掉，
+    或只留标题/歌手（2026-10-30）。
     """
+    side_elements = side_elements if isinstance(side_elements, dict) else {}
+    el_right = side_elements.get("right")
+    el_left = side_elements.get("left")
+    el_back = side_elements.get("left-back")
     p = [mm(s, _dpi[0]) for s in BACK_SEGS]
     total = sum(p)
     out = Image.new("RGB", (total, h_px), "white")
@@ -264,19 +272,19 @@ def make_back_strip(back_im, tray_im, w_px, h_px, cover_im, album, artist,
     else:
         right_spine = _edge_stretch(b, p[0], h_px)
     if use_dp:
-        right_spine = DP.spine_overlay(right_spine, "right", album, artist, company, copy_settings)
+        right_spine = DP.spine_overlay(right_spine, "right", album, artist, company, copy_settings, elements=el_right)
     if side_left_im is not None:
         left_spine = cover_crop(side_left_im, p[2], h_px)
     else:
         left_spine = _edge_stretch(t, p[2], h_px)
     if use_dp:
-        left_spine = DP.spine_overlay(left_spine, "left", album, artist, company, copy_settings)
+        left_spine = DP.spine_overlay(left_spine, "left", album, artist, company, copy_settings, elements=el_left)
     if side_back_im is not None:
         left_spine_back = cover_crop(side_back_im, p[3], h_px)
     else:
         left_spine_back = _edge_stretch(t, p[3], h_px)
     if use_dp:
-        left_spine_back = DP.spine_overlay(left_spine_back, "left-back", album, artist, company, copy_settings)
+        left_spine_back = DP.spine_overlay(left_spine_back, "left-back", album, artist, company, copy_settings, elements=el_back)
     out.paste(right_spine, (0, 0))
     out.paste(left_spine, (p[0] + p[1], 0))
     out.paste(left_spine_back, (p[0] + p[1] + p[2], 0))

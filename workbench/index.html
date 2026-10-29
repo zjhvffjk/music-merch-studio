@@ -1483,6 +1483,9 @@ let ALBUM_SEL  = new Set(); // 已勾选的专辑下标（批量设计用）
 let ROUTE_RESTORING = false;
 let LAST_ARTIST_DATA = null;
 let LAST_SONG_INDEX = null;
+/* 舞台上当前显示的**专辑上下文**（没有在看专辑详情时为 null）。
+   albumParams 靠它判断舞台上的曲目复选框是不是这张专辑的。 */
+let STAGE_ALBUM_CTX = null;
 function setAppBack(label, action){ const b=$('#btnAppBack'); if(!b)return; b.textContent=label; b.hidden=false; b.onclick=action; }
 function hideAppBack(){ const b=$('#btnAppBack'); if(b)b.hidden=true; }
 function goHome(){ history.pushState({route:'home'},'',location.pathname); location.reload(); }
@@ -1614,7 +1617,42 @@ function closeStudio(){
   else { const a = $('#albStage'); if(a) { renderAlbumStage(); showAlbumStage(); } }
 }
 /* 单张专辑 → 设计页参数（与 design.html 的 query 契约保持一致） */
-function albumParams(a){
+/* 专辑墙入口（查看全部专辑 → 点封面 / 点「设计并打印」）。
+   曲目必须当场按专辑 id 去取——绝不能沿用当前页的歌手热门歌：
+   一张只有 1 首的单曲，印出来却是热门 6 首，就是这么串的。 */
+let ALBUM_STUDIO_BUSY = false;
+async function openAlbumStudio(a){
+  if(ALBUM_STUDIO_BUSY) return;
+  const label = (a && a.name) ? `《${a.name}》` : '这张专辑';
+  ALBUM_STUDIO_BUSY = true;
+  toast('正在载入' + label + '曲目…');
+  try{
+    const songs = await fetchAlbumSongs(a);
+    if(!songs || !songs.length){
+      toast(`${label} 没能取到曲目，先不放行了——免得封底印成别人的歌`);
+      return;
+    }
+    openStudio(albumParams(a, songs));
+  }catch(e){
+    toast(`${label} 曲目读取失败：${e && e.message ? e.message : '请重试'}`);
+  }finally{
+    ALBUM_STUDIO_BUSY = false;
+  }
+}
+
+/* 取一张专辑自己的曲目（/api/album_songs）。拿不到返回 null，由调用方决定怎么退。 */
+async function fetchAlbumSongs(a){
+  if(!a || !a.id) return null;
+  try{
+    // 与侧栏「点专辑」同一条数据源：/api/album_songs（openAlbumDetail 也用它）
+    const d = await jget('/api/album_songs?id=' + encodeURIComponent(String(a.id)), 20000);
+    const list = Array.isArray(d && d.songs) ? d.songs : [];
+    if(!list.length) return null;
+    return list.map(s=>({name: s.name || s.title || '', dur: s.dur || ''}));
+  }catch(e){ return null; }
+}
+
+function albumParams(a, songList){
   const u = new URLSearchParams();
   // 以当前正在显示的资料页歌手为准，不能复用搜索框的旧 ARTIST_Q。
   const activeArtist = ((LAST_ARTIST_DATA && LAST_ARTIST_DATA.artist && LAST_ARTIST_DATA.artist.name) || ARTIST_Q || '');
@@ -1624,24 +1662,31 @@ function albumParams(a){
   if(a && a.pic)     u.set('pic', a.pic);
   if(a && a.company) u.set('company', a.company || '');
   if(a && a.date)    u.set('date', a.date || '');
-  // 封底曲目来源：专辑详情页勾选中的曲目优先；没有勾选任何一首时退回热门前 10。
-  // 排名按勾选顺序重排，歌名、时长一并带进设计页。
-  const searchSongs = ((LAST_ARTIST_DATA && LAST_ARTIST_DATA.songs)
-    || (ARTIST_FOUND && ARTIST_FOUND.songs) || []);
+  /* 封底曲目来源必须是**这张专辑自己的曲目**，不能图省事用当前页任一歌单。
+     2026-10-30 事故：专辑墙（查看全部专辑 → 点「设计并打印」）上一张只有 1 首的
+     专辑，印出来的却是歌手页的 6 首热门歌 —— 因为那时 LAST_ARTIST_DATA.songs
+     还是歌手的歌。所以曲目一律由调用方显式给出专辑自己的 songs。 */
+  const songs = Array.isArray(songList) ? songList : [];
   const stageBox = $('#albStage');
-  const checkedIdx = stageBox
+  // 舞台上的复选框只有在这张专辑详情页才算数；在专辑墙上它们是别的歌表的。
+  const ctxMatches = STAGE_ALBUM_CTX && a && String(STAGE_ALBUM_CTX.id||'') === String(a.id||'');
+  const checkedIdx = (stageBox && ctxMatches)
     ? Array.from(stageBox.querySelectorAll('.track-check:checked')).map(c => Number(c.dataset.track))
     : [];
-  const pickIdx = (checkedIdx.length ? checkedIdx : searchSongs.map((_, i) => i).slice(0, 10))
-    .filter(si => si >= 0 && si < searchSongs.length);
+  const pickIdx = (checkedIdx.length ? checkedIdx : songs.map((_, i) => i).slice(0, 10))
+    .filter(si => si >= 0 && si < songs.length);
   const hot = pickIdx.map((si, i) => {
-    const song = searchSongs[si] || {};
+    const song = songs[si] || {};
     return { rank: i + 1, title: song.name || '', duration: song.dur || '' };
   }).filter(song => song.title);
   // URL 负责当前页直达；sessionStorage 是 iframe/刷新场景的可靠兜底。
   if(hot.length){
     u.set('trackData', JSON.stringify(hot));
     try{sessionStorage.setItem('minuet_design_hot_tracks', JSON.stringify({artist:activeArtist,tracks:hot}));}catch(e){}
+  }else{
+    // 没有这张专辑的曲目时也要清掉旧缓存，否则设计页会按“歌手名相同”把上
+    // 一次的热门歌原封不动回填进来。
+    try{sessionStorage.removeItem('minuet_design_hot_tracks');}catch(e){}
   }
   // 专辑入口的目的就是完成可打印实体；设计完成后直接落在“打印制作”模块。
   u.set('flow', 'print');
@@ -1653,6 +1698,7 @@ function renderArtistResultStage(data){
   hideAppBack();
   const box=$('#albStage'); if(!box) return;
   const albCtx=data._album||null;
+  STAGE_ALBUM_CTX = albCtx;   // 舞台此时正在看这张专辑（或普通歌手页 → null）
   const artist=data.artist||{}; const isSongSearch=data.searchKind==='song';
   /* _noCap / 专辑详情模式：有多少首显示多少首；普通歌手页只列热门 18 首。 */
   const songs=(data.songs||[]).slice(0, (data._noCap||albCtx)?100000:(isSongSearch?40:18));
@@ -1779,7 +1825,7 @@ function renderArtistResultStage(data){
     }
   };
   const mkDesign=$('#albumMakeDesign');
-  if(mkDesign) mkDesign.onclick=()=>openStudio(albumParams(albCtx));
+  if(mkDesign) mkDesign.onclick=()=>openStudio(albumParams(albCtx, songs));
   /* 勾选批量制作：把勾选中的曲目整包交给批量制作页（与热门批量同一流程），
      开始制作后走 trackList 通道，后端不再按歌手搜索。 */
   const batchMake=$('#albumBatchMake');
@@ -1852,6 +1898,7 @@ function backToArtistBase(){
 /* 从歌曲资料页进入专辑全集：应用内返回回歌曲列表，首页由顶栏独立负责。 */
 function showArtistAlbums(){
   if(!LAST_ARTIST_DATA) return;
+  STAGE_ALBUM_CTX = null;   // 专辑墙不是某张专辑的详情页：别让它的复选框被误认为曲目勾选
   uiMode('album'); renderAlbumStage(); showAlbumStage();
   setAppBack('← 返回歌曲列表',returnArtistList);
   pushAppRoute('album',{data:LAST_ARTIST_DATA});
@@ -1959,15 +2006,15 @@ function renderAlbumStage(){
     </div>
     <div class="albGrid">${cards}</div>`;
 
-  // 点卡片任意处 / 点「设计这张」→ 就地进设计工作台
+  // 点卡片任意处 / 点「设计并打印」→ 先拉这张专辑自己的曲目，再进设计工作台
   box.querySelectorAll('.albC').forEach(c=>{
     const i = parseInt(c.dataset.i,10);
     c.onclick = ev=>{
       if(ev.target.classList.contains('ck') || ev.target.classList.contains('go')) return;
-      openStudio(albumParams(ALBUM_LIST[i]));
+      openAlbumStudio(ALBUM_LIST[i]);
     };
     const g = c.querySelector('.go');
-    if(g) g.onclick = ev=>{ ev.stopPropagation(); openStudio(albumParams(ALBUM_LIST[i])); };
+    if(g) g.onclick = ev=>{ ev.stopPropagation(); openAlbumStudio(ALBUM_LIST[i]); };
   });
   // 复选框：多选（批量设计）
   box.querySelectorAll('.ck').forEach(cb=>{

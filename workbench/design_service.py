@@ -162,6 +162,26 @@ def _norm_tracks(v):
     return items or None
 
 
+def _album_tracks_by_id(raw):
+    """按专辑 id 向网易云要这张专辑**自己**的曲目。
+
+    批量批量入口（专辑墙勾选后「设计选中的 N 张」）只带了 id，没带 tracks。
+    这里补齐；取不到宁可返回 None（不印曲目），也不退回首歌手的歌单 ——
+    否则一张只有 1 首的单曲会被印上热门的若干首别人的歌（2026-10-30）。
+    """
+    aid = str(raw or "").strip()
+    if not aid.isdigit():
+        return None
+    try:
+        from fetch163 import album_songs as netease_album_songs
+        _info, songs = netease_album_songs(int(aid))
+    except Exception as e:
+        _slog("album tracks lookup failed:", aid, type(e).__name__, e)
+        return None
+    names = [str((s or {}).get("name") or "").strip() for s in (songs or [])]
+    return _norm_tracks([n for n in names if n][:10])
+
+
 def _parse_bands(v):
     """``safeBands`` → ``(top, bottom)``。
 
@@ -237,15 +257,45 @@ def _release_metadata(data, artist, album, company=""):
     return found_company, (year_match.group(0) if year_match else ""), found_date
 
 
+def _ai_elements(data):
+    """读取前端传来的「逐部件文字层开关」：{part: {element: bool}}。
+
+    只有 dict 形态才认；前端可能以 JSON 字符串提交（表单场景），这里一并兜住。
+    返回 {} 表示调用方不管开关 —— 下游 el_on 会把 None 当「全画」，行为不变。
+    """
+    raw = data.get("aiElements") if isinstance(data, dict) else None
+    if isinstance(raw, str) and raw.strip():
+        try:
+            raw = json.loads(raw)
+        except Exception:
+            raw = None
+    if not isinstance(raw, dict):
+        return {}
+    return {k: v for k, v in raw.items() if isinstance(v, dict)}
+
+
 def build_parts(cover, album, artist, D, tracks, company, ai=None, dpi=DPI,
-                inner_copy="", barcode_code="", copyright_text="", release_year="", back_layout="auto", copy_settings=None):
+                inner_copy="", barcode_code="", copyright_text="", release_year="", back_layout="auto", copy_settings=None,
+                ai_elements=None):
     """出 ①②③ 三件（override-aware）。返回 (disc, fold, strip)。
     ai 可覆盖：disc 盘面 / cover 封面 / fold 封面背面 / backArt 封底 /
     trayArt 内盘底 / sideR 右侧封 / sideL 左侧封 / spineBack 左侧封背面；
-    strip（整条封底条展开图）仍兼容旧前端。上传件当底图，三条窄封的
-    侧封文字层照常叠加（文字/字体可在侧封工具栏自定义）。
+    strip（整条封底条展开图）仍兼容旧前端。
+
+    🔴 上传件是**底图**，不是成品：原先生成在这块面上的文字层照旧叠加，
+    逐项由 ai_elements 决定留哪几层（2026-10-30 用户要求：换底图不该等于把
+    曲目/条码/版权一起删掉，删留要交给用户决定）。ai_elements 为 None 时
+    全部保留，与改造前一致。
     """
     MC._dpi[0] = dpi  # make_back_strip 用模块级 _dpi
+    els = ai_elements if isinstance(ai_elements, dict) else {}
+
+    def _el(part):
+        """该部件的元素开关；没配就返回 None（= 全画）。"""
+        v = els.get(part)
+        return v if isinstance(v, dict) else None
+
+    # 上传的封面：归一到原封面尺寸后，作为全部衍生设计（盘面/封底/侧封延展）的画面源
 
     # 上传的封面：归一到原封面尺寸后，作为全部衍生设计（盘面/封底/侧封延展）的画面源
     if ai and ai.get("cover"):
@@ -266,40 +316,61 @@ def build_parts(cover, album, artist, D, tracks, company, ai=None, dpi=DPI,
     # ① 盘面
     disc_d = mm(SP.DISC_D, dpi)
     hole_d = mm(SP.DISC_HOLE, dpi)
-    if ai and ai.get("disc"):
-        # 上传的盘面底图：裁到 Ø40 后套圆形遮罩 + 内孔（实体盘面照片也是这个处理）
-        disc = MC.disc_face(MC.cover_crop(ai["disc"], disc_d, disc_d), disc_d, hole_d)
-    else:
-        disc = DP.design_disc2((ai or {}).get("discArt") or cover, disc_d, hole_d, D, rendered_album, artist, company, copy_settings=copy_settings)
+    disc_base = MC.cover_crop(ai["disc"], disc_d, disc_d) if (ai and ai.get("disc")) else None
+    # 上传态的盘面底图从径向外沿起算：原 design_disc2 针对封面美术，会让上传图再被
+    # 裁一圈；这里直接把整幅交给 design_disc2 套圆遮罩 + 打印信息层。
+    disc = DP.design_disc2(cover, disc_d, hole_d, D, rendered_album, artist, company,
+                           copy_settings=copy_settings,
+                           base_image=disc_base, elements=_el("disc"))
 
     # ② 封面折件（左内页 + 右封面）
     fold_w = mm(SP.COVER_W, dpi)
     fold_h = mm(SP.COVER_H, dpi)
-    if ai and ai.get("fold"):
-        inner_im = MC.cover_crop(ai["fold"], fold_w // 2, fold_h)
-        fold = MC.make_cover_fold(inner_im, cover, fold_w, fold_h, D, copy_settings,
-                                  front_is_upload=bool(ai.get("cover")))
-    else:
-        inner_im = DP.design_inner2((ai or {}).get("insideArt") or cover, fold_w // 2, fold_h, D, rendered_album, artist,
-                                    tracks, quote=(copy_settings or {}).get("conceptCopy", {}).get("primaryChinese") or inner_copy or None,
-                                    copy_settings=copy_settings)
-        fold = MC.make_cover_fold(inner_im, cover, fold_w, fold_h, D, copy_settings,
-                                  front_is_upload=bool(ai and ai.get("cover")))
+    # 封面背面同样是「底图 + 文字层」：上传也好、程序衍生也好，都走同一个
+    # design_inner2，区别只是纸从哪来 —— 这样文字层的删留也只有一处逻辑。
+    inner_im = DP.design_inner2((ai or {}).get("insideArt") or cover, fold_w // 2, fold_h, D, rendered_album, artist,
+                                tracks, quote=(copy_settings or {}).get("conceptCopy", {}).get("primaryChinese") or inner_copy or None,
+                                copy_settings=copy_settings,
+                                base_image=(ai or {}).get("fold"), elements=_el("fold"))
+    fold = MC.make_cover_fold(inner_im, cover, fold_w, fold_h, D, copy_settings,
+                              front_is_upload=bool(ai and ai.get("cover")))
 
     # ③ 封底条（封底 + 内盘底 + 侧封边缘延展）
     strip_w = mm(SP.BACK_W, dpi)
     strip_h = mm(SP.BACK_H, dpi)
-    if ai and ai.get("strip"):
+    segs = [mm(float(s), dpi) for s in SP.BACK_SEGS]
+    # 只要传了底图或配了元素开关，就在这里先把这一面整块渲染好再交给 make_back_strip；
+    # make_back_strip 内部原本是「有上传图就 cover_crop 了事」，会把信息层整块丢掉。
+    back_el, tray_el = _el("back"), _el("tray")
+    back_base, tray_base = (ai or {}).get("backArt"), (ai or {}).get("trayArt")
+    back_rendered = tray_rendered = None
+    if back_base is not None or back_el is not None:
+        back_rendered = DP.design_back2(cover, segs[1], strip_h, D, rendered_album, artist, tracks,
+                                        quote=inner_copy or None, company=company,
+                                        barcode_code=barcode_code, copyright_text=copyright_text,
+                                        release_year=release_year, back_layout=back_layout,
+                                        copy_settings=copy_settings,
+                                        base_image=back_base, elements=back_el)
+    if tray_base is not None or tray_el is not None:
+        tray_rendered = DP.design_tray2(cover, segs[4], strip_h, D, rendered_album, artist, company,
+                                        copy_settings=copy_settings,
+                                        base_image=tray_base, elements=tray_el)
+    if ai and ai.get("strip") and back_rendered is None and tray_rendered is None:
         strip = MC.cover_crop(ai["strip"], strip_w, strip_h)
     else:
-        strip = MC.make_back_strip((ai or {}).get("backArt"), (ai or {}).get("trayArt"), strip_w, strip_h, cover, rendered_album,
+        strip = MC.make_back_strip(back_rendered if back_rendered is not None else back_base,
+                                   tray_rendered if tray_rendered is not None else tray_base,
+                                   strip_w, strip_h, cover, rendered_album,
                                    artist, D, tracks, 0, company,
                                    barcode_code=barcode_code,
                                    copyright_text=copyright_text,
                                    release_year=release_year, back_layout=back_layout, copy_settings=copy_settings,
                                    side_right_im=(ai or {}).get("sideR"),
                                    side_left_im=(ai or {}).get("sideL"),
-                                   side_back_im=(ai or {}).get("spineBack"))
+                                   side_back_im=(ai or {}).get("spineBack"),
+                                   side_elements={"right": _el("sideR"),
+                                                  "left": _el("sideL"),
+                                                  "left-back": _el("spineBack")})
     if title_asset_image is not None:
         reports = {}
         disc, reports["disc"] = TC.place_title_asset(disc, title_asset_image, TC.resolve_title_placement("disc", SP), SP.title_protected_rects_mm("disc"), dpi)
@@ -417,7 +488,8 @@ def build_preview(data):
     try:
         disc, fold, strip = build_parts(cover, album, artist, D, tracks, company,
                                         ai if any(ai.values()) else None, preview_dpi,
-                                        inner_copy, barcode_code, copyright_text, release_year, str(data.get("backLayout") or "auto"), copy_settings)
+                                        inner_copy, barcode_code, copyright_text, release_year, str(data.get("backLayout") or "auto"), copy_settings,
+                                        ai_elements=_ai_elements(data))
     finally:
         TYPO.reset_font_overrides(font_token)
     for name, image in (("disc.png", disc), ("cover.png", fold), ("strip.png", strip)):
@@ -463,6 +535,7 @@ def build_job(data):
         "sideL": _load_ai(data.get("aiSideL")),
         "spineBack": _load_ai(data.get("aiSpine")),
     }
+    els = _ai_elements(data)
     title_state = _title_state(data, D, album, artist, cover)
     has_ai = any(ai.values())
 
@@ -478,7 +551,8 @@ def build_job(data):
     try:
         disc, fold, strip = build_parts(cover, album, artist, D, tracks, company,
                                         ai if has_ai else None, DPI,
-                                        inner_copy, barcode_code, copyright_text, release_year, str(data.get("backLayout") or "auto"), copy_settings)
+                                        inner_copy, barcode_code, copyright_text, release_year, str(data.get("backLayout") or "auto"), copy_settings,
+                                        ai_elements=_ai_elements(data))
     finally:
         TYPO.reset_font_overrides(font_token)
     disc.save(str(d / "part-disc.png"))
@@ -550,6 +624,8 @@ def build_job(data):
         "mood": D["mood"], "style": D["style"],
         "main": list(D["main"]), "hasAi": has_ai or use_local_ai,
         "localAi": use_local_ai,
+        # 每个部件保留了哪些文字层（用户逐项勾选的结果），回看/复刻时要用
+        "aiElements": els,
         # 项目库回看要用的「原始输入」：没有 pic 就只能看出件图、不能重跑
         "pic": str(pic), "safeBands": str(data.get("safeBands") or ""),
         "created": time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -783,6 +859,9 @@ def build_batch(data):
             company, release_year, _release_date = _release_metadata(
                 alb, artist, album, str(alb.get("company") or company_all))
             tracks = _norm_tracks(alb.get("tracks"))
+            if not tracks:
+                # 专辑墙的批量只给了 id：按 id 取这张专辑自己的曲目。
+                tracks = _album_tracks_by_id(alb.get("id"))
             cover = _fetch_cover(alb.get("pic"))
             if cover is None:
                 raise ValueError("封面拉取失败")
@@ -800,7 +879,8 @@ def build_batch(data):
             has_ai = any(ai.values())
             disc, fold, strip = build_parts(cover, album, artist, D, tracks,
                                             company, ai if has_ai else None, DPI,
-                                            release_year=release_year)
+                                            release_year=release_year,
+                                            ai_elements=_ai_elements(alb))
 
             tag = "%02d" % i
             fn = {"disc": tag + "-disc.png", "cover": tag + "-cover.png",
