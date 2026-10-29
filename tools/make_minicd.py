@@ -225,7 +225,8 @@ def make_back_strip(back_im, tray_im, w_px, h_px, cover_im, album, artist,
     像一张真实印刷展开图，而不是几块拼贴。
 
     side_right_im / side_left_im / side_back_im：右侧封 / 左侧封 / 左侧封背面
-    的用户上传图 —— 原样裁到段尺寸使用，不走边缘延展、不叠程序文字。
+    的用户上传图 —— 裁到段尺寸当底图，画面不走边缘延展；但侧封文字层
+    照常叠加（2026-10-29 约定：上传件也要能自定义文字/字体，走侧封工具栏）。
     """
     p = [mm(s, _dpi[0]) for s in BACK_SEGS]
     total = sum(p)
@@ -256,25 +257,26 @@ def make_back_strip(back_im, tray_im, w_px, h_px, cover_im, album, artist,
     # --- 三条窄封：画面都从相邻面板延展，文字职责各不相同 ---
     # 右侧封 = 外侧识别（标题＋歌手）；左侧封 = 封底与内盘底间的纯画面收边；
     # 左侧封背面 = 面向盒内的标题/短文案。这样不会出现三根一模一样的竖排文字。
-    # 上传过实拍图的段：原样使用（裁到段尺寸），不延展、不叠字。
+    # 上传过实拍图的段：裁到段尺寸当底图（不延展），文字层照常叠加——
+    # 用户可以在侧封工具栏里改文字/字体/字号/颜色（2026-10-29 约定）。
     if side_right_im is not None:
         right_spine = cover_crop(side_right_im, p[0], h_px)
     else:
         right_spine = _edge_stretch(b, p[0], h_px)
-        if use_dp:
-            right_spine = DP.spine_overlay(right_spine, "right", album, artist, company, copy_settings)
+    if use_dp:
+        right_spine = DP.spine_overlay(right_spine, "right", album, artist, company, copy_settings)
     if side_left_im is not None:
         left_spine = cover_crop(side_left_im, p[2], h_px)
     else:
         left_spine = _edge_stretch(t, p[2], h_px)
-        if use_dp:
-            left_spine = DP.spine_overlay(left_spine, "left", album, artist, company, copy_settings)
+    if use_dp:
+        left_spine = DP.spine_overlay(left_spine, "left", album, artist, company, copy_settings)
     if side_back_im is not None:
         left_spine_back = cover_crop(side_back_im, p[3], h_px)
     else:
         left_spine_back = _edge_stretch(t, p[3], h_px)
-        if use_dp:
-            left_spine_back = DP.spine_overlay(left_spine_back, "left-back", album, artist, company, copy_settings)
+    if use_dp:
+        left_spine_back = DP.spine_overlay(left_spine_back, "left-back", album, artist, company, copy_settings)
     out.paste(right_spine, (0, 0))
     out.paste(left_spine, (p[0] + p[1], 0))
     out.paste(left_spine_back, (p[0] + p[1] + p[2], 0))

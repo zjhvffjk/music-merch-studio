@@ -1137,8 +1137,7 @@ function renderDownloads(){
     {ic:'A4',t:'A4 竖版拼版 · 7套/页',s:'2480 × 3508 px（封面折件+封底条 · 无盘面）· 推荐',u:LAST.printUrl},
     {ic:'PDF',t:'竖版拼版 PDF',s:'与 PNG 同源，可直接送打印',u:LAST.printPdfUrl},
     {ic:'A4',t:'A4 横版拼版（备用）',s:'297×210mm · 3列带盘面',u:LAST.printLandscapeUrl||''},
-    {ic:'A4',t:'盘面拼版',s:'A4 竖版 · 独立盘面',u:LAST.discPageUrl||''},
-    {ic:'PDF',t:'盘面拼版 PDF',s:'与盘面拼版 PNG 同源',u:LAST.discPagePdfUrl||''},
+    /* 盘面拼版页不进导出清单：用户 2026-10-28 拍板不要，2026-10-29 上游误加回后再删 */
   ];
   (LAST.splitFiles||[]).forEach((sf,i)=>{
     rows.push({ic:'PNG',t:'素材·'+sf.name,s:'与素材库命名一致 · 300DPI',u:sf.url});

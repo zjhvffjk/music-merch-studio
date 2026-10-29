@@ -242,7 +242,8 @@ def build_parts(cover, album, artist, D, tracks, company, ai=None, dpi=DPI,
     """出 ①②③ 三件（override-aware）。返回 (disc, fold, strip)。
     ai 可覆盖：disc 盘面 / cover 封面 / fold 封面背面 / backArt 封底 /
     trayArt 内盘底 / sideR 右侧封 / sideL 左侧封 / spineBack 左侧封背面；
-    strip（整条封底条展开图）仍兼容旧前端。上传件一律原样使用不加程序字。
+    strip（整条封底条展开图）仍兼容旧前端。上传件当底图，三条窄封的
+    侧封文字层照常叠加（文字/字体可在侧封工具栏自定义）。
     """
     MC._dpi[0] = dpi  # make_back_strip 用模块级 _dpi
 
@@ -568,7 +569,7 @@ def build_job(data):
     zip_path = OUT_DIR / ("%s.zip" % jid)
     _zip_members = ("★版面总览-1比1.png", "打印拼版-A4.png", "打印拼版-A4.pdf",
                     "打印拼版-A4竖版7套.png", "打印拼版-A4竖版7套.pdf",
-                    "盘面拼版-A4.png", "盘面拼版-A4.pdf",
+                    # 盘面拼版不打包：用户拍板不要（文件仍在任务目录，作品库可回看）
                     "封面.png", "封面背面.png", "右侧封.png", "左侧封.png",
                     "左侧封背面.png", "封底.png", "内盘底.png", "盘面.png")
     with zipfile.ZipFile(str(zip_path), "w", zipfile.ZIP_DEFLATED) as z:
