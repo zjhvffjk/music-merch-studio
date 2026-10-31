@@ -42,6 +42,7 @@ import os
 import re
 import shutil
 import sys
+import threading
 import time
 import uuid
 import zipfile
@@ -60,8 +61,31 @@ OUT_DIR = Path(ROOT) / "outputs" / "迷你CD设计"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 # 设计页的即时预览不属于正式作品，也不产出打印件。只保留短时的小图缓存，
 # 让用户在按下「生成三件套」前就能确认三个实物部件的结构与取景。
+#
+# ⚠️ 这里刻意用「固定小池 + 循环覆盖」而不是「每次预览新建目录、事后删除」：
+#    2026-10-31 连着两次「实时预览失败：Failed to fetch」，根因都一样 ——
+#    预览请求里顺手做旧目录清理（rmtree），而外部安全策略拦下了删除动作，
+#    处理线程直接中断，整个请求没有响应。清缓存只是收拾临时文件，
+#    绝不该有能力把预览本身搞死。现在预览只写不删，目录数恒定有上限。
 PREVIEW_DIR = OUT_DIR / "_preview_cache"
 PREVIEW_DIR.mkdir(parents=True, exist_ok=True)
+PREVIEW_SLOT_COUNT = 24
+_preview_slot_seq = 0
+_preview_slot_lock = threading.Lock()
+_clean_disabled = False
+_SLOT_TOKEN = re.compile(r"^p-s(\d{2})-[0-9a-f]{8,}$")
+
+
+def _preview_slot():
+    """取下一个预览槽位目录（循环复用，永远只有 PREVIEW_SLOT_COUNT 个）。"""
+    global _preview_slot_seq
+    with _preview_slot_lock:
+        _preview_slot_seq = (_preview_slot_seq + 1) % PREVIEW_SLOT_COUNT
+        idx = _preview_slot_seq
+    name = "s-%02d" % idx
+    dest = PREVIEW_DIR / name
+    dest.mkdir(parents=True, exist_ok=True)
+    return dest, name
 
 try:
     import noproxy  # noqa: F401  绕过本机代理（server 已 import；这里兜底）
@@ -490,33 +514,50 @@ def _load_ai(path):
         return None
 
 
-def _clean_preview_cache(max_age=60 * 60, limit=8):
-    """清理一小时前的临时预览；正式任务永远不放在这个目录。
+def _clean_preview_cache(max_age=60 * 60, limit=24):
+    """回收历史遗留的一次性预览目录（老格式 p-xxxxxxxx）。
 
-    ⚠️ 一次最多删 limit 个，超出留到下一次预览再删：rmtree 是外部安全策略会
-    盯的操作，一次性删几十个会被拦下来，处理线程卡在里面 → 预览请求全部超时
-    （2026-10-31 事故：缓存堆到 99 个 / 113MB，页面只剩「实时预览失败」）。
-    这里宁可多跑几轮慢慢清，也绝不让清理拖垮预览本身。
+    只清新版出现之前留下来的一次性目录；新的预览槽位 s-NN 是循环复用的，不参与删除。
+    在 daemon 线程里跑一次就够了 —— 就算外部安全策略把删除拦下，也顶多是没清掉，
+    不可能把预览请求拖垮。这里的 try 覆盖 BaseException（含 SystemExit），
+    任何岔子都只是「这次没清成」。
     """
+    global _clean_disabled
+    if _clean_disabled:
+        return
     try:
         if not PREVIEW_DIR.is_dir():
             return
-        items = sorted(PREVIEW_DIR.iterdir(), key=lambda p: p.stat().st_mtime)
-    except OSError:
+        items = [p for p in PREVIEW_DIR.iterdir()
+                 if p.is_dir() and not p.name.startswith("s-")]
+    except Exception:
         return
-    # 目录数过多时放宽年龄，先把最老的一批清掉，避免无限堆积。
-    age = 600 if len(items) > 40 else max_age
-    cutoff = time.time() - age
+    if not items:
+        return
+    cutoff = time.time() - max_age
     removed = 0
-    for item in items:
-        if removed >= limit:
-            break
-        try:
-            if item.is_dir() and item.stat().st_mtime < cutoff:
-                shutil.rmtree(item, ignore_errors=True)
-                removed += 1
-        except Exception:
-            continue
+    try:
+        for item in sorted(items, key=lambda p: p.stat().st_mtime):
+            if removed >= limit:
+                break
+            try:
+                if item.stat().st_mtime < cutoff:
+                    shutil.rmtree(item, ignore_errors=True)
+                    removed += 1
+            except Exception:
+                continue
+    except BaseException:
+        # 清理遇到非预期中断（例如外部策略直接中止操作）时，只停手，绝不往上抛。
+        _clean_disabled = True
+
+
+def _start_preview_cache_prune():
+    """服务启动时在后台尝试回收一次历史目录。失败不影响任何请求。"""
+    try:
+        threading.Thread(target=_clean_preview_cache, name="preview-prune",
+                         daemon=True).start()
+    except Exception:
+        pass
 
 
 def _title_state(data, design, album, artist, cover=None):
@@ -567,9 +608,8 @@ def build_preview(data):
         preview_dpi = max(PREVIEW_DPI, min(DPI, int(requested_dpi)))
     except (TypeError, ValueError):
         preview_dpi = PREVIEW_DPI
-    token = "p-" + uuid.uuid4().hex[:16]
-    dest = PREVIEW_DIR / token
-    dest.mkdir(parents=True, exist_ok=True)
+    dest, slot = _preview_slot()  # slot 形如 "s-07"
+    token = "p-%s-%s" % (slot.replace("-", ""), uuid.uuid4().hex[:12])  # → p-s07-xxxxxxxxxxxx
     font_token = TYPO.set_font_overrides(copy_settings.get("typography"))
     try:
         disc, fold, strip = build_parts(cover, album, artist, D, tracks, company,
@@ -580,7 +620,7 @@ def build_preview(data):
         TYPO.reset_font_overrides(font_token)
     for name, image in (("disc.png", disc), ("cover.png", fold), ("strip.png", strip)):
         image.save(str(dest / name), optimize=True)
-    _clean_preview_cache()
+    # 注意：这里不再做任何清理 —— 清理出岔子会把整个预览请求拖没（2026-10-31 两次事故）。
     return {"ok": True, "token": token, "copySettings": copy_settings, "titleTypography": title_state,
             "parts": {name: "/api/design/preview-file?token=%s&name=%s" % (token, name)
                       for name in ("disc.png", "cover.png", "strip.png")}}
@@ -1352,7 +1392,13 @@ def _serve_preview_file(handler, token, name):
     name = (name or "").strip()
     if name not in {"disc.png", "cover.png", "strip.png"}:
         return handler._json({"error": "bad preview file"}, 400)
-    base = (PREVIEW_DIR / token).resolve()
+    # token 形如 p-s07-xxxxxxxxxxxx：槽位目录循环复用，按槽位号取用地；
+    # 旧的一次性目录（p-xxxxxxxx）仍按原路径兼容读取。
+    slot = _SLOT_TOKEN.match(token) if isinstance(token, str) else None
+    if slot:
+        base = (PREVIEW_DIR / ("s-%s" % slot.group(1))).resolve()
+    else:
+        base = (PREVIEW_DIR / token).resolve()
     fp = (base / name).resolve()
     if not fp.is_file() or fp.parent != base:
         return handler._json({"error": "preview expired"}, 404)
@@ -1481,3 +1527,6 @@ class DesignService:
 
 
 SERVICE = DesignService()
+
+# 服务启动时回收一次历史遗留的一次性预览目录（后台线程，失败不影响任何请求）。
+_start_preview_cache_prune()

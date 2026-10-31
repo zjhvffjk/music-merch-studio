@@ -289,7 +289,7 @@ body.embed .proj .t small{display:none}   /* 外层已有专辑名，这里不�
 .top .brand,.top .mods,.top .back{margin-top:7px;margin-bottom:5px}.top .back{margin-left:auto}
 .top .sp{display:none}
 .editorRibbon{order:3;flex:0 0 100%;width:100%;min-width:0;height:84px;display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:28px 56px;align-items:stretch;overflow:hidden;border:0;border-radius:0;background:transparent}
-.editorRibbon:has(.ribbonPanel[data-ribbon-panel="font"].on),.editorRibbon:has(.ribbonPanel[data-ribbon-panel="layout"].on){height:auto;min-height:106px;grid-template-rows:28px minmax(78px,auto);overflow:visible}
+.editorRibbon:has(.ribbonPanel[data-ribbon-panel="layout"].on){height:auto;min-height:106px;grid-template-rows:28px minmax(78px,auto);overflow:visible}
 .ribbonTabs{display:flex;flex-direction:row;align-items:center;gap:2px;padding:3px 2px;background:transparent;border-bottom:1px solid var(--line)}
 .ribbonTabs button{align-self:stretch;border:0;border-radius:5px;background:transparent;color:var(--muted);font:600 12px inherit;padding:3px 13px;white-space:nowrap;cursor:pointer}
 .ribbonTabs button:hover{background:#f1f5f1;color:var(--brand)}.ribbonTabs button.on{background:#eaf4ec;color:var(--brand)}
@@ -305,11 +305,21 @@ body.embed .proj .t small{display:none}   /* 外层已有专辑名，这里不�
 .partScaleBtn:hover{border-color:var(--brand);color:var(--brand)}
 .partScaleBtn.reset{font-size:11px;min-width:auto;padding:0 9px;font-weight:400}
 .partScaleVal{min-width:48px;text-align:center;font:700 11.5px inherit;color:var(--muted);font-variant-numeric:tabular-nums}
+/* 「文字」页签现在上下两行：上行是「选中那一面 + 字号 + 颜色」，下行是整套字体角色。
+   原来字体单独一个页签，改字号要跳页，干脆并到一处。 */
+.editorRibbon:has(.ribbonPanel[data-ribbon-panel="side"].on){height:auto;min-height:112px;grid-template-rows:28px minmax(84px,auto);overflow:visible}
+.ribbonPanel[data-ribbon-panel="side"].on{flex-wrap:wrap;align-items:stretch;overflow:visible;padding:8px 10px;gap:0;width:100%}
+.ribbonPanel[data-ribbon-panel="side"]>*{border-right:0!important}
+.ribbonPanel[data-ribbon-panel="side"] #spineEditorDock{width:100%;padding:0 0 8px;margin-bottom:8px;border-bottom:1px solid var(--line);border-right:0}
+.ribbonPanel[data-ribbon-panel="side"] #fontDock{width:100%;padding-top:0}
+.ribbonPanel[data-ribbon-panel="side"] #fontDock>b>small{font-weight:400;letter-spacing:0;text-transform:none;color:var(--muted)}
+.ribbonPanel[data-ribbon-panel="side"] #fontDock .fieldGrid{grid-template-columns:repeat(auto-fit,minmax(112px,1fr));gap:6px}
+.ribbonPanel[data-ribbon-panel="side"] #fontDock .fontSelect{min-height:32px}
 /* 数据确认卡片固定在主栏（曾试过收进工具栏弹层，因入口不可见已废弃）；
    「资料」按钮只负责滚动定位到这张卡片，不再搬运 DOM。 */
 @keyframes flashCard{0%,100%{box-shadow:none}18%,62%{box-shadow:0 0 0 3px rgba(200,16,46,.30)}}
 .flashCard{animation:flashCard 1.4s ease-out}
-.ribbonPanel{display:none;align-items:center;gap:0;min-width:0;padding:5px 12px;overflow-x:auto;overflow-y:hidden;background:transparent}.ribbonPanel.on{display:flex}.editorRibbon:has(.ribbonPanel[data-ribbon-panel="font"].on) .ribbonPanel,.editorRibbon:has(.ribbonPanel[data-ribbon-panel="layout"].on) .ribbonPanel{overflow-y:visible}
+.ribbonPanel{display:none;align-items:center;gap:0;min-width:0;padding:5px 12px;overflow-x:auto;overflow-y:hidden;background:transparent}.ribbonPanel.on{display:flex}.editorRibbon:has(.ribbonPanel[data-ribbon-panel="layout"].on) .ribbonPanel{overflow-y:visible}
 .ribbonPanel::-webkit-scrollbar{height:4px}.ribbonPanel::-webkit-scrollbar-thumb{background:#d6ddd6;border-radius:4px}
 .editorRibbon .ribbonDock,.editorRibbon #spineEditorDock{align-self:stretch;flex:none;min-width:0;margin:0;padding:0 10px;border:0;border-right:1px solid #e2e6e1;background:transparent}
 .editorRibbon .ribbonDock:last-child{border-right:0}.editorRibbon #backLayoutDock{width:280px}.editorRibbon #spineTemplateDock{width:340px}.editorRibbon #fontDock{width:min(100%,1000px)}.editorRibbon #fontDock .fieldGrid{grid-template-columns:repeat(8,minmax(0,1fr));gap:4px}.editorRibbon #spineEditorDock{width:max-content;display:flex;align-items:center;gap:7px;border-right:0}
@@ -336,10 +346,9 @@ body.embed .proj .t small{display:none}   /* 外层已有专辑名，这里不�
     <button data-mod="export">导出</button>
   </nav>
   <div class="editorRibbon" id="editorRibbon" aria-label="设计工具栏">
-    <div class="ribbonTabs" role="tablist"><button type="button" class="on" data-ribbon-tab="side">文字</button><button type="button" data-ribbon-tab="layout">排版</button><button type="button" data-ribbon-tab="font">字体</button><button type="button" data-ribbon-tab="object">对象</button><button type="button" data-ribbon-tab="view">预览</button><button type="button" id="btnProjectDataTab">资料</button><button type="button" id="btnStructureTab">结构</button><button type="button" id="btnRecentTab">最近</button></div>
+    <div class="ribbonTabs" role="tablist"><button type="button" class="on" data-ribbon-tab="side">文字</button><button type="button" data-ribbon-tab="layout">排版</button><button type="button" data-ribbon-tab="object">对象</button><button type="button" data-ribbon-tab="view">预览</button><button type="button" id="btnProjectDataTab">资料</button><button type="button" id="btnStructureTab">结构</button><button type="button" id="btnRecentTab">最近</button></div>
     <div class="ribbonPanel" data-ribbon-panel="object"><div class="ribbonDock ribbonObjects"><b>编辑对象</b><div class="ribbonObjectButtons"><button type="button" data-canvas-part="disc">① 盘面</button><button type="button" data-canvas-part="booklet">② 封面</button><button type="button" data-canvas-part="sleeve">③ 封底条</button></div></div></div>
     <div class="ribbonPanel" data-ribbon-panel="layout"></div>
-    <div class="ribbonPanel" data-ribbon-panel="font"></div>
     <div class="ribbonPanel on" data-ribbon-panel="side"></div>
     <div class="ribbonPanel" data-ribbon-panel="view"><div class="ribbonDock ribbonView"><b>预览</b><button id="btnRibbonZoom" type="button">放大画布</button><label><input type="checkbox" id="cbRibbonGuides" checked> 辅助线</label></div></div>
   </div>
@@ -399,7 +408,7 @@ body.embed .proj .t small{display:none}   /* 外层已有专辑名，这里不�
             <div class="advancedBody">
             <div class="templateFieldTitle">固定模板内容 <span>这些字段会实时套入对应部件</span></div>
             <label class="field">内页文案（出现在 ② 左页）<textarea id="innerCopy" rows="2" maxlength="80" placeholder="例如：把平凡的日子，过成喜欢的样子。"></textarea></label>
-            <div class="ribbonDock" id="fontDock"><span class="srOnly">字体设置</span>
+            <div class="ribbonDock" id="fontDock"><b>字体 <small>（按用途分角色，中文内容不会误套纯英文字体）</small></b>
             <div class="fieldGrid">
               <div class="fontRole"><label>专辑标题</label><input id="fontDisplay" type="hidden" value="auto"><button class="fontSelect" type="button" data-font-for="fontDisplay"><span class="sample">自动</span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3 6 5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button></div>
               <div class="fontRole"><label>歌手名字</label><input id="fontArtist" type="hidden" value="auto"><button class="fontSelect" type="button" data-font-for="fontArtist"><span class="sample">自动</span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3 6 5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button></div>
@@ -411,7 +420,7 @@ body.embed .proj .t small{display:none}   /* 外层已有专辑名，这里不�
               <div class="fontRole"><label>左侧封背面</label><input id="fontSpineLeftBack" type="hidden" value="auto"><button class="fontSelect" type="button" data-font-for="fontSpineLeftBack"><span class="sample">默认侧封字体</span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3 6 5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button></div>
             </div>
             <div id="fontPicker" class="fontPicker" hidden><div class="fontPickerHead"><input id="fontSearch" placeholder="搜索字体名称"><span id="fontPickerCount" class="fontPickerCount"></span><button id="fontPickerClose" class="fontPickerClose" type="button" aria-label="关闭字体库">×</button></div><div id="fontPickerFilters" class="fontPickerFilters"></div><div id="fontPickerList" class="fontPickerList"></div></div>
-            <small class="muted">中文内容不会错误套用只支持英文的字体；曲目、时长、版权仍保持清晰可读。</small></div>
+            <small class="muted">中文内容不会错误套用只支持英文的字体；曲目、时长、版权仍保持清晰可读。</small></div></div>
             <div id="spineEditorDock">
             <div class="ribbonTextTargets">
             <div class="spineEditorTabs" id="spineEditorTabs"><button type="button" class="spineEditorTab on" data-spine-editor="right">右侧封</button><button type="button" class="spineEditorTab" data-spine-editor="left">左侧封</button><button type="button" class="spineEditorTab" data-spine-editor="leftBack">左侧封背面</button></div>
@@ -619,7 +628,8 @@ const SPINE_INPUT={right:'spineTextRight',left:'spineTextLeft',leftBack:'spineTe
 const SPINE_FONT_INPUT={right:'fontSpineRight',left:'fontSpineLeft',leftBack:'fontSpineLeftBack'};
 const SPINE_MM_X={right:0,left:53.4,leftBack:57.8};
 const SPINE_NAME={right:'右侧封',left:'左侧封',leftBack:'左侧封背面'};
-function dockSpineEditor(){const tabs={backLayoutDock:'layout',fontDock:'font',spineEditorDock:'side'};Object.entries(tabs).forEach(([id,tab])=>{const dock=$('#'+id),slot=document.querySelector('[data-ribbon-panel="'+tab+'"]');if(dock&&slot&&dock.parentElement!==slot)slot.append(dock);});const editor=$('#spineEditorDock'),template=$('#spineTemplateDock');if(editor&&template&&template.parentElement!==editor)editor.insertBefore(template,editor.querySelector('.spineToolbar'));}
+function dockSpineEditor(){/* 「字体」不再单独占一个页签，整块并入「文字」页签，跟字号/颜色挨在一起。 */
+const tabs={backLayoutDock:'layout',spineEditorDock:'side',fontDock:'side'};Object.entries(tabs).forEach(([id,tab])=>{const dock=$('#'+id),slot=document.querySelector('[data-ribbon-panel="'+tab+'"]');if(dock&&slot&&dock.parentElement!==slot)slot.append(dock);});const editor=$('#spineEditorDock'),template=$('#spineTemplateDock');if(editor&&template&&template.parentElement!==editor)editor.insertBefore(template,editor.querySelector('.spineToolbar'));}
 /* 「这一面文字长什么样」的状态。控件不在这里 —— 统一摆在顶部工具条的
    「文字」页签（2026-10-31：放在上传槽位里的折叠面板中太难找，用户找不到）。
    ⚠️ 必须在脚本初始化调用 syncTextTarget() 之前声明：const 有 TDZ，
