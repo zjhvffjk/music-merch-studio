@@ -1175,6 +1175,25 @@ def el_on(elements, key, default=True):
     return bool(elements.get(key, default))
 
 
+def _cover_fit(im, w, h):
+    """等比放大到盖住 (w,h) 后居中裁 —— **不改变原图内部比例**。
+
+    用户上传的实拍照片大多是 4:3 / 3:2，版面却是 49:38（约 1.29）。
+    safe_crop 的窗口算式是按「源图接近正方形」推的（封面正好都是 1:1），
+    套到相机照片上会把画面纵向拉长；这里先把上传图规整成版面尺寸，
+    后面 resolve_substrate 就不再二次裁切（尺寸已相等），画面保持原样。
+    """
+    im = im.convert("RGB")
+    sw, sh = im.size
+    if (sw, sh) == (int(w), int(h)):
+        return im
+    scale = max(int(w) / float(sw), int(h) / float(sh))
+    nw, nh = max(int(w), int(round(sw * scale))), max(int(h), int(round(sh * scale)))
+    im = im.resize((nw, nh), Image.LANCZOS)
+    l, t = (nw - int(w)) // 2, (nh - int(h)) // 2
+    return im.crop((l, t, l + int(w), t + int(h)))
+
+
 def resolve_substrate(base_image, cover, w, h, D, crop, grade_kw, scrim_kw,
                       elements=None, key="scrim", upload_scrim_kw=None):
     """决定一幅印刷面的“纸”从哪来。
@@ -1616,6 +1635,10 @@ def design_tray2(cover, w, h, D, album="", artist="", company="", copy_settings=
     （用户自己的图底部往往就是盘托照片，再压一条会糊掉），其余文字照常。
     """
     uploaded = base_image is not None
+    if uploaded:
+        # 上传图先按原比例规整到版面（只吃掉长边多余的一点点），让取消「底部照片条」
+        # 之后看到的就是自己那张图的本来样子：比例、构图位置都不变。
+        base_image = _cover_fit(base_image, int(w), int(h))
     g = _key_grade(D)
     key = D.get("main", (120, 120, 120))
     tint = tuple(int(c * 0.20 + 196) for c in key)      # 由封面主色调出的浅纸色
