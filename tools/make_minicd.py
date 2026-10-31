@@ -217,8 +217,7 @@ def _solid_block(cover_im, w_px, h_px, album, artist):
 def make_back_strip(back_im, tray_im, w_px, h_px, cover_im, album, artist,
                     D=None, tracks=None, seed=0, company="", inner_copy="",
                     barcode_code="", copyright_text="", release_year="", back_layout="auto", copy_settings=None,
-                    side_right_im=None, side_left_im=None, side_back_im=None, side_elements=None,
-                    part_ink=None, part_scale=None):
+                    side_right_im=None, side_left_im=None, side_back_im=None, side_elements=None):
     """[右侧封][封底][左侧封][背脊][内盘底] 一条连续展开图。
 
     封底与内盘底缺件时走**封面衍生设计**（design_back / design_tray）；
@@ -234,11 +233,6 @@ def make_back_strip(back_im, tray_im, w_px, h_px, cover_im, album, artist,
     或只留标题/歌手（2026-10-30）。
     """
     side_elements = side_elements if isinstance(side_elements, dict) else {}
-    # part_ink：{"back": "#ffffff", "tray": "#ffffff"} 之类用户手选墨色。
-    # 没选的段为 None，下面 design_*2 收到 None 就继续按画面深浅自动选墨。
-    part_ink = part_ink if isinstance(part_ink, dict) else {}
-    # part_scale：{"back": 1.15, "tray": 0.9} 之类用户手选字号倍率。
-    part_scale = part_scale if isinstance(part_scale, dict) else {}
     el_right = side_elements.get("right")
     el_left = side_elements.get("left")
     el_back = side_elements.get("left-back")
@@ -254,8 +248,7 @@ def make_back_strip(back_im, tray_im, w_px, h_px, cover_im, album, artist,
         b = DP.design_back2(cover_im, p[1], h_px, D, album, artist, tracks,
                             seed, quote=inner_copy or None, company=company,
                             barcode_code=barcode_code, copyright_text=copyright_text,
-                            release_year=release_year, back_layout=back_layout, copy_settings=copy_settings,
-                            ink_override=part_ink.get("back"), text_scale=part_scale.get("back"))
+                            release_year=release_year, back_layout=back_layout, copy_settings=copy_settings)
     else:
         b = _solid_block(cover_im, p[1], h_px, album, artist)
     out.paste(b, (p[0], 0))
@@ -264,8 +257,7 @@ def make_back_strip(back_im, tray_im, w_px, h_px, cover_im, album, artist,
     if tray_im is not None:
         t = cover_crop(tray_im, p[4], h_px)
     elif use_dp:
-        t = DP.design_tray2(cover_im, p[4], h_px, D, album, artist, company, copy_settings=copy_settings,
-                            ink_override=part_ink.get("tray"), text_scale=part_scale.get("tray"))
+        t = DP.design_tray2(cover_im, p[4], h_px, D, album, artist, company, copy_settings=copy_settings)
     else:
         t = _solid_block(cover_im, p[4], h_px, album, artist)
     out.paste(t, (p[0] + p[1] + p[2] + p[3], 0))

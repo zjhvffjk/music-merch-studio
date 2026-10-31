@@ -1,11 +1,7 @@
 """Mini CD 文案与字体设置：只决定方向与真实字体记录，不生成 Artwork 文字。"""
 from __future__ import annotations
 
-import re
-
 ROLES = ("display", "artist", "chineseCopy", "englishCopy", "metadata", "spine")
-# 可让用户手选「这一面文字用什么颜色」的印刷面（侧封另走 spineAppearance）。
-PART_TEXT_COLOR_PARTS = ("disc", "fold", "back", "tray")
 # 三条物理侧封尺寸完全相同，因此共用一套模板库；位置只决定它贴在哪一条边。
 SPINE_TEMPLATE_DEFAULTS = {"right": "title-artist-classic", "left": "title-artist-classic", "leftBack": "title-artist-classic"}
 COMMON_SPINE_TEMPLATE_OPTIONS = {"title-artist-classic"}
@@ -37,38 +33,6 @@ def _spine_appearance(raw):
         color = "auto"
     return {"font": font, "sizeMm": size_mm, "titleSizeMm": title_size_mm,
             "artistSizeMm": artist_size_mm, "style": style, "color": color}
-
-
-def _part_text_color(raw):
-    """每个出版面的「用户手选文字颜色」：{"disc": "#ffffff", ...}。
-
-    只允许 auto 或 #rrggbb，其它一律回落 auto（不让脏值渗进渲染层）。
-    """
-    raw = raw if isinstance(raw, dict) else {}
-    out = {}
-    for part in PART_TEXT_COLOR_PARTS:
-        value = str(raw.get(part) or "auto").lower()
-        if value != "auto" and not re.fullmatch(r"#[0-9a-f]{6}", value):
-            value = "auto"
-        out[part] = value
-    return out
-
-
-def _part_text_scale(raw):
-    """每个出版面的「字号倍率」：{"disc": 1.15, ...}。
-
-    只允许 0.6–1.8 之间的数字，其它一律回落到 1.0（原始版式），
-    免得一个脏值把某个出版面的字放大到糊成一团。
-    """
-    raw = raw if isinstance(raw, dict) else {}
-    out = {}
-    for part in PART_TEXT_COLOR_PARTS:
-        try:
-            value = float(raw.get(part) or 1.0)
-        except (TypeError, ValueError):
-            value = 1.0
-        out[part] = max(0.6, min(1.8, round(value, 2)))
-    return out
 
 
 def _spine_character_styles(raw):
@@ -114,8 +78,6 @@ def normalize_copy_settings(raw):
                           for key in SPINE_TEMPLATE_DEFAULTS},
             "spineAppearance": {key: _spine_appearance(spine_appearance_raw.get(key))
                                for key in SPINE_TEMPLATE_DEFAULTS},
-            "partTextColor": _part_text_color(raw.get("partTextColor")),
-            "partTextScale": _part_text_scale(raw.get("partTextScale")),
             "spineCharacterStyles": _spine_character_styles(spine_character_styles_raw),
             "typography": {k: str(typo.get(k) or "auto") for k in ROLES}}
 

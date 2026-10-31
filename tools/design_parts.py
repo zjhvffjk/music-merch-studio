@@ -17,7 +17,6 @@ import math
 import os
 import re
 import time
-from contextlib import contextmanager
 
 import numpy as np
 from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageChops
@@ -142,7 +141,7 @@ def grain(im, amt=10, seed=0):
 
 def fit_font(d, text, box_w, start, bold=False, min_s=8):
     """在给定宽度内自动缩字号（先降号，再省略）。"""
-    s = _scaled_size(start)
+    s = start
     while s > min_s:
         f = _font(s, bold)
         if d.textlength(text, font=f) <= box_w:
@@ -479,44 +478,8 @@ try:
 except Exception:  # pragma: no cover
     _typo = None
 
-# 部件级字号倍率的运行栈（单线程同步渲染，用一个列表当栈足够）。
-# 见 part_text_scale()：倍率为 1 时不入栈，所有字号算式原样不动。
-_TS = [1.0]
-
-
-def _scaled_size(size):
-    """按「当前这一出版面」的字号倍率缩放一个字号。
-
-    倍率为 1 时**原值返回**（不 round），保证没开这项设置时成品与改造前逐像素一致。
-    """
-    r = _TS[-1]
-    if r == 1.0:
-        return size
-    return max(1, int(round(size * r)))
-
-
-@contextmanager
-def part_text_scale(ratio):
-    """作用域式的字号倍率：包住某块版面的绘制过程。
-
-    倍率为 1（或空/非法）时不入栈 —— 完全走原路径，不改任何算式。
-    """
-    try:
-        r = float(ratio)
-    except (TypeError, ValueError):
-        r = 1.0
-    if not r or abs(r - 1.0) < 1e-9:
-        yield
-        return
-    _TS.append(r)
-    try:
-        yield
-    finally:
-        _TS.pop()
-
 
 def _t(role, size, text=None):
-    size = _scaled_size(size)
     if _typo is None:
         return _font(size, bold=role in ("heavy", "serif"))
     return _typo.font(role, size, text)
@@ -532,7 +495,7 @@ def tracked(d, xy, text, f, fill, tracking=0.0, anchor_x="left", limit=None):
 def fit_tracked(d, text, box_w, start, role, tracking=0.0, min_s=7):
     if _typo is None:
         return fit_font(d, text, box_w, start)
-    return _typo.fit_tracked(d, text, box_w, _scaled_size(start), role, tracking, min_s)
+    return _typo.fit_tracked(d, text, box_w, start, role, tracking, min_s)
 
 
 def wrap_tracked(d, text, f, box_w, tracking=0.0):
@@ -1212,18 +1175,6 @@ def el_on(elements, key, default=True):
     return bool(elements.get(key, default))
 
 
-def hex_rgb(value):
-    """'#rrggbb' → (r,g,b)；'auto'/空/非法 → None。
-
-    用于「用户手选墨色」的入口：返回 None = 沿用程序自动选墨，
-    保证不加这项设置时成品与改造前**逐像素一致**。
-    """
-    s = str(value or "").strip().lower()
-    if not re.fullmatch(r"#[0-9a-f]{6}", s):
-        return None
-    return tuple(int(s[i:i + 2], 16) for i in (1, 3, 5))
-
-
 def _cover_fit(im, w, h):
     """等比放大到盖住 (w,h) 后居中裁 —— **不改变原图内部比例**。
 
@@ -1267,18 +1218,7 @@ def resolve_substrate(base_image, cover, w, h, D, crop, grade_kw, scrim_kw,
 def design_back2(cover, w, h, D, album="", artist="", tracks=None, seed=0,
                  quote=None, company="", barcode_code="", copyright_text="", release_year="",
                  back_layout="auto", copy_settings=None,
-                 base_image=None, elements=None, ink_override=None, text_scale=None):
-    """封底。text_scale 是「这一面所有程序文字」的字号倍率（1.0=原始版式）。"""
-    with part_text_scale(text_scale):
-        return _design_back2_impl(cover, w, h, D, album, artist, tracks, seed, quote, company,
-                                  barcode_code, copyright_text, release_year, back_layout,
-                                  copy_settings, base_image, elements, ink_override)
-
-
-def _design_back2_impl(cover, w, h, D, album="", artist="", tracks=None, seed=0,
-                       quote=None, company="", barcode_code="", copyright_text="", release_year="",
-                       back_layout="auto", copy_settings=None,
-                       base_image=None, elements=None, ink_override=None):
+                 base_image=None, elements=None):
     """封底（v2）：整幅照片做底 + 左侧压暗信息栏 + 曲目 + 金句 + 版权层 + EAN-13。
 
     版式取实体唱片的通用解法：**照片通铺、信息分区**。硬切左右两半会显得像
@@ -1308,8 +1248,6 @@ def _design_back2_impl(cover, w, h, D, album="", artist="", tracks=None, seed=0,
     # 选择深墨；由统一的 scrim 保证可读性。
     local_luma = lum(tuple(np.asarray(base.convert("RGB").resize((1, 1)))[0, 0]))
     ink = (248, 247, 245) if local_luma < 142 else (28, 29, 31)
-    if ink_override:          # 用户手选墨色优先于自动判深浅
-        ink = ink_override
     pad = max(5, int(w * 0.048))
     sx, sy = w / SP.BACK_PANEL_W, h / SP.BACK_PANEL_H
     px = lambda mm: int(round(mm * sx))
@@ -1523,15 +1461,7 @@ def _angled_tag(im, xy, text, size, color, align="left", width=None, angle=-3.0)
 
 
 def design_disc2(cover, d_px, hole_px, D, album="", artist="", company="", copy_settings=None,
-                 base_image=None, elements=None, ink_override=None, text_scale=None):
-    """盘面。text_scale 是这一面所有程序文字的字号倍率（1.0=原始版式）。"""
-    with part_text_scale(text_scale):
-        return _design_disc2_impl(cover, d_px, hole_px, D, album, artist, company, copy_settings,
-                                  base_image, elements, ink_override)
-
-
-def _design_disc2_impl(cover, d_px, hole_px, D, album="", artist="", company="", copy_settings=None,
-                       base_image=None, elements=None, ink_override=None):
+                 base_image=None, elements=None):
     """盘面（v2）：先做**亮度归一**再去糊 —— v1 最大的毛病就是盘面发灰发闷。
 
     实体盘面的观感 = 主图够亮够透 + 银色聚碳酸酯内环 + 细密勾槽 +
@@ -1584,8 +1514,6 @@ def _design_disc2_impl(cover, d_px, hole_px, D, album="", artist="", company="",
     # 自行上传的盘面深浅不可预判：固定深墨会印成“看不见的字”，
     # 所以上传模式下按盘面主色自动选墨；程序衍生件沿用原固定墨色不变。
     ink = ink_on(palette(out.convert("RGB"), 3)[0]) if base_image is not None else (36, 33, 30)
-    if ink_override:          # 用户手选墨色优先于自动判深浅（同样作用于 CD 标识）
-        ink = ink_override
     # serif -> 专辑标题选择；artist -> 歌手名字体选择；editorial -> 英文文案选择。
     if el_on(elements, "albumTitle") or el_on(elements, "artist"):
         fs, tt = fit_tracked(dtext, album or "", title_w, max(10, int(d_px * 0.095)),
@@ -1629,16 +1557,7 @@ def _design_disc2_impl(cover, d_px, hole_px, D, album="", artist="", company="",
 
 
 def design_inner2(cover, w, h, D, album="", artist="", tracks=None, quote=None,
-                  copy_settings=None, base_image=None, elements=None, ink_override=None,
-                  text_scale=None):
-    """封面背面 / 内页。text_scale 是这一面所有程序文字的字号倍率。"""
-    with part_text_scale(text_scale):
-        return _design_inner2_impl(cover, w, h, D, album, artist, tracks, quote, copy_settings,
-                                   base_image, elements, ink_override)
-
-
-def _design_inner2_impl(cover, w, h, D, album="", artist="", tracks=None, quote=None,
-                        copy_settings=None, base_image=None, elements=None, ink_override=None):
+                  copy_settings=None, base_image=None, elements=None):
     """内页左半（折进盒里的那一面）：整幅写真 + 手写金句 + 落款。
 
     v1 这里是「压暗的封面 + 一坨曲目」，等于把封面又印了一遍；
@@ -1668,12 +1587,6 @@ def _design_inner2_impl(cover, w, h, D, album="", artist="", tracks=None, quote=
         tag_ink = dim
     else:
         ink, dim, tag_ink = (250, 250, 248), (222, 224, 228), (224, 226, 230)
-    if ink_override:
-        # 用户手选墨色：主墨用它，落款/英文的淡墨按画面主色统一派生，
-        # 保持「同一块面上只有一种墨色家族」的规则。
-        ink = ink_override
-        dim = dim_ink(ink, palette(base.convert("RGB"), 3)[0], 0.72)
-        tag_ink = dim
     _primary, _secondary, _short = _copy_text(copy_settings)
     q = _primary or quote or pick_quote(None, D)
     if q:
@@ -1713,15 +1626,7 @@ def _design_inner2_impl(cover, w, h, D, album="", artist="", tracks=None, quote=
 
 
 def design_tray2(cover, w, h, D, album="", artist="", company="", copy_settings=None,
-                 base_image=None, elements=None, ink_override=None, text_scale=None):
-    """内盘底。text_scale 是这一面所有程序文字的字号倍率。"""
-    with part_text_scale(text_scale):
-        return _design_tray2_impl(cover, w, h, D, album, artist, company, copy_settings,
-                                  base_image, elements, ink_override)
-
-
-def _design_tray2_impl(cover, w, h, D, album="", artist="", company="", copy_settings=None,
-                       base_image=None, elements=None, ink_override=None):
+                 base_image=None, elements=None):
     """内盘底（v2）：浅色纸面 + 居中衬线标题 + 底部照片条。
 
     托盘不该跟封面抢戏 —— v1 用深色渐变把整块压成一坨糊，摆进盒里像脏了。
@@ -1744,7 +1649,7 @@ def _design_tray2_impl(cover, w, h, D, album="", artist="", company="", copy_set
         upload_scrim_kw=dict(veil=0.0, top=0.06, bottom=0.04))
     d = ImageDraw.Draw(base)
     sw = palette(base, 3)[0]
-    ink = ink_override or ink_on(sw)      # 手选墨色优先，淡墨始终从同一个墨色派生
+    ink = ink_on(sw)
     dim = dim_ink(ink, sw, 0.62)
 
     # 底部照片条（3:1 裁切，给块留口气）
