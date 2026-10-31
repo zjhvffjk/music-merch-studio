@@ -156,20 +156,6 @@ label.field{display:block;margin:11px 0 0;font-size:12.5px;color:var(--muted)}
 .aiEls .elRow input{margin:0;accent-color:#7d8f6a}
 .aiEls .elRow input:not(:checked)+span{text-decoration:line-through;opacity:.6}
 .aiEls .note{font-size:11px;color:var(--muted);margin:6px 0 0}
-.aiEls .elInk{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);font-size:11.5px;color:var(--muted)}
-.aiEls .elInk>span{font-weight:600;color:var(--ink)}
-.aiEls .inkBtn{border:1px solid var(--line);background:#fff;border-radius:6px;padding:2px 9px;font:600 11.5px inherit;color:var(--muted);cursor:pointer;transition:.14s}
-.aiEls .inkBtn:hover{border-color:var(--brand);color:var(--ink)}
-.aiEls .inkBtn.on{border-color:var(--brand);color:var(--brand);box-shadow:0 0 0 2px rgba(200,16,46,.10)}
-.aiEls .inkPick{width:26px;height:23px;padding:0;border:1px solid var(--line);border-radius:6px;background:#fff;cursor:pointer}
-.aiEls summary .inkTag{display:inline-flex;align-items:center;gap:5px;font-style:normal;font-size:11px;color:var(--brand);font-weight:600}
-.aiEls summary .inkTag b{width:9px;height:9px;border-radius:50%;border:1px solid rgba(20,25,40,.18);background:#fff}
-.aiEls .elScale{display:flex;align-items:center;gap:6px;margin-top:7px;font-size:11.5px;color:var(--muted)}
-.aiEls .elScale>span{font-weight:600;color:var(--ink)}
-.aiEls .scaleBtn{min-width:22px;height:22px;border:1px solid var(--line);background:#fff;border-radius:6px;font:600 12px/1 inherit;color:var(--muted);cursor:pointer}
-.aiEls .scaleBtn:hover{border-color:var(--brand);color:var(--brand)}
-.aiEls .scaleBtn.reset{font-size:11px;min-width:auto;padding:0 8px;font-weight:400}
-.aiEls .scaleVal{min-width:42px;text-align:center;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums}
 .aiEls.off summary b{color:#b4553c}
 
 /* ---------- 实尺寸画布 ---------- */
@@ -307,6 +293,18 @@ body.embed .proj .t small{display:none}   /* 外层已有专辑名，这里不�
 .ribbonTabs{display:flex;flex-direction:row;align-items:center;gap:2px;padding:3px 2px;background:transparent;border-bottom:1px solid var(--line)}
 .ribbonTabs button{align-self:stretch;border:0;border-radius:5px;background:transparent;color:var(--muted);font:600 12px inherit;padding:3px 13px;white-space:nowrap;cursor:pointer}
 .ribbonTabs button:hover{background:#f1f5f1;color:var(--brand)}.ribbonTabs button.on{background:#eaf4ec;color:var(--brand)}
+/* 工具条「文字」页签：左边点选要编辑的那一面，右边的工具条随之切换成它。 */
+.ribbonTextTargets{display:flex;align-items:center;gap:6px;flex:none}
+.partTabs{display:flex;align-items:center;gap:5px;padding-left:8px;border-left:1px solid #e2e6e1}
+.partTabs .grpTag{font-size:10px;color:var(--muted);white-space:nowrap}
+.spineEditorTab i.dot{display:inline-block;width:5px;height:5px;margin-left:4px;border-radius:50%;background:var(--brand);vertical-align:middle}
+.partTextControls{display:flex;align-items:center;gap:6px}
+.partTextControls .fontSelect{min-width:130px;flex:none;height:31px;min-height:31px}
+.partScale{display:flex;align-items:center;gap:4px}
+.partScaleBtn{min-width:28px;height:31px;border:1px solid var(--line);background:#fff;border-radius:6px;font:700 13px/1 inherit;color:var(--muted);cursor:pointer}
+.partScaleBtn:hover{border-color:var(--brand);color:var(--brand)}
+.partScaleBtn.reset{font-size:11px;min-width:auto;padding:0 9px;font-weight:400}
+.partScaleVal{min-width:48px;text-align:center;font:700 11.5px inherit;color:var(--muted);font-variant-numeric:tabular-nums}
 /* 数据确认卡片固定在主栏（曾试过收进工具栏弹层，因入口不可见已废弃）；
    「资料」按钮只负责滚动定位到这张卡片，不再搬运 DOM。 */
 @keyframes flashCard{0%,100%{box-shadow:none}18%,62%{box-shadow:0 0 0 3px rgba(200,16,46,.30)}}
@@ -338,7 +336,7 @@ body.embed .proj .t small{display:none}   /* 外层已有专辑名，这里不�
     <button data-mod="export">导出</button>
   </nav>
   <div class="editorRibbon" id="editorRibbon" aria-label="设计工具栏">
-    <div class="ribbonTabs" role="tablist"><button type="button" class="on" data-ribbon-tab="side">侧封</button><button type="button" data-ribbon-tab="layout">排版</button><button type="button" data-ribbon-tab="font">字体</button><button type="button" data-ribbon-tab="object">对象</button><button type="button" data-ribbon-tab="view">预览</button><button type="button" id="btnProjectDataTab">资料</button><button type="button" id="btnStructureTab">结构</button><button type="button" id="btnRecentTab">最近</button></div>
+    <div class="ribbonTabs" role="tablist"><button type="button" class="on" data-ribbon-tab="side">文字</button><button type="button" data-ribbon-tab="layout">排版</button><button type="button" data-ribbon-tab="font">字体</button><button type="button" data-ribbon-tab="object">对象</button><button type="button" data-ribbon-tab="view">预览</button><button type="button" id="btnProjectDataTab">资料</button><button type="button" id="btnStructureTab">结构</button><button type="button" id="btnRecentTab">最近</button></div>
     <div class="ribbonPanel" data-ribbon-panel="object"><div class="ribbonDock ribbonObjects"><b>编辑对象</b><div class="ribbonObjectButtons"><button type="button" data-canvas-part="disc">① 盘面</button><button type="button" data-canvas-part="booklet">② 封面</button><button type="button" data-canvas-part="sleeve">③ 封底条</button></div></div></div>
     <div class="ribbonPanel" data-ribbon-panel="layout"></div>
     <div class="ribbonPanel" data-ribbon-panel="font"></div>
@@ -415,12 +413,24 @@ body.embed .proj .t small{display:none}   /* 外层已有专辑名，这里不�
             <div id="fontPicker" class="fontPicker" hidden><div class="fontPickerHead"><input id="fontSearch" placeholder="搜索字体名称"><span id="fontPickerCount" class="fontPickerCount"></span><button id="fontPickerClose" class="fontPickerClose" type="button" aria-label="关闭字体库">×</button></div><div id="fontPickerFilters" class="fontPickerFilters"></div><div id="fontPickerList" class="fontPickerList"></div></div>
             <small class="muted">中文内容不会错误套用只支持英文的字体；曲目、时长、版权仍保持清晰可读。</small></div>
             <div id="spineEditorDock">
+            <div class="ribbonTextTargets">
             <div class="spineEditorTabs" id="spineEditorTabs"><button type="button" class="spineEditorTab on" data-spine-editor="right">右侧封</button><button type="button" class="spineEditorTab" data-spine-editor="left">左侧封</button><button type="button" class="spineEditorTab" data-spine-editor="leftBack">左侧封背面</button></div>
+            <div class="partTabs" id="partTabs"><span class="grpTag">印面文字</span><button type="button" class="spineEditorTab" data-part-target="disc">①盘面</button><button type="button" class="spineEditorTab" data-part-target="fold">③封面背面</button><button type="button" class="spineEditorTab" data-part-target="back">⑤封底</button><button type="button" class="spineEditorTab" data-part-target="tray">⑧内盘底</button></div>
+            </div>
             <input id="spineTextRight" type="hidden"><input id="spineTextLeft" type="hidden"><input id="spineTextLeftBack" type="hidden">
             <div class="spineToolbar" aria-label="侧封文字格式">
               <label data-tooltip-title="选择要调的文字" data-tooltip-detail="固定模板可分别设置专辑名和歌手名字号；输入自定义文字时选择“自定义文字”。"><select id="spineSizeTarget" class="spineSize" aria-label="选择要调节字号的文字"><option value="title">专辑名</option><option value="artist">歌手名</option><option value="custom">自定义文字</option></select></label>
               <label data-tooltip-title="成品字号" data-tooltip-detail="先选择上方文字角色，再选择其实际成品字号，范围为 0.8–2.6 毫米。"><select id="spineSizeMm" class="spineSize" aria-label="字号（毫米）"><option value="0.8">0.8 mm</option><option value="1.0">1.0 mm</option><option value="1.2">1.2 mm</option><option value="1.3">1.3 mm</option><option value="1.4">1.4 mm</option><option value="1.6">1.6 mm</option><option value="1.7" selected>1.7 mm</option><option value="1.8">1.8 mm</option><option value="2.0">2.0 mm</option><option value="2.2">2.2 mm</option><option value="2.4">2.4 mm</option><option value="2.6">2.6 mm</option></select></label>
               <button type="button" class="spineFormatBtn" id="spineBold" data-tooltip-title="加粗" data-tooltip-detail="使当前侧封文字更醒目。">B</button><button type="button" class="spineFormatBtn" id="spineItalic" data-tooltip-title="斜体" data-tooltip-detail="为当前侧封文字加入倾斜效果。"><i>I</i></button>
+              <span class="partTextControls" id="partTextControls" hidden>
+                <input id="fontPartText" type="hidden" value="auto"><button class="fontSelect" type="button" data-font-for="fontPartText" data-tooltip-title="这一面的字体" data-tooltip-detail="选好后，这一面上程序排印的文字都会用它；遇到纯英文字体时中文会自动回退，不会出现方框。"><span class="sample">自动</span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3 6 5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
+                <span class="partScale" data-tooltip-title="整面字号" data-tooltip-detail="按百分比统一缩放这一面的文字；曲目较多时可以调小，避免挤成一团。">
+                  <button type="button" class="partScaleBtn" id="partScaleDown" title="缩小 5%">−</button>
+                  <b class="partScaleVal" id="partScaleVal">100%</b>
+                  <button type="button" class="partScaleBtn" id="partScaleUp" title="放大 5%">＋</button>
+                  <button type="button" class="partScaleBtn reset" id="partScaleReset">复位</button>
+                </span>
+              </span>
               <div class="spineColorMenu">
                 <button type="button" id="spineColorMenuButton" class="spineColorMenuButton" data-tooltip-title="字体颜色" data-tooltip-detail="打开颜色面板，选择自动色、主题色或更多字体颜色。" aria-expanded="false"><span>A</span><i></i><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3 6 5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
                 <div id="spineColorPopover" class="spineColorPopover" hidden>
@@ -610,16 +620,95 @@ const SPINE_FONT_INPUT={right:'fontSpineRight',left:'fontSpineLeft',leftBack:'fo
 const SPINE_MM_X={right:0,left:53.4,leftBack:57.8};
 const SPINE_NAME={right:'右侧封',left:'左侧封',leftBack:'左侧封背面'};
 function dockSpineEditor(){const tabs={backLayoutDock:'layout',fontDock:'font',spineEditorDock:'side'};Object.entries(tabs).forEach(([id,tab])=>{const dock=$('#'+id),slot=document.querySelector('[data-ribbon-panel="'+tab+'"]');if(dock&&slot&&dock.parentElement!==slot)slot.append(dock);});const editor=$('#spineEditorDock'),template=$('#spineTemplateDock');if(editor&&template&&template.parentElement!==editor)editor.insertBefore(template,editor.querySelector('.spineToolbar'));}
+/* 「这一面文字长什么样」的状态。控件不在这里 —— 统一摆在顶部工具条的
+   「文字」页签（2026-10-31：放在上传槽位里的折叠面板中太难找，用户找不到）。
+   ⚠️ 必须在脚本初始化调用 syncTextTarget() 之前声明：const 有 TDZ，
+   写晚了一进页面就 ReferenceError，后面所有绑定都不会执行。 */
+const PART_COLOR={disc:'auto',fold:'auto',back:'auto',tray:'auto'};
+const PART_SCALE={disc:1.0,fold:1.0,back:1.0,tray:1.0};
+const PART_FONT={disc:'auto',fold:'auto',back:'auto',tray:'auto'};
+const PART_NAME={disc:'盘面',fold:'封面背面',back:'封底',tray:'内盘底'};
+const SCALE_STEP=0.05;
+function normalizeInk(v){v=String(v||'').trim().toLowerCase();return /^#[0-9a-f]{6}$/.test(v)?v:'auto';}
+function clampScale(v){v=Number(v);if(!isFinite(v)||!v)return 1;return Math.max(0.6,Math.min(1.8,Math.round(v*100)/100));}
+function partTouched(part){return Object.prototype.hasOwnProperty.call(PART_COLOR,part)&&
+  (PART_COLOR[part]!=='auto'||Math.abs((PART_SCALE[part]||1)-1)>1e-6||PART_FONT[part]!=='auto');}
+function partMarks(part){
+  const out=[];
+  if(PART_COLOR[part]!=='auto')out.push(PART_COLOR[part]);
+  if(Math.abs((PART_SCALE[part]||1)-1)>1e-6)out.push(Math.round((PART_SCALE[part]||1)*100)+'%');
+  if(PART_FONT[part]!=='auto'){
+    const item=fontItem(PART_FONT[part]);out.push(item&&item.id===PART_FONT[part]?item.name:'自定义字体');
+  }
+  return out;
+}
+/* 「文字」页签当前编辑的是哪一面：三条侧封走 SPINE_EDITOR_ZONE，
+   四个印面走 TEXT_TARGET（本身就是 part key）。两者互斥。 */
+let TEXT_TARGET='right';
+function isPartTarget(t){return Object.prototype.hasOwnProperty.call(PART_COLOR,t);}
+function currentTargetColor(){const p=TEXT_TARGET;return isPartTarget(p)?(PART_COLOR[p]||'auto'):SPINE_APPEARANCE[SPINE_EDITOR_ZONE].color;}
+function setTextTarget(t){
+  if(isPartTarget(t)){TEXT_TARGET=t;syncTextTarget();return;}
+  setSpineEditorZone(t);
+}
+function setPartScale(value){
+  if(!isPartTarget(TEXT_TARGET))return;
+  PART_SCALE[TEXT_TARGET]=clampScale(value);
+  syncTextTarget();queuePreview();
+}
+function applyTextTargetColor(color){
+  const p=TEXT_TARGET;
+  if(isPartTarget(p))PART_COLOR[p]=normalizeInk(color);
+  else SPINE_APPEARANCE[SPINE_EDITOR_ZONE].color=normalizeInk(color);
+  syncTargetColorWidgets();
+  if(!isPartTarget(p))syncSpineEditor();
+  queuePreview();
+}
+/* 颜色面板被侧封和四个印面共用：高亮项永远跟着「当前编辑的那一面」走。 */
+function syncTargetColorWidgets(){
+  const color=currentTargetColor()||'auto';
+  document.querySelectorAll('[data-spine-color]').forEach(b=>b.classList.toggle('on',b.dataset.spineColor===color));
+  const btn=$('#spineColorMenuButton');
+  if(btn)btn.style.setProperty('--spine-color',color==='auto'||!color?'#111111':color);
+}
+function syncTextTarget(){
+  const part=isPartTarget(TEXT_TARGET)?TEXT_TARGET:null,showPart=!!part;
+  const set=(el,hide)=>{if(el)el.hidden=!!hide;};
+  set($('#spineSizeTarget')&&$('#spineSizeTarget').closest('label'),showPart);
+  set($('#spineSizeMm')&&$('#spineSizeMm').closest('label'),showPart);
+  set($('#spineBold'),showPart);
+  set($('#spineItalic'),showPart);
+  set($('#spineTemplateDock'),showPart);
+  set($('#partTextControls'),!showPart);
+  document.querySelectorAll('[data-part-target]').forEach(b=>{
+    const p=b.dataset.partTarget;
+    b.classList.toggle('on',p===part);
+    const dot=b.querySelector('i.dot');
+    if(partTouched(p)){if(!dot)b.insertAdjacentHTML('beforeend','<i class="dot"></i>');}
+    else if(dot)dot.remove();
+    // 悬停能看到这一面改了什么；没改过就提示进去可以改
+    const marks=partMarks(p);
+    b.title=marks.length?(PART_NAME[p]+'：'+marks.join(' · ')):('编辑'+PART_NAME[p]+'上的文字');
+  });
+  document.querySelectorAll('[data-spine-editor]').forEach(b=>b.classList.toggle('on',!showPart&&b.dataset.spineEditor===SPINE_EDITOR_ZONE));
+  if(part){
+    const el=$('#fontPartText');if(el)el.value=PART_FONT[part]||'auto';
+    setFontButton('fontPartText');
+    const val=$('#partScaleVal');
+    if(val){const sc=PART_SCALE[part]||1;val.textContent=Math.round(sc*100)+'%';val.style.color=Math.abs(sc-1)>1e-6?'var(--brand)':'';}
+  }
+  syncTargetColorWidgets();
+}
 function setRibbonTab(tab){const target=document.querySelector('[data-ribbon-panel="'+tab+'"]');if(!target)return;document.querySelectorAll('[data-ribbon-tab]').forEach(button=>button.classList.toggle('on',button.dataset.ribbonTab===tab));document.querySelectorAll('[data-ribbon-panel]').forEach(panel=>panel.classList.toggle('on',panel===target));}
 function layoutSpineCanvas(){const image=$('#spineLargeImage'),crop=$('#spineCanvasCrop');if(!image||!crop||!image.naturalWidth||!image.naturalHeight||!crop.clientHeight)return;const fullW=image.naturalWidth*crop.clientHeight/image.naturalHeight,cropW=fullW*4.4/111.2;crop.style.width=Math.max(70,cropW)+'px';image.style.width=fullW+'px';image.style.height=crop.clientHeight+'px';image.style.left=-(fullW*SPINE_MM_X[SPINE_EDITOR_ZONE]/111.2)+'px';}
 function updateSpineCanvas(){const source=$('#imStrip');const image=$('#spineLargeImage'),empty=$('#spineCanvasEmpty'),meta=$('#spineCanvasMeta');if(!image||!empty)return;if(meta)meta.textContent='当前编辑：'+SPINE_NAME[SPINE_EDITOR_ZONE]+' · 约 4× 放大';if(!source||!source.src)return;if(image.src!==source.src){image.onload=()=>layoutSpineCanvas();image.src=source.src;}empty.hidden=true;image.hidden=false;layoutSpineCanvas();}
 function spineStyleHas(kind){const style=SPINE_APPEARANCE[SPINE_EDITOR_ZONE].style;return kind==='bold'?style==='bold'||style==='boldItalic':style==='italic'||style==='boldItalic'}
 function defaultSpineText(){return [$('#album').value.trim(),$('#artist').value.trim()].filter(Boolean).join('｜');}
 function spineSizeKey(){return SPINE_SIZE_TARGET==='artist'?'artistSizeMm':(SPINE_SIZE_TARGET==='title'?'titleSizeMm':'sizeMm');}
-function syncSpineEditor(){const zone=SPINE_EDITOR_ZONE,appearance=SPINE_APPEARANCE[zone],fontId=SPINE_FONT_INPUT[zone],textEditor=$('#spineTextEditor'),saved=$('#'+SPINE_INPUT[zone]).value.trim(),sizeKey=spineSizeKey();textEditor.value=saved||defaultSpineText();textEditor.placeholder='点击修改'+SPINE_NAME[zone]+'模板文字';appearance.titleSizeMm=Number(appearance.titleSizeMm)||Number(appearance.sizeMm)||1.7;appearance.artistSizeMm=Number(appearance.artistSizeMm)||1.3;$('#spineSizeTarget').value=SPINE_SIZE_TARGET;$('#spineSizeMm').value=appearance[sizeKey]||1.7;$('#'+fontId).value=appearance.font||'auto';setFontButton(fontId);$('#spineBold').classList.toggle('on',spineStyleHas('bold'));$('#spineItalic').classList.toggle('on',spineStyleHas('italic'));document.querySelectorAll('[data-spine-color]').forEach(b=>b.classList.toggle('on',b.dataset.spineColor===appearance.color));const colorButton=$('#spineColorMenuButton');if(colorButton)colorButton.style.setProperty('--spine-color',appearance.color==='auto'||!appearance.color?'#111111':appearance.color);if(appearance.color&&appearance.color!=='auto')$('#spineCustomColor').value=appearance.color;document.querySelectorAll('[data-spine-editor]').forEach(b=>b.classList.toggle('on',b.dataset.spineEditor===zone));updateSpineCanvas();}
-function setSpineEditorZone(zone){if(!Object.prototype.hasOwnProperty.call(SPINE_APPEARANCE,zone))return;SPINE_EDITOR_ZONE=zone;syncSpineEditor();}
+function syncSpineEditor(){const zone=SPINE_EDITOR_ZONE,appearance=SPINE_APPEARANCE[zone],fontId=SPINE_FONT_INPUT[zone],textEditor=$('#spineTextEditor'),saved=$('#'+SPINE_INPUT[zone]).value.trim(),sizeKey=spineSizeKey();textEditor.value=saved||defaultSpineText();textEditor.placeholder='点击修改'+SPINE_NAME[zone]+'模板文字';appearance.titleSizeMm=Number(appearance.titleSizeMm)||Number(appearance.sizeMm)||1.7;appearance.artistSizeMm=Number(appearance.artistSizeMm)||1.3;$('#spineSizeTarget').value=SPINE_SIZE_TARGET;$('#spineSizeMm').value=appearance[sizeKey]||1.7;$('#'+fontId).value=appearance.font||'auto';setFontButton(fontId);$('#spineBold').classList.toggle('on',spineStyleHas('bold'));$('#spineItalic').classList.toggle('on',spineStyleHas('italic'));syncTargetColorWidgets();if(appearance.color&&appearance.color!=='auto')$('#spineCustomColor').value=appearance.color;document.querySelectorAll('[data-spine-editor]').forEach(b=>b.classList.toggle('on',b.dataset.spineEditor===zone));updateSpineCanvas();}
+function setSpineEditorZone(zone){if(!Object.prototype.hasOwnProperty.call(SPINE_APPEARANCE,zone))return;SPINE_EDITOR_ZONE=zone;TEXT_TARGET=zone;syncSpineEditor();syncTextTarget();}
 function toggleSpineStyle(kind){const appearance=SPINE_APPEARANCE[SPINE_EDITOR_ZONE];let bold=spineStyleHas('bold'),italic=spineStyleHas('italic');if(kind==='bold')bold=!bold;else italic=!italic;appearance.style=bold&&italic?'boldItalic':(bold?'bold':(italic?'italic':'normal'));syncSpineEditor();queuePreview();}
-function currentCopySettings(){const titleMode=$('#titleMode'),titleProvider=$('#titleProvider'),fontValue=id=>{const el=$('#'+id);return el?el.value:'auto'};Object.entries(SPINE_FONT_INPUT).forEach(([zone,id])=>SPINE_APPEARANCE[zone].font=fontValue(id));return {copyLayout:$('#copyLayout').value||'auto',typographyStyle:($('#typographyStyle')?$('#typographyStyle').value:'auto'),copyAngle:$('#copyAngle').value||'none',spineTemplates:{...SPINE_TEMPLATES},spineText:{right:$('#spineTextRight').value.trim(),left:$('#spineTextLeft').value.trim(),leftBack:$('#spineTextLeftBack').value.trim()},spineAppearance:SPINE_APPEARANCE,partTextColor:{...PART_INK},partTextScale:{...PART_SCALE},conceptCopy:{primaryChinese:$('#primaryCopy').value.trim(),secondaryEnglish:$('#secondaryCopy').value.trim(),shortEnglish:$('#shortTag').value.trim()},showBackChineseCopy:$('#showBackChineseCopy').checked,typography:{display:fontValue('fontDisplay'),artist:fontValue('fontArtist'),chineseCopy:fontValue('fontChineseCopy'),englishCopy:fontValue('fontEnglishCopy'),metadata:fontValue('fontMetadata'),spine:'auto'},titleMode:titleMode?titleMode.value:'cover-follow',titleProvider:titleProvider?titleProvider.value:'unavailable',selectedTitleAssetId:TITLE_ASSET_ID}}
+function currentCopySettings(){const titleMode=$('#titleMode'),titleProvider=$('#titleProvider'),fontValue=id=>{const el=$('#'+id);return el?el.value:'auto'};Object.entries(SPINE_FONT_INPUT).forEach(([zone,id])=>SPINE_APPEARANCE[zone].font=fontValue(id));return {copyLayout:$('#copyLayout').value||'auto',typographyStyle:($('#typographyStyle')?$('#typographyStyle').value:'auto'),copyAngle:$('#copyAngle').value||'none',spineTemplates:{...SPINE_TEMPLATES},spineText:{right:$('#spineTextRight').value.trim(),left:$('#spineTextLeft').value.trim(),leftBack:$('#spineTextLeftBack').value.trim()},spineAppearance:SPINE_APPEARANCE,partTextColor:{...PART_COLOR},partTextScale:{...PART_SCALE},partTextFont:{...PART_FONT},conceptCopy:{primaryChinese:$('#primaryCopy').value.trim(),secondaryEnglish:$('#secondaryCopy').value.trim(),shortEnglish:$('#shortTag').value.trim()},showBackChineseCopy:$('#showBackChineseCopy').checked,typography:{display:fontValue('fontDisplay'),artist:fontValue('fontArtist'),chineseCopy:fontValue('fontChineseCopy'),englishCopy:fontValue('fontEnglishCopy'),metadata:fontValue('fontMetadata'),spine:'auto'},titleMode:titleMode?titleMode.value:'cover-follow',titleProvider:titleProvider?titleProvider.value:'unavailable',selectedTitleAssetId:TITLE_ASSET_ID}}
 
 let FONT_LIBRARY=[
   {id:'auto',name:'默认侧封字体',group:'默认',face:'inherit',meta:'使用侧封预设字体'},
@@ -723,6 +812,7 @@ dockPrimaryActions();
 document.querySelectorAll('[data-ribbon-tab]').forEach(button=>button.addEventListener('click',()=>setRibbonTab(button.dataset.ribbonTab)));
 setRibbonTab('side');
 syncSpineEditor();
+syncTextTarget();
 
 
 const formatTooltip=$('#formatTooltip');let tooltipTarget=null;
@@ -735,6 +825,15 @@ document.addEventListener('focusout',e=>{const target=e.target.closest('[data-to
 window.addEventListener('scroll',()=>{if(tooltipTarget)showFormatTooltip(tooltipTarget);},true);
 window.addEventListener('resize',()=>{if(tooltipTarget)showFormatTooltip(tooltipTarget);});
 $('#spineEditorTabs').onclick=e=>{const b=e.target.closest('[data-spine-editor]');if(!b)return;setSpineEditorZone(b.dataset.spineEditor);requestAnimationFrame(()=>$('#spineTextEditor').focus());};
+$('#partTabs').onclick=e=>{const b=e.target.closest('[data-part-target]');if(!b)return;setTextTarget(b.dataset.partTarget);};
+$('#partScaleDown').onclick=()=>setPartScale((PART_SCALE[TEXT_TARGET]||1)-SCALE_STEP);
+$('#partScaleUp').onclick=()=>setPartScale((PART_SCALE[TEXT_TARGET]||1)+SCALE_STEP);
+$('#partScaleReset').onclick=()=>setPartScale(1);
+['input','change'].forEach(ev=>$('#fontPartText').addEventListener(ev,()=>{
+  if(!isPartTarget(TEXT_TARGET))return;
+  PART_FONT[TEXT_TARGET]=($('#fontPartText').value||'auto');
+  syncTextTarget();queuePreview();
+}));
 $('#spineTextEditor').oninput=()=>{$('#'+SPINE_INPUT[SPINE_EDITOR_ZONE]).value=$('#spineTextEditor').value.replace(/\n/g,'').slice(0,18);queuePreview();};
 function updateSpineSize(){const n=Number($('#spineSizeMm').value),appearance=SPINE_APPEARANCE[SPINE_EDITOR_ZONE];appearance[spineSizeKey()]=Math.max(.8,Math.min(2.6,Number.isFinite(n)?n:1.7));queuePreview();}
 $('#spineSizeTarget').onchange=()=>{SPINE_SIZE_TARGET=$('#spineSizeTarget').value;syncSpineEditor();};
@@ -745,15 +844,15 @@ function closeSpineColorMenu(){const panel=$('#spineColorPopover'),button=$('#sp
 function placeSpineColorMenu(){const panel=$('#spineColorPopover'),button=$('#spineColorMenuButton');if(!panel||!button)return;const rect=button.getBoundingClientRect(),width=panel.offsetWidth||242,height=panel.offsetHeight||280;panel.style.left=Math.max(8,Math.min(window.innerWidth-width-8,rect.right-width))+'px';panel.style.top=Math.max(8,Math.min(window.innerHeight-height-8,rect.bottom+8))+'px';}
 const spineColorPopover=$('#spineColorPopover');if(spineColorPopover&&spineColorPopover.parentElement!==document.body)document.body.append(spineColorPopover);
 $('#spineColorMenuButton').onclick=()=>{const panel=$('#spineColorPopover'),button=$('#spineColorMenuButton');panel.hidden=!panel.hidden;button.setAttribute('aria-expanded',String(!panel.hidden));if(!panel.hidden)placeSpineColorMenu();};
-document.querySelectorAll('[data-spine-color]').forEach(b=>b.onclick=()=>{SPINE_APPEARANCE[SPINE_EDITOR_ZONE].color=b.dataset.spineColor;syncSpineEditor();queuePreview();closeSpineColorMenu();});
+document.querySelectorAll('[data-spine-color]').forEach(b=>b.onclick=()=>{applyTextTargetColor(b.dataset.spineColor);closeSpineColorMenu();});
 function normalizeSpineColor(value){const raw=String(value||'').trim();return /^#[0-9a-f]{6}$/i.test(raw)?raw.toUpperCase():null;}
 function setSpineCustomColorValue(value){const color=normalizeSpineColor(value);if(!color)return false;$('#spineCustomColorHex').value=color;$('#spineHexPreview').style.background=color;document.querySelectorAll('[data-custom-color]').forEach(b=>b.classList.toggle('on',b.dataset.customColor===color));return true;}
 function closeSpineCustomColorDialog(){$('#spineCustomColorPanel').hidden=true;}
-$('#spineCustomColorButton').onclick=()=>{const current=SPINE_APPEARANCE[SPINE_EDITOR_ZONE].color;setSpineCustomColorValue(current==='auto'?'#111111':current);$('#spineCustomColorPanel').hidden=false;$('#spineCustomColorHex').focus();};
+$('#spineCustomColorButton').onclick=()=>{const current=currentTargetColor();setSpineCustomColorValue(current==='auto'?'#111111':current);$('#spineCustomColorPanel').hidden=false;$('#spineCustomColorHex').focus();};
 document.querySelectorAll('[data-custom-color]').forEach(b=>b.onclick=()=>setSpineCustomColorValue(b.dataset.customColor));
 $('#spineCustomColorHex').oninput=()=>{const color=normalizeSpineColor($('#spineCustomColorHex').value);if(color)$('#spineHexPreview').style.background=color;};
 $('#spineCustomColorCancel').onclick=closeSpineCustomColorDialog;
-$('#spineCustomColorApply').onclick=()=>{const color=normalizeSpineColor($('#spineCustomColorHex').value);if(!color){$('#spineCustomColorHex').focus();return;}SPINE_APPEARANCE[SPINE_EDITOR_ZONE].color=color;$('#spineCustomColor').value=color;syncSpineEditor();queuePreview();closeSpineCustomColorDialog();};
+$('#spineCustomColorApply').onclick=()=>{const color=normalizeSpineColor($('#spineCustomColorHex').value);if(!color){$('#spineCustomColorHex').focus();return;}$('#spineCustomColor').value=color;applyTextTargetColor(color);closeSpineCustomColorDialog();};
 document.addEventListener('click',e=>{if(!e.target.closest('#spineColorPopover'))closeSpineCustomColorDialog();});
 document.addEventListener('click',e=>{if(!e.target.closest('.spineColorMenu')&&!e.target.closest('#spineColorPopover'))closeSpineColorMenu();});
 window.addEventListener('resize',()=>{if(!$('#spineColorPopover').hidden)placeSpineColorMenu();});
@@ -889,7 +988,8 @@ $('#btnProjectDataTab').onclick=e=>{
   card.classList.remove('flashCard');void card.offsetWidth;card.classList.add('flashCard');
   setTimeout(()=>card.classList.remove('flashCard'),1400);
 };
-document.querySelectorAll('[data-canvas-part]').forEach(button=>button.onclick=()=>{const part=button.dataset.canvasPart;showMod('design');const row=document.querySelector('.stageRow[data-part="'+part+'"]');if(row)row.scrollIntoView({behavior:'smooth',block:'center'});document.querySelectorAll('[data-canvas-part]').forEach(x=>x.classList.toggle('on',x===button));});
+const CANVAS_PART_TARGET={disc:'disc',sleeve:'back'};
+document.querySelectorAll('[data-canvas-part]').forEach(button=>button.onclick=()=>{const part=button.dataset.canvasPart;showMod('design');const row=document.querySelector('.stageRow[data-part="'+part+'"]');if(row)row.scrollIntoView({behavior:'smooth',block:'center'});document.querySelectorAll('[data-canvas-part]').forEach(x=>x.classList.toggle('on',x===button));const target=CANVAS_PART_TARGET[part];if(target){setRibbonTab('side');setTextTarget(target);}});
 
 /* 编辑页默认保持三件套总览；点单件时请求与导出相同 300DPI 渲染，再在弹窗内缩放查看。 */
 let zoomTicket=0;
@@ -1118,48 +1218,6 @@ const PART_ELEMENTS={
   aiSideL:[['title','标题'],['artist','歌手名']],
   aiSpine:[['title','标题'],['artist','歌手名']]
 };
-/* 用户手选「这一面文字用什么颜色」的槽位 → 后端 part key。侧封走 spineAppearance，
-   这里只管会印大段程序文字的四个面：盘面 / 封面背面 / 底封 / 内盘底。 */
-const PART_INK_KEY={aiDisc:'disc',aiFold:'fold',aiBack:'back',aiTray:'tray'};
-const PART_INK={disc:'auto',fold:'auto',back:'auto',tray:'auto'};
-/* 同一面的字号倍率：1.0 = 原始版式（后端收到 1.0 就完全走原路径，成品不变） */
-const PART_SCALE={disc:1.0,fold:1.0,back:1.0,tray:1.0};
-const SCALE_STEP=0.05;
-function normalizeInk(v){v=String(v||'').trim().toLowerCase();return /^#[0-9a-f]{6}$/.test(v)?v:'auto';}
-function clampScale(v){v=Number(v);if(!isFinite(v)||!v)return 1;return Math.max(0.6,Math.min(1.8,Math.round(v*100)/100));}
-function setSlotScale(part,value){
-  if(!Object.prototype.hasOwnProperty.call(PART_SCALE,part))return;
-  PART_SCALE[part]=clampScale(value);
-  document.querySelectorAll('.aiSlot').forEach(s=>syncSlotInk(s));
-  queuePreview();
-}
-function syncSlotInk(slot){
-  const part=PART_INK_KEY[slot.dataset.key];if(!part)return;
-  const cur=PART_INK[part]||'auto',box=slot.querySelector('.elInk');if(!box)return;
-  box.querySelectorAll('[data-ink]').forEach(b=>b.classList.toggle('on',b.dataset.ink===cur));
-  const pick=box.querySelector('.inkPick');if(pick)pick.value=cur==='auto'?'#ffffff':cur;
-  const scaleVal=slot.querySelector('.scaleVal');
-  if(scaleVal){const sc=PART_SCALE[part]||1;scaleVal.textContent=Math.round(sc*100)+'%';scaleVal.style.color=(Math.abs(sc-1)<1e-6)?'':'var(--brand)';}
-  // 折叠标题上挂一个标签：不点开也能看出这一面改过色/改过字号
-  const tag=slot.querySelector('.inkTag');
-  if(tag){
-    const sc=PART_SCALE[part]||1,marks=[];
-    if(cur!=='auto')marks.push('文字色 '+cur);
-    if(Math.abs(sc-1)>1e-6)marks.push(Math.round(sc*100)+'%');
-    tag.hidden=!marks.length;
-    if(!tag.hidden){
-      tag.textContent='';
-      const dot=document.createElement('b');dot.style.background=(cur==='auto'?'transparent':cur);
-      tag.append(dot,document.createTextNode(marks.join(' · ')));
-    }
-  }
-}
-function setSlotInk(part,value){
-  if(!Object.prototype.hasOwnProperty.call(PART_INK,part))return;
-  PART_INK[part]=normalizeInk(value);
-  document.querySelectorAll('.aiSlot').forEach(s=>syncSlotInk(s));
-  queuePreview();
-}
 function elSummaryText(slot){
   const boxes=[...slot.querySelectorAll('.aiEls input[data-el]')];
   // 只有「本来开着、被用户关掉」的才算去掉；本来就没开的项（如封面背面的压暗）
@@ -1183,36 +1241,12 @@ document.querySelectorAll('.aiSlot').forEach(slot=>{
   if(!spec)return;                       // ② 封面正面本来就不叠程序文字
   const det=document.createElement('details');
   det.className='aiEls';
-  det.innerHTML='<summary><b>全部保留</b><span>点开可逐项去掉，或改这一面的文字颜色</span><i class="inkTag" hidden></i></summary>'+
-    (PART_INK_KEY[slot.dataset.key]
-      ? '<div class="elInk"><span>文字颜色</span>'+
-        '<button type="button" class="inkBtn on" data-ink="auto">自动（按画面深浅）</button>'+
-        '<button type="button" class="inkBtn" data-ink="#18181a">深色字</button>'+
-        '<button type="button" class="inkBtn" data-ink="#fafaf8">浅色字</button>'+
-        '<input type="color" class="inkPick" value="#fafaf8" aria-label="自定义文字颜色" title="自定义文字颜色">'+
-        '</div>'+
-        '<div class="elScale"><span>字号</span>'+
-        '<button type="button" class="scaleBtn" data-scale="-1" title="缩小 5%">−</button>'+
-        '<b class="scaleVal">100%</b>'+
-        '<button type="button" class="scaleBtn" data-scale="1" title="放大 5%">＋</button>'+
-        '<button type="button" class="scaleBtn reset" data-scale="0">复位</button>'+
-        '<small style="margin-left:auto">只影响程序排印的文字</small></div>'
-      : '')+
+  det.innerHTML='<summary><b>全部保留</b><span>点开可逐项去掉（取消＝不印）</span></summary>'+
     '<div class="elGrid">'+spec.map(([k,label,on])=>
       `<label class="elRow"><input type="checkbox" data-el="${k}" data-def="${on===false?'0':'1'}"${on===false?'':' checked'}><span>${label}</span></label>`).join('')+'</div>'+
-    '<p class="note">这一面的程序文字（标题/曲目/版权等）统一用上面的颜色；若你上传的实拍图上已经印了曲目/条码，把同名项取消勾选，就不会重影。</p>';
+    '<p class="note">若你上传的实拍图上已经印了曲目/条码，把同名项取消勾选，就不会重影。想改这一面文字的颜色、字号或字体，用页面顶部的「文字」工具条。</p>';
   slot.appendChild(det);
   det.querySelectorAll('input[data-el]').forEach(cb=>cb.onchange=()=>{syncElSummary(slot);queuePreview();});
-  if(PART_INK_KEY[slot.dataset.key]){
-    det.querySelectorAll('[data-ink]').forEach(b=>b.onclick=()=>setSlotInk(PART_INK_KEY[slot.dataset.key],b.dataset.ink));
-    const pick=det.querySelector('.inkPick');
-    if(pick)pick.oninput=()=>setSlotInk(PART_INK_KEY[slot.dataset.key],pick.value);
-    det.querySelectorAll('[data-scale]').forEach(b=>b.onclick=()=>{
-      const part=PART_INK_KEY[slot.dataset.key],step=Number(b.dataset.scale);
-      setSlotScale(part,step===0?1:(PART_SCALE[part]||1)+step*SCALE_STEP);
-    });
-    syncSlotInk(slot);
-  }
 });
 function collectElements(){
   const out={};
@@ -1496,12 +1530,14 @@ async function loadProject(jid){
     Object.entries(m.spineAppearance).forEach(([zone,value])=>{if(SPINE_APPEARANCE[zone]&&value&&typeof value==='object')SPINE_APPEARANCE[zone]={...SPINE_APPEARANCE[zone],...value};});
   }
   if(m.partTextColor && typeof m.partTextColor==='object'){
-    Object.keys(PART_INK).forEach(k=>{PART_INK[k]=normalizeInk(m.partTextColor[k]);});
+    Object.keys(PART_COLOR).forEach(k=>{PART_COLOR[k]=normalizeInk(m.partTextColor[k]);});
   }
   if(m.partTextScale && typeof m.partTextScale==='object'){
     Object.keys(PART_SCALE).forEach(k=>{const v=Number(m.partTextScale[k]);PART_SCALE[k]=(isFinite(v)&&v)?clampScale(v):1;});
   }
-  document.querySelectorAll('.aiSlot').forEach(s=>syncSlotInk(s));
+  if(m.partTextFont && typeof m.partTextFont==='object'){
+    Object.keys(PART_FONT).forEach(k=>{const v=String(m.partTextFont[k]||'auto').trim();PART_FONT[k]=v||'auto';});
+  }
   syncSpineEditor();
   setBackLayout(m.backLayout||'auto');
   if(m.spineTemplates && typeof m.spineTemplates==='object'){

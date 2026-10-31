@@ -4,6 +4,8 @@ from __future__ import annotations
 import re
 
 ROLES = ("display", "artist", "chineseCopy", "englishCopy", "metadata", "spine")
+# 字体 id 的形状约束：字母数字开头，允许 : _ . - 分隔（如 builtin:noto-serif-sc）。
+_FONT_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_:.\-]{0,63}$")
 # 可让用户手选「这一面文字用什么颜色」的印刷面（侧封另走 spineAppearance）。
 PART_TEXT_COLOR_PARTS = ("disc", "fold", "back", "tray")
 # 三条物理侧封尺寸完全相同，因此共用一套模板库；位置只决定它贴在哪一条边。
@@ -57,8 +59,8 @@ def _part_text_color(raw):
 def _part_text_scale(raw):
     """每个出版面的「字号倍率」：{"disc": 1.15, ...}。
 
-    只允许 0.6–1.8 之间的数字，其它一律回落到 1.0（原始版式），
-    免得一个脏值把某个出版面的字放大到糊成一团。
+    超出范围的数字会被夹回边界（避免一个脏值把某面文字放大到糊成一团），
+    非数字或缺失一律回落到 1.0（原始版式）。
     """
     raw = raw if isinstance(raw, dict) else {}
     out = {}
@@ -68,6 +70,23 @@ def _part_text_scale(raw):
         except (TypeError, ValueError):
             value = 1.0
         out[part] = max(0.6, min(1.8, round(value, 2)))
+    return out
+
+
+def _part_text_font(raw):
+    """每个出版面的「整面统一字体」：{"disc": "serif-cn-bold", ...}。
+
+    只认形状合法的字体 id；形状不对的一律回落 auto（沿用各角色默认字体），
+    免得一个脏值让某一面的文字全部掉帧。这里刻意**不去比字体库清单**：
+    本机字体、私有字体的 id 是运行时才枚举出来的，拿静态清单比对会把它们误杀。
+    """
+    raw = raw if isinstance(raw, dict) else {}
+    out = {}
+    for part in PART_TEXT_COLOR_PARTS:
+        value = str(raw.get(part) or "auto").strip()
+        if value != "auto" and not _FONT_ID_RE.fullmatch(value):
+            value = "auto"
+        out[part] = value
     return out
 
 
@@ -116,6 +135,7 @@ def normalize_copy_settings(raw):
                                for key in SPINE_TEMPLATE_DEFAULTS},
             "partTextColor": _part_text_color(raw.get("partTextColor")),
             "partTextScale": _part_text_scale(raw.get("partTextScale")),
+            "partTextFont": _part_text_font(raw.get("partTextFont")),
             "spineCharacterStyles": _spine_character_styles(spine_character_styles_raw),
             "typography": {k: str(typo.get(k) or "auto") for k in ROLES}}
 

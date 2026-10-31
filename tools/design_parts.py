@@ -515,6 +515,19 @@ def part_text_scale(ratio):
         _TS.pop()
 
 
+@contextmanager
+def part_text_font(font_id):
+    """作用域式的「整面统一字体」：包住某个出版面的绘制过程。
+
+    空值 / "auto" / typo 缺失时一次都不生效 —— 没开这项设置时成品与原先一致。
+    """
+    if _typo is None or not font_id or str(font_id) == "auto":
+        yield
+        return
+    with _typo.part_font(font_id):
+        yield
+
+
 def _t(role, size, text=None):
     size = _scaled_size(size)
     if _typo is None:
@@ -1267,9 +1280,10 @@ def resolve_substrate(base_image, cover, w, h, D, crop, grade_kw, scrim_kw,
 def design_back2(cover, w, h, D, album="", artist="", tracks=None, seed=0,
                  quote=None, company="", barcode_code="", copyright_text="", release_year="",
                  back_layout="auto", copy_settings=None,
-                 base_image=None, elements=None, ink_override=None, text_scale=None):
-    """封底。text_scale 是「这一面所有程序文字」的字号倍率（1.0=原始版式）。"""
-    with part_text_scale(text_scale):
+                 base_image=None, elements=None, ink_override=None, text_scale=None, text_font=None):
+    """封底。text_scale 是「这一面所有程序文字」的字号倍率（1.0=原始版式）；
+    text_font 是这一面统一使用的字体（auto/空 = 沿用各角色的默认字体）。"""
+    with part_text_font(text_font), part_text_scale(text_scale):
         return _design_back2_impl(cover, w, h, D, album, artist, tracks, seed, quote, company,
                                   barcode_code, copyright_text, release_year, back_layout,
                                   copy_settings, base_image, elements, ink_override)
@@ -1523,9 +1537,9 @@ def _angled_tag(im, xy, text, size, color, align="left", width=None, angle=-3.0)
 
 
 def design_disc2(cover, d_px, hole_px, D, album="", artist="", company="", copy_settings=None,
-                 base_image=None, elements=None, ink_override=None, text_scale=None):
-    """盘面。text_scale 是这一面所有程序文字的字号倍率（1.0=原始版式）。"""
-    with part_text_scale(text_scale):
+                 base_image=None, elements=None, ink_override=None, text_scale=None, text_font=None):
+    """盘面。text_scale 字号倍率、text_font 整面统一字体，缺省沿用原版式。"""
+    with part_text_font(text_font), part_text_scale(text_scale):
         return _design_disc2_impl(cover, d_px, hole_px, D, album, artist, company, copy_settings,
                                   base_image, elements, ink_override)
 
@@ -1630,9 +1644,9 @@ def _design_disc2_impl(cover, d_px, hole_px, D, album="", artist="", company="",
 
 def design_inner2(cover, w, h, D, album="", artist="", tracks=None, quote=None,
                   copy_settings=None, base_image=None, elements=None, ink_override=None,
-                  text_scale=None):
-    """封面背面 / 内页。text_scale 是这一面所有程序文字的字号倍率。"""
-    with part_text_scale(text_scale):
+                  text_scale=None, text_font=None):
+    """封面背面 / 内页。text_scale 字号倍率、text_font 整面统一字体，缺省沿用原版式。"""
+    with part_text_font(text_font), part_text_scale(text_scale):
         return _design_inner2_impl(cover, w, h, D, album, artist, tracks, quote, copy_settings,
                                    base_image, elements, ink_override)
 
@@ -1713,9 +1727,9 @@ def _design_inner2_impl(cover, w, h, D, album="", artist="", tracks=None, quote=
 
 
 def design_tray2(cover, w, h, D, album="", artist="", company="", copy_settings=None,
-                 base_image=None, elements=None, ink_override=None, text_scale=None):
-    """内盘底。text_scale 是这一面所有程序文字的字号倍率。"""
-    with part_text_scale(text_scale):
+                 base_image=None, elements=None, ink_override=None, text_scale=None, text_font=None):
+    """内盘底。text_scale 字号倍率、text_font 整面统一字体，缺省沿用原版式。"""
+    with part_text_font(text_font), part_text_scale(text_scale):
         return _design_tray2_impl(cover, w, h, D, album, artist, company, copy_settings,
                                   base_image, elements, ink_override)
 

@@ -26,6 +26,7 @@ from __future__ import annotations
 import os
 import sys
 import json
+from contextlib import contextmanager
 from functools import lru_cache
 from pathlib import Path
 from contextvars import ContextVar
@@ -341,6 +342,28 @@ def set_font_overrides(overrides: dict | None):
 
 def reset_font_overrides(token):
     _FONT_OVERRIDES.reset(token)
+
+
+# 全部的配置槽位（所有绘制角色最终都归到这 6 个槽上，见 _ROLE_SLOT）。
+# 一次把 6 个槽都指向同一个字体 = 这一整面出版物的文字统一用它。
+_FONT_SLOTS = ("display", "artist", "chineseCopy", "englishCopy", "metadata", "spine")
+
+
+@contextmanager
+def part_font(font_id):
+    """作用域式的「整面统一字体」：包住某个出版面的绘制过程。
+
+    空值 / "auto" 时一次都不 set —— 没开这项设置时走原路径，成品与原先一致。
+    纯拉丁字体遇到中文会由 _preset_path 自动回退到本角色字体，不会出现豆腐块。
+    """
+    if not font_id or str(font_id) == "auto":
+        yield
+        return
+    token = set_font_overrides({slot: str(font_id) for slot in _FONT_SLOTS})
+    try:
+        yield
+    finally:
+        reset_font_overrides(token)
 
 
 def _preset_path(font_id: str | None, text: str | None = None) -> str | None:
