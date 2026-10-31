@@ -274,9 +274,40 @@ def _ai_elements(data):
     return {k: v for k, v in raw.items() if isinstance(v, dict)}
 
 
+def part_ink_from_copy(copy_settings):
+    """读取 copy_settings.partTextColor（用户给某个部件手选的墨色）。
+
+    {"disc": "#ffffff", ...} → {"disc": (255,255,255), ...}；没选的部件为 None，
+    下游 design_*2 收到 None 就继续按画面深浅自动选墨 —— 与改造前完全一致。
+    """
+    raw = (copy_settings or {}).get("partTextColor")
+    if not isinstance(raw, dict):
+        return {}
+    return {part: DP.hex_rgb(raw.get(part)) for part in ("disc", "fold", "back", "tray")}
+
+
+def part_scale_from_copy(copy_settings):
+    """读取 copy_settings.partTextScale（用户给某个部件手选的字号倍率）。
+
+    缺省或 1.0 都得到 1.0 —— 下游 part_text_scale(1.0) 不入栈，
+    所有字号算式保持原样，成品与改造前一致。
+    """
+    raw = (copy_settings or {}).get("partTextScale")
+    if not isinstance(raw, dict):
+        return {}
+    out = {}
+    for part in ("disc", "fold", "back", "tray"):
+        try:
+            value = float(raw.get(part) or 1.0)
+        except (TypeError, ValueError):
+            value = 1.0
+        out[part] = max(0.6, min(1.8, value))
+    return out
+
+
 def build_parts(cover, album, artist, D, tracks, company, ai=None, dpi=DPI,
                 inner_copy="", barcode_code="", copyright_text="", release_year="", back_layout="auto", copy_settings=None,
-                ai_elements=None):
+                ai_elements=None, part_ink=None):
     """出 ①②③ 三件（override-aware）。返回 (disc, fold, strip)。
     ai 可覆盖：disc 盘面 / cover 封面 / fold 封面背面 / backArt 封底 /
     trayArt 内盘底 / sideR 右侧封 / sideL 左侧封 / spineBack 左侧封背面；
@@ -294,6 +325,14 @@ def build_parts(cover, album, artist, D, tracks, company, ai=None, dpi=DPI,
         """该部件的元素开关；没配就返回 None（= 全画）。"""
         v = els.get(part)
         return v if isinstance(v, dict) else None
+
+    part_ink = part_ink if isinstance(part_ink, dict) else part_ink_from_copy(copy_settings)
+    part_scale = part_scale_from_copy(copy_settings)
+
+    def _ink(part):
+        """该部件的「用户手选墨色」；没配就返回 None（= 程序自动判深浅）。"""
+        value = part_ink.get(part)
+        return value if isinstance(value, tuple) else None
 
     # 上传的封面：归一到原封面尺寸后，作为全部衍生设计（盘面/封底/侧封延展）的画面源
 
@@ -321,7 +360,8 @@ def build_parts(cover, album, artist, D, tracks, company, ai=None, dpi=DPI,
     # 裁一圈；这里直接把整幅交给 design_disc2 套圆遮罩 + 打印信息层。
     disc = DP.design_disc2(cover, disc_d, hole_d, D, rendered_album, artist, company,
                            copy_settings=copy_settings,
-                           base_image=disc_base, elements=_el("disc"))
+                           base_image=disc_base, elements=_el("disc"), ink_override=_ink("disc"),
+                           text_scale=part_scale.get("disc"))
 
     # ② 封面折件（左内页 + 右封面）
     fold_w = mm(SP.COVER_W, dpi)
@@ -331,7 +371,8 @@ def build_parts(cover, album, artist, D, tracks, company, ai=None, dpi=DPI,
     inner_im = DP.design_inner2((ai or {}).get("insideArt") or cover, fold_w // 2, fold_h, D, rendered_album, artist,
                                 tracks, quote=(copy_settings or {}).get("conceptCopy", {}).get("primaryChinese") or inner_copy or None,
                                 copy_settings=copy_settings,
-                                base_image=(ai or {}).get("fold"), elements=_el("fold"))
+                                base_image=(ai or {}).get("fold"), elements=_el("fold"),
+                                ink_override=_ink("fold"), text_scale=part_scale.get("fold"))
     fold = MC.make_cover_fold(inner_im, cover, fold_w, fold_h, D, copy_settings,
                               front_is_upload=bool(ai and ai.get("cover")))
 
@@ -350,11 +391,13 @@ def build_parts(cover, album, artist, D, tracks, company, ai=None, dpi=DPI,
                                         barcode_code=barcode_code, copyright_text=copyright_text,
                                         release_year=release_year, back_layout=back_layout,
                                         copy_settings=copy_settings,
-                                        base_image=back_base, elements=back_el)
+                                        base_image=back_base, elements=back_el,
+                                        ink_override=_ink("back"), text_scale=part_scale.get("back"))
     if tray_base is not None or tray_el is not None:
         tray_rendered = DP.design_tray2(cover, segs[4], strip_h, D, rendered_album, artist, company,
                                         copy_settings=copy_settings,
-                                        base_image=tray_base, elements=tray_el)
+                                        base_image=tray_base, elements=tray_el,
+                                        ink_override=_ink("tray"), text_scale=part_scale.get("tray"))
     if ai and ai.get("strip") and back_rendered is None and tray_rendered is None:
         strip = MC.cover_crop(ai["strip"], strip_w, strip_h)
     else:
@@ -370,7 +413,8 @@ def build_parts(cover, album, artist, D, tracks, company, ai=None, dpi=DPI,
                                    side_back_im=(ai or {}).get("spineBack"),
                                    side_elements={"right": _el("sideR"),
                                                   "left": _el("sideL"),
-                                                  "left-back": _el("spineBack")})
+                                                  "left-back": _el("spineBack")},
+                                   part_ink=part_ink, part_scale=part_scale)
     if title_asset_image is not None:
         reports = {}
         disc, reports["disc"] = TC.place_title_asset(disc, title_asset_image, TC.resolve_title_placement("disc", SP), SP.title_protected_rects_mm("disc"), dpi)
@@ -637,6 +681,8 @@ def build_job(data):
         "spineTemplates": copy_settings["spineTemplates"],
         "spineText": copy_settings["spineText"],
         "spineAppearance": copy_settings["spineAppearance"],
+        "partTextColor": copy_settings.get("partTextColor", {}),
+        "partTextScale": copy_settings.get("partTextScale", {}),
         "typography": copy_settings["typography"],
         "titleTypography": title_state,
         "mood": D["mood"], "style": D["style"],
