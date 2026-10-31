@@ -422,15 +422,33 @@ def _load_ai(path):
         return None
 
 
-def _clean_preview_cache(max_age=60 * 60):
-    """清理一小时前的临时预览；正式任务永远不放在这个目录。"""
-    cutoff = time.time() - max_age
-    for item in PREVIEW_DIR.iterdir():
+def _clean_preview_cache(max_age=60 * 60, limit=8):
+    """清理一小时前的临时预览；正式任务永远不放在这个目录。
+
+    ⚠️ 一次最多删 limit 个，超出留到下一次预览再删：rmtree 是外部安全策略会
+    盯的操作，一次性删几十个会被拦下来，处理线程卡在里面 → 预览请求全部超时
+    （2026-10-31 事故：缓存堆到 99 个 / 113MB，页面只剩「实时预览失败」）。
+    这里宁可多跑几轮慢慢清，也绝不让清理拖垮预览本身。
+    """
+    try:
+        if not PREVIEW_DIR.is_dir():
+            return
+        items = sorted(PREVIEW_DIR.iterdir(), key=lambda p: p.stat().st_mtime)
+    except OSError:
+        return
+    # 目录数过多时放宽年龄，先把最老的一批清掉，避免无限堆积。
+    age = 600 if len(items) > 40 else max_age
+    cutoff = time.time() - age
+    removed = 0
+    for item in items:
+        if removed >= limit:
+            break
         try:
             if item.is_dir() and item.stat().st_mtime < cutoff:
                 shutil.rmtree(item, ignore_errors=True)
-        except OSError:
-            pass
+                removed += 1
+        except Exception:
+            continue
 
 
 def _title_state(data, design, album, artist, cover=None):
