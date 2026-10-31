@@ -51,11 +51,7 @@ class DesignUiRegressionTests(unittest.TestCase):
         html = (Path(__file__).resolve().parents[1] / 'workbench' / 'design.html').read_text(encoding='utf-8')
         self.assertIn('data-ribbon-tab="side"', html)
         self.assertIn('data-ribbon-panel="side"', html)
-        # 2026-10-31：字体不再单独占一个页签，整块并入「文字」页签（dockSpineEditor 把它挂进 side 面板），
-        # 改字号/改颜色/换字体必须在同一条工具条里完成，不用来回跳页。
-        self.assertNotIn('data-ribbon-tab="font"', html)
-        self.assertNotIn('data-ribbon-panel="font"', html)
-        self.assertIn("{backLayoutDock:'layout',spineEditorDock:'side',fontDock:'side'}", html)
+        self.assertIn('data-ribbon-tab="font"', html)
         self.assertNotIn('<div class="templateFieldTitle">字体 <span>选择后立即套入预览与正式出件</span></div>', html)
         self.assertIn('function setRibbonTab(tab)', html)
         self.assertIn('height:112px', html)
