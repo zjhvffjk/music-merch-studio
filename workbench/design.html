@@ -859,7 +859,16 @@ $('#partScaleReset').onclick=()=>setPartScale(1);
   PART_FONT[TEXT_TARGET]=($('#fontPartText').value||'auto');
   syncTextTarget();queuePreview();
 }));
-$('#spineTextEditor').oninput=()=>{$('#'+SPINE_INPUT[SPINE_EDITOR_ZONE]).value=$('#spineTextEditor').value.replace(/\n/g,'').slice(0,18);queuePreview();};
+$('#spineTextEditor').oninput=()=>{
+  const value=$('#spineTextEditor').value.replace(/\n/g,'').slice(0,18);
+  $('#'+SPINE_INPUT[SPINE_EDITOR_ZONE]).value=value;
+  if(value.trim() && SPINE_SIZE_TARGET!=='custom'){
+    SPINE_SIZE_TARGET='custom';
+    $('#spineSizeTarget').value='custom';
+    $('#spineSizeMm').value=SPINE_APPEARANCE[SPINE_EDITOR_ZONE].sizeMm||1.7;
+  }
+  queuePreview();
+};
 function updateSpineSize(){const n=Number($('#spineSizeMm').value),appearance=SPINE_APPEARANCE[SPINE_EDITOR_ZONE];appearance[spineSizeKey()]=Math.max(.8,Math.min(2.6,Number.isFinite(n)?n:1.7));queuePreview();}
 $('#spineSizeTarget').onchange=()=>{SPINE_SIZE_TARGET=$('#spineSizeTarget').value;syncSpineEditor();};
 $('#spineSizeMm').oninput=updateSpineSize;$('#spineSizeMm').onchange=updateSpineSize;
