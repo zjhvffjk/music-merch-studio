@@ -42,6 +42,7 @@ import os
 import re
 import shutil
 import sys
+import threading
 import time
 import uuid
 import zipfile
@@ -60,8 +61,31 @@ OUT_DIR = Path(ROOT) / "outputs" / "迷你CD设计"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 # 设计页的即时预览不属于正式作品，也不产出打印件。只保留短时的小图缓存，
 # 让用户在按下「生成三件套」前就能确认三个实物部件的结构与取景。
+#
+# ⚠️ 这里刻意用「固定小池 + 循环覆盖」而不是「每次预览新建目录、事后删除」：
+#    2026-10-31 连着两次「实时预览失败：Failed to fetch」，根因都一样 ——
+#    预览请求里顺手做旧目录清理（rmtree），而外部安全策略拦下了删除动作，
+#    处理线程直接中断，整个请求没有响应。清缓存只是收拾临时文件，
+#    绝不该有能力把预览本身搞死。现在预览只写不删，目录数恒定有上限。
 PREVIEW_DIR = OUT_DIR / "_preview_cache"
 PREVIEW_DIR.mkdir(parents=True, exist_ok=True)
+PREVIEW_SLOT_COUNT = 24
+_preview_slot_seq = 0
+_preview_slot_lock = threading.Lock()
+_clean_disabled = False
+_SLOT_TOKEN = re.compile(r"^p-s(\d{2})-[0-9a-f]{8,}$")
+
+
+def _preview_slot():
+    """取下一个预览槽位目录（循环复用，永远只有 PREVIEW_SLOT_COUNT 个）。"""
+    global _preview_slot_seq
+    with _preview_slot_lock:
+        _preview_slot_seq = (_preview_slot_seq + 1) % PREVIEW_SLOT_COUNT
+        idx = _preview_slot_seq
+    name = "s-%02d" % idx
+    dest = PREVIEW_DIR / name
+    dest.mkdir(parents=True, exist_ok=True)
+    return dest, name
 
 try:
     import noproxy  # noqa: F401  绕过本机代理（server 已 import；这里兜底）
@@ -102,6 +126,36 @@ def _safe_jid(jid):
         if not (ch.isascii() and (ch.isalnum() or ch == "-")):
             return None
     return jid
+
+
+def zip_download_name(jid):
+    """导出 ZIP 的落盘文件名：优先「歌手-专辑名」，拿不到才退回 jid 形态。
+
+    以前不管哪张专辑都叫「迷你CD设计-<jid>」，下载一堆之后根本分不清谁是谁
+    （2026-11-01 用户要求：名字要对应歌手和专辑名，例如「郑润泽-旷野」）。
+    批量任务没有单一专辑名，退化为「<歌手>-批量<N>张」。
+    """
+    jid = _safe_jid(jid)
+    fallback = "迷你CD设计-%s.zip" % (jid or "未知")
+    mp = (OUT_DIR / jid / "meta.json") if jid else None
+    if not mp or not mp.is_file():
+        return fallback
+    try:
+        m = json.loads(mp.read_text(encoding="utf-8"))
+    except Exception:
+        return fallback
+    artist = re.sub(r"\s+", " ", str(m.get("artist") or "")).strip()
+    album = re.sub(r"\s+", " ", str(m.get("album") or "")).strip()
+    if m.get("kind") == "minicd-design-batch":
+        n = m.get("count") or 0
+        base = "-".join([p for p in (artist, "批量%d张" % n if n else "批量") if p])
+    else:
+        base = "-".join([p for p in (artist, album) if p])
+    # Windows 文件名禁用的字符换成下划线，再去掉首尾空格与末尾的点（末尾带点会被系统吃掉）。
+    base = re.sub(r'[\\/:*?"<>|\r\n\t]', "_", base).strip().strip(".")[:80].strip()
+    if not base:
+        return fallback
+    return "%s.zip" % base
 
 
 def mm(v, dpi):
@@ -160,6 +214,26 @@ def _norm_tracks(v):
         if len(items) >= 10:
             break
     return items or None
+
+
+def _album_tracks_by_id(raw):
+    """按专辑 id 向网易云要这张专辑**自己**的曲目。
+
+    批量批量入口（专辑墙勾选后「设计选中的 N 张」）只带了 id，没带 tracks。
+    这里补齐；取不到宁可返回 None（不印曲目），也不退回首歌手的歌单 ——
+    否则一张只有 1 首的单曲会被印上热门的若干首别人的歌（2026-10-30）。
+    """
+    aid = str(raw or "").strip()
+    if not aid.isdigit():
+        return None
+    try:
+        from fetch163 import album_songs as netease_album_songs
+        _info, songs = netease_album_songs(int(aid))
+    except Exception as e:
+        _slog("album tracks lookup failed:", aid, type(e).__name__, e)
+        return None
+    names = [str((s or {}).get("name") or "").strip() for s in (songs or [])]
+    return _norm_tracks([n for n in names if n][:10])
 
 
 def _parse_bands(v):
@@ -237,15 +311,124 @@ def _release_metadata(data, artist, album, company=""):
     return found_company, (year_match.group(0) if year_match else ""), found_date
 
 
+def _ai_elements(data):
+    """读取前端传来的「逐部件文字层开关」：{part: {element: bool}}。
+
+    只有 dict 形态才认；前端可能以 JSON 字符串提交（表单场景），这里一并兜住。
+    返回 {} 表示调用方不管开关 —— 下游 el_on 会把 None 当「全画」，行为不变。
+    """
+    raw = data.get("aiElements") if isinstance(data, dict) else None
+    if isinstance(raw, str) and raw.strip():
+        try:
+            raw = json.loads(raw)
+        except Exception:
+            raw = None
+    if not isinstance(raw, dict):
+        return {}
+    return {k: v for k, v in raw.items() if isinstance(v, dict)}
+
+
+def part_ink_from_copy(copy_settings):
+    """读取 copy_settings.partTextColor（用户给某个部件手选的墨色）。
+
+    {"disc": "#ffffff", ...} → {"disc": (255,255,255), ...}；没选的部件为 None，
+    下游 design_*2 收到 None 就继续按画面深浅自动选墨 —— 与改造前完全一致。
+    """
+    raw = (copy_settings or {}).get("partTextColor")
+    if not isinstance(raw, dict):
+        return {}
+    return {part: DP.hex_rgb(raw.get(part)) for part in ("disc", "fold", "back", "tray")}
+
+
+def part_scale_from_copy(copy_settings):
+    """读取 copy_settings.partTextScale（用户给某个部件手选的字号倍率）。
+
+    缺省或 1.0 都得到 1.0 —— 下游 part_text_scale(1.0) 不入栈，
+    所有字号算式保持原样，成品与改造前一致。
+    """
+    raw = (copy_settings or {}).get("partTextScale")
+    if not isinstance(raw, dict):
+        return {}
+    out = {}
+    for part in ("disc", "fold", "back", "tray"):
+        try:
+            value = float(raw.get(part) or 1.0)
+        except (TypeError, ValueError):
+            value = 1.0
+        out[part] = max(0.6, min(1.8, value))
+    return out
+
+
+def part_font_from_copy(copy_settings):
+    """读取 copy_settings.partTextFont（用户给某个出版面选的「整面统一字体」）。
+
+    没选的面得到 None —— 下游 part_text_font(None) 一次都不 set，
+    各文字角色仍用各自的默认字体，成品与改造前一致。
+    """
+    raw = (copy_settings or {}).get("partTextFont")
+    if not isinstance(raw, dict):
+        return {}
+    out = {}
+    for part in ("disc", "fold", "back", "tray"):
+        value = str(raw.get(part) or "auto").strip()
+        out[part] = None if value in ("", "auto") else value
+    return out
+
+
+def part_style_from_copy(copy_settings):
+    """读取 copy_settings.partTextStyle（用户给某个出版面选的加粗 / 斜体）。
+
+    只认 normal / bold / italic / boldItalic，其余（含缺省）一律当 normal ——
+    下游 part_text_style("normal") 不改变任何画法，成品与改造前一致。
+    """
+    raw = (copy_settings or {}).get("partTextStyle")
+    if not isinstance(raw, dict):
+        return {}
+    out = {}
+    for part in ("disc", "fold", "back", "tray"):
+        value = str(raw.get(part) or "normal").strip().lower()
+        out[part] = value if value in ("bold", "italic", "bolditalic") else None
+    return out
+
+
 def build_parts(cover, album, artist, D, tracks, company, ai=None, dpi=DPI,
-                inner_copy="", barcode_code="", copyright_text="", release_year="", back_layout="auto", copy_settings=None):
+                inner_copy="", barcode_code="", copyright_text="", release_year="", back_layout="auto", copy_settings=None,
+                ai_elements=None, part_ink=None):
     """出 ①②③ 三件（override-aware）。返回 (disc, fold, strip)。
     ai 可覆盖：disc 盘面 / cover 封面 / fold 封面背面 / backArt 封底 /
     trayArt 内盘底 / sideR 右侧封 / sideL 左侧封 / spineBack 左侧封背面；
-    strip（整条封底条展开图）仍兼容旧前端。上传件当底图，三条窄封的
-    侧封文字层照常叠加（文字/字体可在侧封工具栏自定义）。
+    strip（整条封底条展开图）仍兼容旧前端。
+
+    🔴 上传件是**底图**，不是成品：原先生成在这块面上的文字层照旧叠加，
+    逐项由 ai_elements 决定留哪几层（2026-10-30 用户要求：换底图不该等于把
+    曲目/条码/版权一起删掉，删留要交给用户决定）。ai_elements 为 None 时
+    全部保留，与改造前一致。
     """
     MC._dpi[0] = dpi  # make_back_strip 用模块级 _dpi
+    els = ai_elements if isinstance(ai_elements, dict) else {}
+
+    def _el(part):
+        """该部件的元素开关；没配就返回 None（= 全画）。"""
+        v = els.get(part)
+        return v if isinstance(v, dict) else None
+
+    part_ink = part_ink if isinstance(part_ink, dict) else part_ink_from_copy(copy_settings)
+    part_scale = part_scale_from_copy(copy_settings)
+    part_font = part_font_from_copy(copy_settings)
+    part_style = part_style_from_copy(copy_settings)
+
+    def _ink(part):
+        """该部件的「用户手选墨色」；没配就返回 None（= 程序自动判深浅）。"""
+        value = part_ink.get(part)
+        return value if isinstance(value, tuple) else None
+
+    def _font(part):
+        """该出版面的「整面统一字体」；没配就返回 None（= 各角色默认字体）。"""
+        return part_font.get(part)
+
+    def _style(part):
+        """该出版面的加粗 / 斜体；没配就返回 None（= normal，与改造前一致）。"""
+        return part_style.get(part)
 
     # 上传的封面：归一到原封面尺寸后，作为全部衍生设计（盘面/封底/侧封延展）的画面源
     if ai and ai.get("cover"):
@@ -266,40 +449,74 @@ def build_parts(cover, album, artist, D, tracks, company, ai=None, dpi=DPI,
     # ① 盘面
     disc_d = mm(SP.DISC_D, dpi)
     hole_d = mm(SP.DISC_HOLE, dpi)
-    if ai and ai.get("disc"):
-        # 上传的盘面底图：裁到 Ø40 后套圆形遮罩 + 内孔（实体盘面照片也是这个处理）
-        disc = MC.disc_face(MC.cover_crop(ai["disc"], disc_d, disc_d), disc_d, hole_d)
-    else:
-        disc = DP.design_disc2((ai or {}).get("discArt") or cover, disc_d, hole_d, D, rendered_album, artist, company, copy_settings=copy_settings)
+    disc_base = MC.cover_crop(ai["disc"], disc_d, disc_d) if (ai and ai.get("disc")) else None
+    # 上传态的盘面底图从径向外沿起算：原 design_disc2 针对封面美术，会让上传图再被
+    # 裁一圈；这里直接把整幅交给 design_disc2 套圆遮罩 + 打印信息层。
+    disc = DP.design_disc2(cover, disc_d, hole_d, D, rendered_album, artist, company,
+                           copy_settings=copy_settings,
+                           base_image=disc_base, elements=_el("disc"), ink_override=_ink("disc"),
+                           text_scale=part_scale.get("disc"),
+                           text_font=_font("disc"), text_style=_style("disc"))
 
     # ② 封面折件（左内页 + 右封面）
     fold_w = mm(SP.COVER_W, dpi)
     fold_h = mm(SP.COVER_H, dpi)
-    if ai and ai.get("fold"):
-        inner_im = MC.cover_crop(ai["fold"], fold_w // 2, fold_h)
-        fold = MC.make_cover_fold(inner_im, cover, fold_w, fold_h, D, copy_settings,
-                                  front_is_upload=bool(ai.get("cover")))
-    else:
-        inner_im = DP.design_inner2((ai or {}).get("insideArt") or cover, fold_w // 2, fold_h, D, rendered_album, artist,
-                                    tracks, quote=(copy_settings or {}).get("conceptCopy", {}).get("primaryChinese") or inner_copy or None,
-                                    copy_settings=copy_settings)
-        fold = MC.make_cover_fold(inner_im, cover, fold_w, fold_h, D, copy_settings,
-                                  front_is_upload=bool(ai and ai.get("cover")))
+    # 封面背面同样是「底图 + 文字层」：上传也好、程序衍生也好，都走同一个
+    # design_inner2，区别只是纸从哪来 —— 这样文字层的删留也只有一处逻辑。
+    inner_im = DP.design_inner2((ai or {}).get("insideArt") or cover, fold_w // 2, fold_h, D, rendered_album, artist,
+                                tracks, quote=(copy_settings or {}).get("conceptCopy", {}).get("primaryChinese") or inner_copy or None,
+                                copy_settings=copy_settings,
+                                base_image=(ai or {}).get("fold"), elements=_el("fold"),
+                                ink_override=_ink("fold"), text_scale=part_scale.get("fold"),
+                                text_font=_font("fold"),
+                                text_style=_style("fold"))
+    fold = MC.make_cover_fold(inner_im, cover, fold_w, fold_h, D, copy_settings,
+                              front_is_upload=bool(ai and ai.get("cover")))
 
     # ③ 封底条（封底 + 内盘底 + 侧封边缘延展）
     strip_w = mm(SP.BACK_W, dpi)
     strip_h = mm(SP.BACK_H, dpi)
-    if ai and ai.get("strip"):
+    segs = [mm(float(s), dpi) for s in SP.BACK_SEGS]
+    # 只要传了底图或配了元素开关，就在这里先把这一面整块渲染好再交给 make_back_strip；
+    # make_back_strip 内部原本是「有上传图就 cover_crop 了事」，会把信息层整块丢掉。
+    back_el, tray_el = _el("back"), _el("tray")
+    back_base, tray_base = (ai or {}).get("backArt"), (ai or {}).get("trayArt")
+    back_rendered = tray_rendered = None
+    if back_base is not None or back_el is not None:
+        back_rendered = DP.design_back2(cover, segs[1], strip_h, D, rendered_album, artist, tracks,
+                                        quote=inner_copy or None, company=company,
+                                        barcode_code=barcode_code, copyright_text=copyright_text,
+                                        release_year=release_year, back_layout=back_layout,
+                                        copy_settings=copy_settings,
+                                        base_image=back_base, elements=back_el,
+                                        ink_override=_ink("back"), text_scale=part_scale.get("back"),
+                                        text_font=_font("back"),
+                                        text_style=_style("back"))
+    if tray_base is not None or tray_el is not None:
+        tray_rendered = DP.design_tray2(cover, segs[4], strip_h, D, rendered_album, artist, company,
+                                        copy_settings=copy_settings,
+                                        base_image=tray_base, elements=tray_el,
+                                        ink_override=_ink("tray"), text_scale=part_scale.get("tray"),
+                                        text_font=_font("tray"),
+                                        text_style=_style("tray"))
+    if ai and ai.get("strip") and back_rendered is None and tray_rendered is None:
         strip = MC.cover_crop(ai["strip"], strip_w, strip_h)
     else:
-        strip = MC.make_back_strip((ai or {}).get("backArt"), (ai or {}).get("trayArt"), strip_w, strip_h, cover, rendered_album,
+        strip = MC.make_back_strip(back_rendered if back_rendered is not None else back_base,
+                                   tray_rendered if tray_rendered is not None else tray_base,
+                                   strip_w, strip_h, cover, rendered_album,
                                    artist, D, tracks, 0, company,
                                    barcode_code=barcode_code,
                                    copyright_text=copyright_text,
                                    release_year=release_year, back_layout=back_layout, copy_settings=copy_settings,
                                    side_right_im=(ai or {}).get("sideR"),
                                    side_left_im=(ai or {}).get("sideL"),
-                                   side_back_im=(ai or {}).get("spineBack"))
+                                   side_back_im=(ai or {}).get("spineBack"),
+                                   side_elements={"right": _el("sideR"),
+                                                  "left": _el("sideL"),
+                                                  "left-back": _el("spineBack")},
+                                   part_ink=part_ink, part_scale=part_scale,
+                                   part_font=part_font, part_style=part_style)
     if title_asset_image is not None:
         reports = {}
         disc, reports["disc"] = TC.place_title_asset(disc, title_asset_image, TC.resolve_title_placement("disc", SP), SP.title_protected_rects_mm("disc"), dpi)
@@ -351,15 +568,50 @@ def _load_ai(path):
         return None
 
 
-def _clean_preview_cache(max_age=60 * 60):
-    """清理一小时前的临时预览；正式任务永远不放在这个目录。"""
+def _clean_preview_cache(max_age=60 * 60, limit=24):
+    """回收历史遗留的一次性预览目录（老格式 p-xxxxxxxx）。
+
+    只清新版出现之前留下来的一次性目录；新的预览槽位 s-NN 是循环复用的，不参与删除。
+    在 daemon 线程里跑一次就够了 —— 就算外部安全策略把删除拦下，也顶多是没清掉，
+    不可能把预览请求拖垮。这里的 try 覆盖 BaseException（含 SystemExit），
+    任何岔子都只是「这次没清成」。
+    """
+    global _clean_disabled
+    if _clean_disabled:
+        return
+    try:
+        if not PREVIEW_DIR.is_dir():
+            return
+        items = [p for p in PREVIEW_DIR.iterdir()
+                 if p.is_dir() and not p.name.startswith("s-")]
+    except Exception:
+        return
+    if not items:
+        return
     cutoff = time.time() - max_age
-    for item in PREVIEW_DIR.iterdir():
-        try:
-            if item.is_dir() and item.stat().st_mtime < cutoff:
-                shutil.rmtree(item, ignore_errors=True)
-        except OSError:
-            pass
+    removed = 0
+    try:
+        for item in sorted(items, key=lambda p: p.stat().st_mtime):
+            if removed >= limit:
+                break
+            try:
+                if item.stat().st_mtime < cutoff:
+                    shutil.rmtree(item, ignore_errors=True)
+                    removed += 1
+            except Exception:
+                continue
+    except BaseException:
+        # 清理遇到非预期中断（例如外部策略直接中止操作）时，只停手，绝不往上抛。
+        _clean_disabled = True
+
+
+def _start_preview_cache_prune():
+    """服务启动时在后台尝试回收一次历史目录。失败不影响任何请求。"""
+    try:
+        threading.Thread(target=_clean_preview_cache, name="preview-prune",
+                         daemon=True).start()
+    except Exception:
+        pass
 
 
 def _title_state(data, design, album, artist, cover=None):
@@ -410,19 +662,19 @@ def build_preview(data):
         preview_dpi = max(PREVIEW_DPI, min(DPI, int(requested_dpi)))
     except (TypeError, ValueError):
         preview_dpi = PREVIEW_DPI
-    token = "p-" + uuid.uuid4().hex[:16]
-    dest = PREVIEW_DIR / token
-    dest.mkdir(parents=True, exist_ok=True)
+    dest, slot = _preview_slot()  # slot 形如 "s-07"
+    token = "p-%s-%s" % (slot.replace("-", ""), uuid.uuid4().hex[:12])  # → p-s07-xxxxxxxxxxxx
     font_token = TYPO.set_font_overrides(copy_settings.get("typography"))
     try:
         disc, fold, strip = build_parts(cover, album, artist, D, tracks, company,
                                         ai if any(ai.values()) else None, preview_dpi,
-                                        inner_copy, barcode_code, copyright_text, release_year, str(data.get("backLayout") or "auto"), copy_settings)
+                                        inner_copy, barcode_code, copyright_text, release_year, str(data.get("backLayout") or "auto"), copy_settings,
+                                        ai_elements=_ai_elements(data))
     finally:
         TYPO.reset_font_overrides(font_token)
     for name, image in (("disc.png", disc), ("cover.png", fold), ("strip.png", strip)):
         image.save(str(dest / name), optimize=True)
-    _clean_preview_cache()
+    # 注意：这里不再做任何清理 —— 清理出岔子会把整个预览请求拖没（2026-10-31 两次事故）。
     return {"ok": True, "token": token, "copySettings": copy_settings, "titleTypography": title_state,
             "parts": {name: "/api/design/preview-file?token=%s&name=%s" % (token, name)
                       for name in ("disc.png", "cover.png", "strip.png")}}
@@ -463,6 +715,7 @@ def build_job(data):
         "sideL": _load_ai(data.get("aiSideL")),
         "spineBack": _load_ai(data.get("aiSpine")),
     }
+    els = _ai_elements(data)
     title_state = _title_state(data, D, album, artist, cover)
     has_ai = any(ai.values())
 
@@ -478,7 +731,8 @@ def build_job(data):
     try:
         disc, fold, strip = build_parts(cover, album, artist, D, tracks, company,
                                         ai if has_ai else None, DPI,
-                                        inner_copy, barcode_code, copyright_text, release_year, str(data.get("backLayout") or "auto"), copy_settings)
+                                        inner_copy, barcode_code, copyright_text, release_year, str(data.get("backLayout") or "auto"), copy_settings,
+                                        ai_elements=_ai_elements(data))
     finally:
         TYPO.reset_font_overrides(font_token)
     disc.save(str(d / "part-disc.png"))
@@ -545,11 +799,17 @@ def build_job(data):
         "spineTemplates": copy_settings["spineTemplates"],
         "spineText": copy_settings["spineText"],
         "spineAppearance": copy_settings["spineAppearance"],
+        "partTextColor": copy_settings.get("partTextColor", {}),
+        "partTextScale": copy_settings.get("partTextScale", {}),
+        "partTextFont": copy_settings.get("partTextFont", {}),
+        "partTextStyle": copy_settings.get("partTextStyle", {}),
         "typography": copy_settings["typography"],
         "titleTypography": title_state,
         "mood": D["mood"], "style": D["style"],
         "main": list(D["main"]), "hasAi": has_ai or use_local_ai,
         "localAi": use_local_ai,
+        # 每个部件保留了哪些文字层（用户逐项勾选的结果），回看/复刻时要用
+        "aiElements": els,
         # 项目库回看要用的「原始输入」：没有 pic 就只能看出件图、不能重跑
         "pic": str(pic), "safeBands": str(data.get("safeBands") or ""),
         "created": time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -783,6 +1043,9 @@ def build_batch(data):
             company, release_year, _release_date = _release_metadata(
                 alb, artist, album, str(alb.get("company") or company_all))
             tracks = _norm_tracks(alb.get("tracks"))
+            if not tracks:
+                # 专辑墙的批量只给了 id：按 id 取这张专辑自己的曲目。
+                tracks = _album_tracks_by_id(alb.get("id"))
             cover = _fetch_cover(alb.get("pic"))
             if cover is None:
                 raise ValueError("封面拉取失败")
@@ -800,7 +1063,8 @@ def build_batch(data):
             has_ai = any(ai.values())
             disc, fold, strip = build_parts(cover, album, artist, D, tracks,
                                             company, ai if has_ai else None, DPI,
-                                            release_year=release_year)
+                                            release_year=release_year,
+                                            ai_elements=_ai_elements(alb))
 
             tag = "%02d" % i
             fn = {"disc": tag + "-disc.png", "cover": tag + "-cover.png",
@@ -1183,7 +1447,13 @@ def _serve_preview_file(handler, token, name):
     name = (name or "").strip()
     if name not in {"disc.png", "cover.png", "strip.png"}:
         return handler._json({"error": "bad preview file"}, 400)
-    base = (PREVIEW_DIR / token).resolve()
+    # token 形如 p-s07-xxxxxxxxxxxx：槽位目录循环复用，按槽位号取用地；
+    # 旧的一次性目录（p-xxxxxxxx）仍按原路径兼容读取。
+    slot = _SLOT_TOKEN.match(token) if isinstance(token, str) else None
+    if slot:
+        base = (PREVIEW_DIR / ("s-%s" % slot.group(1))).resolve()
+    else:
+        base = (PREVIEW_DIR / token).resolve()
     fp = (base / name).resolve()
     if not fp.is_file() or fp.parent != base:
         return handler._json({"error": "preview expired"}, 404)
@@ -1286,7 +1556,7 @@ def handle(handler, path, query, method):
             if not zp.is_file():
                 handler._json({"error": "任务尚未生成或已清理"}, 404)
                 return True
-            handler._file(str(zp), name="迷你CD设计-%s.zip" % jid)
+            handler._file(str(zp), name=zip_download_name(jid))
             return True
         if path == "/api/design/state":
             jid = _safe_jid(value("jid"))
@@ -1312,3 +1582,6 @@ class DesignService:
 
 
 SERVICE = DesignService()
+
+# 服务启动时回收一次历史遗留的一次性预览目录（后台线程，失败不影响任何请求）。
+_start_preview_cache_prune()

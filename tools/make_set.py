@@ -79,6 +79,45 @@ def norm(song: dict) -> dict:
     }
 
 
+def _artist_order(ars, artist):
+    """候选顺序：**名字完全相同者排最前**，其余保持网易云的热度顺序。
+
+    ⚠️ 网易云 type=100 是热度排序，不是匹配度排序。同名/关联艺人常常压在
+    本人条目前面 —— 实测搜「刘清云」第一个是 h3R3（50 首热门），本人
+    「刘清云」排第二（6 首）。旧代码 `ar = ars[0]` 会拉回别人的歌单，
+    再拿它去算主唱命中率必然 0%，最后被判「版权不在网易云」整批丢弃，
+    用户看到的却是"明明App里有歌，这里搜不到"（2026-10-30 修复）。
+    """
+    target = (artist or "").strip()
+    ids = set()
+    exact, rest = [], []
+    for a in ars:
+        aid = a.get("id")
+        if aid in ids:
+            continue
+        ids.add(aid)
+        if target and (a.get("name") or "").strip() == target:
+            exact.append(a)
+        else:
+            rest.append(a)
+    return exact + rest
+
+
+def _fetch_hot(ar, retry, timeout):
+    """取一位歌手的热门歌，返回 (songs, err)。hotSongs 为空时退 top/song。"""
+    d, e2 = get_json_ex(f"{API}/v1/artist/{ar['id']}",
+                        retry=retry, timeout=timeout)
+    hot = d.get("hotSongs") or []
+    e3 = None
+    if not hot:
+        d2, e3 = get_json_ex(f"{API}/artist/top/song", {"id": ar["id"]},
+                             retry=retry, timeout=timeout)
+        hot = d2.get("songs") or []
+    if not hot and (e2 or e3):
+        return [], f"歌手详情接口不可用（{e2 or e3}）"
+    return hot, None
+
+
 def hot_songs_ex(artist: str, n: int, retry: int = 2, timeout: int = 9):
     """取歌手热门前 n 首。返回 (ar, pool, err)。
 
@@ -99,17 +138,19 @@ def hot_songs_ex(artist: str, n: int, retry: int = 2, timeout: int = 9):
     ars = (res.get("result") or {}).get("artists") or []
     if not ars:
         return None, [], None
-    ar = ars[0]
-    d, e2 = get_json_ex(f"{API}/v1/artist/{ar['id']}",
-                        retry=retry, timeout=timeout)
-    hot = d.get("hotSongs") or []
-    if not hot:
-        d2, e3 = get_json_ex(f"{API}/artist/top/song", {"id": ar["id"]},
-                             retry=retry, timeout=timeout)
-        hot = d2.get("songs") or []
-        if not hot and (e2 or e3):
-            return ar, [], f"歌手详情接口不可用（{e2 or e3}）"
-    return ar, [norm(s) for s in hot[:n]], None
+    order = _artist_order(ars, artist)
+    head, last_err = order[0], None
+    for ar in order:
+        hot, err = _fetch_hot(ar, retry, timeout)
+        if err:
+            # 接口失败不等于「没有版权」→ 记下来，继续试下一个候选
+            last_err = err
+            continue
+        if hot:
+            return ar, [norm(s) for s in hot[:n]], None
+    if last_err:
+        return head, [], last_err
+    return head, [], None      # 所有候选都没有歌 → 确实没有这位歌手
 
 
 def hot_songs(artist: str, n: int):

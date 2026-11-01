@@ -26,11 +26,12 @@ from __future__ import annotations
 import os
 import sys
 import json
+from contextlib import contextmanager
 from functools import lru_cache
 from pathlib import Path
 from contextvars import ContextVar
 
-from PIL import ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 if _HERE not in sys.path:
@@ -343,6 +344,28 @@ def reset_font_overrides(token):
     _FONT_OVERRIDES.reset(token)
 
 
+# 全部的配置槽位（所有绘制角色最终都归到这 6 个槽上，见 _ROLE_SLOT）。
+# 一次把 6 个槽都指向同一个字体 = 这一整面出版物的文字统一用它。
+_FONT_SLOTS = ("display", "artist", "chineseCopy", "englishCopy", "metadata", "spine")
+
+
+@contextmanager
+def part_font(font_id):
+    """作用域式的「整面统一字体」：包住某个出版面的绘制过程。
+
+    空值 / "auto" 时一次都不 set —— 没开这项设置时走原路径，成品与原先一致。
+    纯拉丁字体遇到中文会由 _preset_path 自动回退到本角色字体，不会出现豆腐块。
+    """
+    if not font_id or str(font_id) == "auto":
+        yield
+        return
+    token = set_font_overrides({slot: str(font_id) for slot in _FONT_SLOTS})
+    try:
+        yield
+    finally:
+        reset_font_overrides(token)
+
+
 def _preset_path(font_id: str | None, text: str | None = None) -> str | None:
     builtin_path, builtin_language = _builtin_font_file(font_id)
     if builtin_path:
@@ -468,11 +491,21 @@ def tracked_width(d, text: str, f, tracking: float = 0.0) -> float:
     return sum(d.textlength(ch, font=f) for ch in text) + tracking * max(0, len(text) - 1)
 
 
+# 加粗 / 斜体的强度：与侧封竖排（design_parts._vertical_spine_text）保持同一套手感 ——
+# 加粗 = 描边重绘（不是偏移 1px 重画，字号小的时候那样根本看不出来）；
+# 斜体 = 整段水平错切（顶部向右倾），0.25 的斜率在 1.7mm 小字上也认得出。
+_BOLD_STROKE_K = 0.05
+_ITALIC_SHEAR = 0.25
+
+
 def tracked(d, xy, text: str, f, fill, tracking: float = 0.0,
-            anchor_x: str = "left", limit: float | None = None) -> float:
+            anchor_x: str = "left", limit: float | None = None,
+            bold: bool = False, italic: bool = False) -> float:
     """带字距的绘制（PIL 原生没有 letter-spacing，只能逐字画）。
 
     ``limit`` 给定时超出宽度自动截断加省略号，返回实际宽度。
+    ``bold`` / ``italic`` **默认关闭**：没开时走的就是原来那条逐字绘制的路径，
+    成品与加这两个开关之前逐像素一致。
     """
     x, y = xy
     if not text:
@@ -489,8 +522,53 @@ def tracked(d, xy, text: str, f, fill, tracking: float = 0.0,
         x -= w / 2.0
     elif anchor_x == "right":
         x -= w
+    if not bold and not italic:
+        for ch in text:
+            d.text((x, y), ch, font=f, fill=fill)
+            x += d.textlength(ch, font=f) + tracking
+        return w
+    # 斜体需要一块临时图层做错切，再贴回原图；拿不到原图（或是单通道图层，
+    # 例如 hand_text 的阴影遮罩）就只能退化为普通绘制。
+    base_im = getattr(d, "_image", None)
+    if base_im is not None and base_im.mode not in ("RGB", "RGBA"):
+        base_im = None
+    if base_im is None:
+        stroke_w = max(1, int(round(f.size * _BOLD_STROKE_K))) if bold else 0
+        for ch in text:
+            if stroke_w:
+                d.text((x, y), ch, font=f, fill=fill,
+                       stroke_width=stroke_w, stroke_fill=fill)
+            else:
+                d.text((x, y), ch, font=f, fill=fill)
+            x += d.textlength(ch, font=f) + tracking
+        return w
+    # fill 可能是 RGB 元组，也可能是单通道的整数（hand_text 的阴影遮罩就是 255）。
+    rgba = (fill, fill, fill, 255) if isinstance(fill, int) else tuple(fill[:3]) + (255,)
+    if italic:
+        pad = max(2, int(f.size * 0.25))
+        ch_h = int(f.size * 1.4) + pad * 2
+        cw = int(w) + pad * 2
+        extra = int(ch_h * _ITALIC_SHEAR)
+        layer = Image.new("RGBA", (cw, ch_h), (0, 0, 0, 0))
+        ld = ImageDraw.Draw(layer)
+        lx = pad
+        stroke_w = max(1, int(round(f.size * _BOLD_STROKE_K))) if bold else 0
+        for ch in text:
+            if stroke_w:
+                ld.text((lx, pad), ch, font=f, fill=rgba,
+                        stroke_width=stroke_w, stroke_fill=rgba)
+            else:
+                ld.text((lx, pad), ch, font=f, fill=rgba)
+            lx += ld.textlength(ch, font=f) + tracking
+        sheared = layer.transform((cw + extra, ch_h), Image.AFFINE,
+                                  (1, _ITALIC_SHEAR, -extra, 0, 1, 0),
+                                  resample=Image.Resampling.BICUBIC)
+        base_im.paste(sheared, (int(x) - pad, int(y) - pad), sheared)
+        return w
+    stroke_w = max(1, int(round(f.size * _BOLD_STROKE_K)))
     for ch in text:
-        d.text((x, y), ch, font=f, fill=fill)
+        d.text((x, y), ch, font=f, fill=fill,
+               stroke_width=stroke_w, stroke_fill=fill)
         x += d.textlength(ch, font=f) + tracking
     return w
 

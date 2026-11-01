@@ -1,7 +1,16 @@
 """Mini CD 文案与字体设置：只决定方向与真实字体记录，不生成 Artwork 文字。"""
 from __future__ import annotations
 
+import re
+
 ROLES = ("display", "artist", "chineseCopy", "englishCopy", "metadata", "spine")
+# 字体 id 的形状约束：字母数字开头，允许 : _ . - 分隔（如 builtin:noto-serif-sc）。
+_FONT_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_:.\-]{0,63}$")
+# 可让用户手选「这一面文字用什么颜色」的印刷面（侧封另走 spineAppearance）。
+PART_TEXT_COLOR_PARTS = ("disc", "fold", "back", "tray")
+# 四个印面的加粗 / 斜体取值，与侧封 spineAppearance.style 完全一致
+# （键是小写形式，值是存档里写的规范形式 —— 比较一律先 lower）。
+PART_TEXT_STYLES = {"normal": "normal", "bold": "bold", "italic": "italic", "bolditalic": "boldItalic"}
 # 三条物理侧封尺寸完全相同，因此共用一套模板库；位置只决定它贴在哪一条边。
 SPINE_TEMPLATE_DEFAULTS = {"right": "title-artist-classic", "left": "title-artist-classic", "leftBack": "title-artist-classic"}
 COMMON_SPINE_TEMPLATE_OPTIONS = {"title-artist-classic"}
@@ -33,6 +42,68 @@ def _spine_appearance(raw):
         color = "auto"
     return {"font": font, "sizeMm": size_mm, "titleSizeMm": title_size_mm,
             "artistSizeMm": artist_size_mm, "style": style, "color": color}
+
+
+def _part_text_color(raw):
+    """每个出版面的「用户手选文字颜色」：{"disc": "#ffffff", ...}。
+
+    只允许 auto 或 #rrggbb，其它一律回落 auto（不让脏值渗进渲染层）。
+    """
+    raw = raw if isinstance(raw, dict) else {}
+    out = {}
+    for part in PART_TEXT_COLOR_PARTS:
+        value = str(raw.get(part) or "auto").lower()
+        if value != "auto" and not re.fullmatch(r"#[0-9a-f]{6}", value):
+            value = "auto"
+        out[part] = value
+    return out
+
+
+def _part_text_scale(raw):
+    """每个出版面的「字号倍率」：{"disc": 1.15, ...}。
+
+    超出范围的数字会被夹回边界（避免一个脏值把某面文字放大到糊成一团），
+    非数字或缺失一律回落到 1.0（原始版式）。
+    """
+    raw = raw if isinstance(raw, dict) else {}
+    out = {}
+    for part in PART_TEXT_COLOR_PARTS:
+        try:
+            value = float(raw.get(part) or 1.0)
+        except (TypeError, ValueError):
+            value = 1.0
+        out[part] = max(0.6, min(1.8, round(value, 2)))
+    return out
+
+
+def _part_text_font(raw):
+    """每个出版面的「整面统一字体」：{"disc": "serif-cn-bold", ...}。
+
+    只认形状合法的字体 id；形状不对的一律回落 auto（沿用各角色默认字体），
+    免得一个脏值让某一面的文字全部掉帧。这里刻意**不去比字体库清单**：
+    本机字体、私有字体的 id 是运行时才枚举出来的，拿静态清单比对会把它们误杀。
+    """
+    raw = raw if isinstance(raw, dict) else {}
+    out = {}
+    for part in PART_TEXT_COLOR_PARTS:
+        value = str(raw.get(part) or "auto").strip()
+        if value != "auto" and not _FONT_ID_RE.fullmatch(value):
+            value = "auto"
+        out[part] = value
+    return out
+
+
+def _part_text_style(raw):
+    """每个出版面的「加粗 / 斜体」：{"disc": "bold", ...}。
+
+    只认 normal / bold / italic / boldItalic 四个值（与侧封 spineAppearance.style
+    同一套写法），其它一律回落 normal。
+    """
+    raw = raw if isinstance(raw, dict) else {}
+    out = {}
+    for part in PART_TEXT_COLOR_PARTS:
+        out[part] = PART_TEXT_STYLES.get(str(raw.get(part) or "").strip().lower(), "normal")
+    return out
 
 
 def _spine_character_styles(raw):
@@ -78,6 +149,10 @@ def normalize_copy_settings(raw):
                           for key in SPINE_TEMPLATE_DEFAULTS},
             "spineAppearance": {key: _spine_appearance(spine_appearance_raw.get(key))
                                for key in SPINE_TEMPLATE_DEFAULTS},
+            "partTextColor": _part_text_color(raw.get("partTextColor")),
+            "partTextScale": _part_text_scale(raw.get("partTextScale")),
+            "partTextFont": _part_text_font(raw.get("partTextFont")),
+            "partTextStyle": _part_text_style(raw.get("partTextStyle")),
             "spineCharacterStyles": _spine_character_styles(spine_character_styles_raw),
             "typography": {k: str(typo.get(k) or "auto") for k in ROLES}}
 

@@ -58,5 +58,15 @@ class DesignUiRegressionTests(unittest.TestCase):
         self.assertIn('grid-template-rows:28px 56px', html)
         self.assertIn("setRibbonTab('side');", html)
 
+    def test_bold_italic_buttons_are_shared_by_spines_and_parts(self):
+        """2026-11-01：选到盘面/封面背面/封底/内盘底时，B / I 不能整组消失 ——
+        四个印面要和三条侧封共用同一对按钮、同一套加粗斜体手感。"""
+        html = (Path(__file__).resolve().parents[1] / 'workbench' / 'design.html').read_text(encoding='utf-8')
+        self.assertNotIn("set($('#spineBold'),showPart)", html)
+        self.assertNotIn("set($('#spineItalic'),showPart)", html)
+        self.assertIn('const PART_STYLE={disc:', html)
+        self.assertIn('function currentStyleHas(kind)', html)
+        self.assertIn('partTextStyle:{...PART_STYLE}', html)
+
 if __name__ == '__main__':
     unittest.main()
