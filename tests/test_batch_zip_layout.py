@@ -39,6 +39,18 @@ class BatchAlbumFoldersTests(unittest.TestCase):
         self.assertEqual(DS._batch_album_folders(rows),
                          {"07": "专辑07", "08": "专辑08"})
 
+    def test_existing_suffix_does_not_collide_with_generated_suffix(self):
+        rows = [{"no": "01", "album": "旷野"}, {"no": "02", "album": "旷野"},
+                {"no": "03", "album": "旷野 (2)"}]
+        folders = DS._batch_album_folders(rows)
+        self.assertEqual(len(set(folders.values())), 3)
+
+    def test_folder_names_are_unique_on_windows(self):
+        rows = [{"no": str(i), "album": name} for i, name in enumerate(["Album", "album", "ALBUM (2)"])]
+        folders = DS._batch_album_folders(rows)
+        self.assertEqual(len({name.casefold() for name in folders.values()}), 3)
+        self.assertNotEqual(DS._safe_name("CON"), "CON")
+
     def test_illegal_chars_are_replaced(self):
         rows = [{"no": "01", "album": "A/B: 2026?"}]
         name = DS._batch_album_folders(rows)["01"]

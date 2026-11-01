@@ -219,7 +219,9 @@ def _safe_name(name, limit=80):
     系统悄悄吃掉，导致「文件夹存在但打不开」）→ 截断到 limit。
     """
     s = re.sub(r"\s+", " ", str(name or "")).strip()
-    s = re.sub(r'[\\/:*?"<>|\r\n\t]', "_", s).strip().strip(".")[:limit].strip()
+    s = re.sub(r'[\\/:*?"<>|\x00-\x1f]', "_", s).strip().strip(".")[:limit].strip(" .")
+    if re.fullmatch(r"(?:CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\..*)?", s, re.I):
+        s = "_" + s
     return s
 
 
@@ -229,18 +231,18 @@ def _batch_album_folders(rows):
     - 用专辑名做文件夹；重名自动加 `` (2)`` `` (3)``（同一张专辑选两次也不会互相覆盖）。
     - 名字是空的 / 只剩非法字符（极少见）→ 回落 ``专辑<序号>``，保证有地方放东西。
     """
-    out, seen = {}, {}
+    out, seen = {}, set()
     for r in rows:
         no = str(r.get("no") or "")
         name = _safe_name(r.get("album"))
-        key = name.lower() if name else ""
         if not name:
             name = "专辑%s" % (no or "?")
-        elif key in seen:
-            seen[key] += 1
-            name = "%s (%d)" % (name, seen[key])
-        else:
-            seen[key] = 1
+        base, suffix = name, 2
+        while name.casefold() in seen:
+            ending = " (%d)" % suffix
+            name = base[:80 - len(ending)].rstrip(" .") + ending
+            suffix += 1
+        seen.add(name.casefold())
         out[no] = name
     return out
 
