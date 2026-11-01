@@ -133,7 +133,8 @@ def zip_download_name(jid):
 
     以前不管哪张专辑都叫「迷你CD设计-<jid>」，下载一堆之后根本分不清谁是谁
     （2026-11-01 用户要求：名字要对应歌手和专辑名，例如「郑润泽-旷野」）。
-    批量任务没有单一专辑名，退化为「<歌手>-批量<N>张」。
+    批量任务（一次勾选多张专辑）：整批都是同一个歌手 → 就叫「<歌手>.zip」，
+    解压后里面按专辑分文件夹；混了多个歌手时才退化为「<歌手>-批量<N>张」。
     """
     jid = _safe_jid(jid)
     fallback = "迷你CD设计-%s.zip" % (jid or "未知")
@@ -144,15 +145,29 @@ def zip_download_name(jid):
         m = json.loads(mp.read_text(encoding="utf-8"))
     except Exception:
         return fallback
-    artist = re.sub(r"\s+", " ", str(m.get("artist") or "")).strip()
-    album = re.sub(r"\s+", " ", str(m.get("album") or "")).strip()
+    artist = _safe_name(m.get("artist"))
+    album = _safe_name(m.get("album"))
     if m.get("kind") == "minicd-design-batch":
-        n = m.get("count") or 0
-        base = "-".join([p for p in (artist, "批量%d张" % n if n else "批量") if p])
+        names = m.get("albums")
+        singers = []
+        if isinstance(names, list):
+            for a in names:
+                if not isinstance(a, dict):
+                    continue
+                s = _safe_name(a.get("artist"))
+                if s and s not in singers:
+                    singers.append(s)
+        if not singers and artist:
+            singers = [artist]
+        if len(singers) == 1:
+            # 整批都是同一个人 → 压缩包就叫他的名字，专辑在里面的文件夹里分
+            base = singers[0]
+        else:
+            n = m.get("count") or 0
+            suffix = "批量%d张" % n if n else "批量"
+            base = "-".join([p for p in (artist, suffix) if p])
     else:
         base = "-".join([p for p in (artist, album) if p])
-    # Windows 文件名禁用的字符换成下划线，再去掉首尾空格与末尾的点（末尾带点会被系统吃掉）。
-    base = re.sub(r'[\\/:*?"<>|\r\n\t]', "_", base).strip().strip(".")[:80].strip()
     if not base:
         return fallback
     return "%s.zip" % base
@@ -160,6 +175,107 @@ def zip_download_name(jid):
 
 def mm(v, dpi):
     return int(round(v * dpi / 25.4))
+
+
+# 实体专辑素材拆件：把封面折件与封底条裁成 8 张独立件（用户素材库命名约定，
+# 2026-10-28 拍板）。封面折件 = [封面背面 | 封面]，
+# 封底条 = [右侧封 | 封底 | 左侧封 | 左侧封背面 | 内盘底]，再加一张盘面。
+# 单张生成与批量生成共用这一段 —— 批量 ZIP 里每本要跟单独生成「一模一样的那套东西」，
+# 各写一份迟早会长歪。
+SPLIT_PART_NAMES = ("封面.png", "封面背面.png", "右侧封.png", "左侧封.png",
+                    "左侧封背面.png", "封底.png", "内盘底.png", "盘面.png")
+
+
+def _split_part_images(fold, strip, disc):
+    """把「封面折件 / 封底条 / 盘面」裁成 8 张独立素材，键即落盘用的文件名。"""
+    hw = fold.width // 2
+    cover_front = fold.crop((fold.width - hw, 0, fold.width, fold.height))
+    cover_back = fold.crop((0, 0, hw, fold.height))
+    cuts = [0]
+    for s in SP.BACK_SEGS:
+        cuts.append(min(strip.width, cuts[-1] + mm(s, DPI)))
+    cuts[-1] = strip.width
+    seg_right_spine = strip.crop((cuts[0], 0, cuts[1], strip.height))
+    seg_back = strip.crop((cuts[1], 0, cuts[2], strip.height))
+    seg_left_spine = strip.crop((cuts[2], 0, cuts[3], strip.height))
+    seg_spine_back = strip.crop((cuts[3], 0, cuts[4], strip.height))
+    seg_tray = strip.crop((cuts[4], 0, cuts[5], strip.height))
+    return {
+        "封面.png": cover_front,
+        "封面背面.png": cover_back,
+        "右侧封.png": seg_right_spine,
+        "左侧封.png": seg_left_spine,
+        "左侧封背面.png": seg_spine_back,
+        "封底.png": seg_back,
+        "内盘底.png": seg_tray,
+        "盘面.png": disc,
+    }
+
+
+def _safe_name(name, limit=80):
+    """把字符串收拾成能当 Windows 文件/文件夹名的样子。
+
+    去掉首尾空白与控制字符 → 禁用字符换成下划线 → 去掉结尾的点（末尾带点会被
+    系统悄悄吃掉，导致「文件夹存在但打不开」）→ 截断到 limit。
+    """
+    s = re.sub(r"\s+", " ", str(name or "")).strip()
+    s = re.sub(r'[\\/:*?"<>|\r\n\t]', "_", s).strip().strip(".")[:limit].strip()
+    return s
+
+
+def _batch_album_folders(rows):
+    """批量 ZIP 里每一本专辑的文件夹名：``{序号: 文件夹名}``。
+
+    - 用专辑名做文件夹；重名自动加 `` (2)`` `` (3)``（同一张专辑选两次也不会互相覆盖）。
+    - 名字是空的 / 只剩非法字符（极少见）→ 回落 ``专辑<序号>``，保证有地方放东西。
+    """
+    out, seen = {}, {}
+    for r in rows:
+        no = str(r.get("no") or "")
+        name = _safe_name(r.get("album"))
+        key = name.lower() if name else ""
+        if not name:
+            name = "专辑%s" % (no or "?")
+        elif key in seen:
+            seen[key] += 1
+            name = "%s (%d)" % (name, seen[key])
+        else:
+            seen[key] = 1
+        out[no] = name
+    return out
+
+
+def _batch_zip_plan(d, rows, folders, sheet_name):
+    """批量 ZIP 的成员清单 ``[(磁盘路径, 包内路径), ...]``。
+
+    根目录放整批对照图 + meta.json；其余按「一张专辑一个文件夹」分层，
+    每本里面是跟单独生成完全一样的那套素材（见 _album_zip_members）。
+    磁盘上不存在的文件直接跳过 —— 某一本少生成一页不该让整包失败。
+    """
+    plan = []
+    for f in (sheet_name, "meta.json"):
+        if (d / f).is_file():
+            plan.append((d / f, f))
+    for r in rows:
+        no = str(r.get("no") or "")
+        folder = folders.get(no)
+        if not folder:
+            continue
+        for f in _album_zip_members():
+            p = d / ("%s-%s" % (no, f))
+            if p.is_file():
+                plan.append((p, "%s/%s" % (folder, f)))
+    return plan
+
+
+def _album_zip_members():
+    """「单独生成一张专辑」时打包进 ZIP 的那套东西，顺序即查看顺序。
+
+    盘面拼版-A4 不在此列：2026-10-28 用户拍板「导出不含盘面拼版页」，
+    文件仍在任务目录里，作品库能回看。批量 ZIP 跟着走同一套，保持一致。
+    """
+    return ("★版面总览-1比1.png", "打印拼版-A4.png", "打印拼版-A4.pdf",
+            "打印拼版-A4竖版7套.png", "打印拼版-A4竖版7套.pdf") + SPLIT_PART_NAMES
 
 
 def _fetch_cover(pic):
@@ -742,28 +858,7 @@ def build_job(data):
     # ---- 实体专辑素材拆件（用户素材库命名约定，2026-10-28 拍板）----
     # 封面折件 = [封面背面 | 封面]，封底条 = [右侧封|封底|左侧封|左侧封背面|内盘底]。
     # 按段裁开存成 8 张独立 PNG，右侧封与左侧封各自导出，避免遗漏上传的素材。
-    hw = fold.width // 2
-    cover_front = fold.crop((fold.width - hw, 0, fold.width, fold.height))
-    cover_back = fold.crop((0, 0, hw, fold.height))
-    cuts = [0]
-    for s in SP.BACK_SEGS:
-        cuts.append(min(strip.width, cuts[-1] + mm(s, DPI)))
-    cuts[-1] = strip.width
-    seg_right_spine = strip.crop((cuts[0], 0, cuts[1], strip.height))
-    seg_back = strip.crop((cuts[1], 0, cuts[2], strip.height))
-    seg_left_spine = strip.crop((cuts[2], 0, cuts[3], strip.height))
-    seg_spine_back = strip.crop((cuts[3], 0, cuts[4], strip.height))
-    seg_tray = strip.crop((cuts[4], 0, cuts[5], strip.height))
-    split_files = {
-        "封面.png": cover_front,
-        "封面背面.png": cover_back,
-        "右侧封.png": seg_right_spine,
-        "左侧封.png": seg_left_spine,
-        "左侧封背面.png": seg_spine_back,
-        "封底.png": seg_back,
-        "内盘底.png": seg_tray,
-        "盘面.png": disc,
-    }
+    split_files = _split_part_images(fold, strip, disc)
     for name, im in split_files.items():
         im.save(str(d / name))
 
@@ -827,13 +922,8 @@ def build_job(data):
 
     # 打包 ZIP
     zip_path = OUT_DIR / ("%s.zip" % jid)
-    _zip_members = ("★版面总览-1比1.png", "打印拼版-A4.png", "打印拼版-A4.pdf",
-                    "打印拼版-A4竖版7套.png", "打印拼版-A4竖版7套.pdf",
-                    # 盘面拼版不打包：用户拍板不要（文件仍在任务目录，作品库可回看）
-                    "封面.png", "封面背面.png", "右侧封.png", "左侧封.png",
-                    "左侧封背面.png", "封底.png", "内盘底.png", "盘面.png")
     with zipfile.ZipFile(str(zip_path), "w", zipfile.ZIP_DEFLATED) as z:
-        for f in _zip_members:
+        for f in _album_zip_members():
             p = d / f
             if p.is_file():
                 z.write(str(p), f)
@@ -1087,6 +1177,25 @@ def build_batch(data):
             p7n = tag + "-打印拼版-A4竖版7套.png"
             p7.save(str(d / p7n))
             written.append(p7n)
+            page_im.save(str(d / (tag + "-打印拼版-A4.pdf")), "PDF", resolution=DPI)
+            written.append(tag + "-打印拼版-A4.pdf")
+            p7.save(str(d / (tag + "-打印拼版-A4竖版7套.pdf")), "PDF", resolution=DPI)
+            written.append(tag + "-打印拼版-A4竖版7套.pdf")
+
+            # 8 张实体素材拆件（跟单独一张专辑出来的完全一致，同一个函数裁的）
+            for pname, pim in _split_part_images(fold, strip, disc).items():
+                pn2 = tag + "-" + pname
+                pim.save(str(d / pn2))
+                written.append(pn2)
+
+            # 这一张自己的 1:1 总览（批量 ZIP 里每本都要有，和单独生成对齐）
+            Msheettag = tag + "-★版面总览-1比1.png"
+            MS.build_sheet(cover, album, artist, D, tracks, company, str(d / Msheettag),
+                           SHEET_DPI, png=True,
+                           rendered_parts={"rendered_disc": (disc, False),
+                                           "rendered_fold": (fold, False),
+                                           "rendered_strip": (strip, False)})
+            written.append(Msheettag)
 
             rows.append({"no": tag, "album": album, "artist": artist,
                          "date": str(alb.get("date") or ""),
@@ -1126,12 +1235,14 @@ def build_batch(data):
                                  encoding="utf-8")
     written.append("meta.json")
 
+    # ---- 打包 ZIP：歌手名.zip → 一张专辑一个文件夹 → 里面是「单独生成」那一套 ----
+    # 以前是 01-disc.png 这种带序号的平铺文件名，下载回来还得自己分拣。
+    # 磁盘上仍按序号存（批量结果页要用），只有 ZIP 内的路径是分好层的。
+    folders = _batch_album_folders(rows)
     zip_path = OUT_DIR / ("%s.zip" % jid)
     with zipfile.ZipFile(str(zip_path), "w", zipfile.ZIP_DEFLATED) as z:
-        for f in written:
-            p = d / f
-            if p.is_file():
-                z.write(str(p), f)
+        for src, arc in _batch_zip_plan(d, rows, folders, sheet_name):
+            z.write(str(src), arc)
 
     return {
         "ok": True, "jid": jid, "count": len(items), "failed": failed,
