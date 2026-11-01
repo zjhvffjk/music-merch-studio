@@ -17,9 +17,10 @@ import math
 import os
 import re
 import time
+from contextlib import contextmanager
 
 import numpy as np
-from PIL import Image, ImageDraw, ImageEnhance, ImageFilter
+from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageChops
 import spec_minicd as SP
 
 try:
@@ -141,7 +142,7 @@ def grain(im, amt=10, seed=0):
 
 def fit_font(d, text, box_w, start, bold=False, min_s=8):
     """在给定宽度内自动缩字号（先降号，再省略）。"""
-    s = start
+    s = _scaled_size(start)
     while s > min_s:
         f = _font(s, bold)
         if d.textlength(text, font=f) <= box_w:
@@ -478,8 +479,84 @@ try:
 except Exception:  # pragma: no cover
     _typo = None
 
+# 部件级字号倍率的运行栈（单线程同步渲染，用一个列表当栈足够）。
+# 见 part_text_scale()：倍率为 1 时不入栈，所有字号算式原样不动。
+_TS = [1.0]
+
+# 部件级「加粗 / 斜体」的运行栈。默认 normal —— 只有用户在这一面开了
+# 加粗或斜体时才变化；normal 时画法和加这两个开关之前完全一致。
+_TS_STYLE = ["normal"]
+
+
+def _scaled_size(size):
+    """按「当前这一出版面」的字号倍率缩放一个字号。
+
+    倍率为 1 时**原值返回**（不 round），保证没开这项设置时成品与改造前逐像素一致。
+    """
+    r = _TS[-1]
+    if r == 1.0:
+        return size
+    return max(1, int(round(size * r)))
+
+
+@contextmanager
+def part_text_scale(ratio):
+    """作用域式的字号倍率：包住某块版面的绘制过程。
+
+    倍率为 1（或空/非法）时不入栈 —— 完全走原路径，不改任何算式。
+    """
+    try:
+        r = float(ratio)
+    except (TypeError, ValueError):
+        r = 1.0
+    if not r or abs(r - 1.0) < 1e-9:
+        yield
+        return
+    _TS.append(r)
+    try:
+        yield
+    finally:
+        _TS.pop()
+
+
+@contextmanager
+def part_text_font(font_id):
+    """作用域式的「整面统一字体」：包住某个出版面的绘制过程。
+
+    空值 / "auto" / typo 缺失时一次都不生效 —— 没开这项设置时成品与原先一致。
+    """
+    if _typo is None or not font_id or str(font_id) == "auto":
+        yield
+        return
+    with _typo.part_font(font_id):
+        yield
+
+
+@contextmanager
+def part_text_style(style):
+    """作用域式的「整面加粗 / 斜体」：包住某块版面的绘制过程。
+
+    取值 normal / bold / italic / boldItalic，认不出的一律当 normal ——
+    与侧封（spineAppearance.style）同一套写法，用户在哪一面都看到一样的效果。
+    """
+    s = str(style or "normal").strip().lower()
+    if s not in ("normal", "bold", "italic", "bolditalic"):
+        s = "normal"
+    _TS_STYLE.append(s)
+    try:
+        yield
+    finally:
+        _TS_STYLE.pop()
+
+
+def _style_flags():
+    """当前这一面的 (bold, italic)。normal 时为 (False, False)，走原绘制路径。"""
+    s = _TS_STYLE[-1]
+    return s in ("bold", "bolditalic"), s in ("italic", "bolditalic")
+
 
 def _t(role, size, text=None):
+    size = _scaled_size(size)
     if _typo is None:
         return _font(size, bold=role in ("heavy", "serif"))
     return _typo.font(role, size, text)
@@ -489,13 +566,17 @@ def tracked(d, xy, text, f, fill, tracking=0.0, anchor_x="left", limit=None):
     if _typo is None:
         d.text(xy, text, font=f, fill=fill)
         return d.textlength(text, font=f)
-    return _typo.tracked(d, xy, text, f, fill, tracking, anchor_x, limit)
+    bold, italic = _style_flags()
+    if not bold and not italic:
+        return _typo.tracked(d, xy, text, f, fill, tracking, anchor_x, limit)
+    return _typo.tracked(d, xy, text, f, fill, tracking, anchor_x, limit,
+                         bold=bold, italic=italic)
 
 
 def fit_tracked(d, text, box_w, start, role, tracking=0.0, min_s=7):
     if _typo is None:
         return fit_font(d, text, box_w, start)
-    return _typo.fit_tracked(d, text, box_w, start, role, tracking, min_s)
+    return _typo.fit_tracked(d, text, box_w, _scaled_size(start), role, tracking, min_s)
 
 
 def wrap_tracked(d, text, f, box_w, tracking=0.0):
@@ -946,8 +1027,10 @@ def _copy_lines(d, w, artist="", company="", custom="", release_year=""):
     # 换算后，300DPI 为 8px（约 0.68mm），刚好让最长声明完整可读。
     fs = max(3, int(round((float(w) / SP.COPYRIGHT["widthMm"]) * 0.68)))
     f = _t("sans", fs, artist)
-    # 归属始终来自专辑发行数据（或用户确认的厂牌），避免旧项目的自由文本污染生产信息。
-    rest = _label_credit(artist, company, release_year)
+    # 归属行可以由用户改写（=️ 封底版权区填了就用填的），留空时才从发行数据生成：
+    # 厂牌/年份抓错的情况很常见，不给出口就等于印错。
+    # 下面两行英文权利声明是印刷物的固定措辞，不开放改写 —— 改了反而不合规。
+    rest = str(custom or "").strip() or _label_credit(artist, company, release_year)
     a = wrap_tracked(d, rest, f, w, 0.2)
     b = [
         "All rights reserved. Unauthorized copying, reproduction, hiring, lending,",
@@ -1157,15 +1240,108 @@ def _key_grade(D, span=1.0):
     return dict(sat=1.0, bright=1.0 * span, contrast=1.05)
 
 
+# ---------------- 文字层元素开关 ----------------
+# 用户上传自定义底图后，原先由程序生成的信息层（曲目 / 条码 / 版权 / 标题…）
+# 不能被整块丢掉：底图是底图、文字是文字，两层各自独立，用户按元素决定留哪几层。
+# elements 为 None 表示调用方不关心开关（旧调用路径），行为与改造前完全一致。
+def part_elements(elements=None):
+    """规范化elements：None→None（全开，旧行为）；dict→dict。"""
+    return elements if isinstance(elements, dict) else None
+
+
+def el_on(elements, key, default=True):
+    """某个文字元素是否绘制。elements 为 None 时一律沿用旧行为（画）。"""
+    if not isinstance(elements, dict):
+        return default
+    return bool(elements.get(key, default))
+
+
+def hex_rgb(value):
+    """'#rrggbb' → (r,g,b)；'auto'/空/非法 → None。
+
+    用于「用户手选墨色」的入口：返回 None = 沿用程序自动选墨，
+    保证不加这项设置时成品与改造前**逐像素一致**。
+    """
+    s = str(value or "").strip().lower()
+    if not re.fullmatch(r"#[0-9a-f]{6}", s):
+        return None
+    return tuple(int(s[i:i + 2], 16) for i in (1, 3, 5))
+
+
+def _cover_fit(im, w, h):
+    """等比放大到盖住 (w,h) 后居中裁 —— **不改变原图内部比例**。
+
+    用户上传的实拍照片大多是 4:3 / 3:2，版面却是 49:38（约 1.29）。
+    safe_crop 的窗口算式是按「源图接近正方形」推的（封面正好都是 1:1），
+    套到相机照片上会把画面纵向拉长；这里先把上传图规整成版面尺寸，
+    后面 resolve_substrate 就不再二次裁切（尺寸已相等），画面保持原样。
+    """
+    im = im.convert("RGB")
+    sw, sh = im.size
+    if (sw, sh) == (int(w), int(h)):
+        return im
+    scale = max(int(w) / float(sw), int(h) / float(sh))
+    nw, nh = max(int(w), int(round(sw * scale))), max(int(h), int(round(sh * scale)))
+    im = im.resize((nw, nh), Image.LANCZOS)
+    l, t = (nw - int(w)) // 2, (nh - int(h)) // 2
+    return im.crop((l, t, l + int(w), t + int(h)))
+
+
+def resolve_substrate(base_image, cover, w, h, D, crop, grade_kw, scrim_kw,
+                      elements=None, key="scrim", upload_scrim_kw=None):
+    """决定一幅印刷面的“纸”从哪来。
+
+    base_image 非空 → 用户上传图直接当纸（只居中裁到版面尺寸，**不再 grade**
+    重着色，否则换了等于没换）；仍可保留一层压暗，避免文字压到亮部看不清，
+    但上传态通常用更轻的 upload_scrim_kw —— 原本的 scrim 是为封面衍生图调的，
+    直接套在用户自己的照片上会把整幅压灰。
+    否则 → 与改造前一致：从封面按原参数取景 + grade + scrim。
+    """
+    if base_image is not None:
+        b = base_image.convert("RGB")
+        if b.size != (int(w), int(h)):
+            b = safe_crop(b, int(w), int(h))
+        if el_on(elements, key, True):
+            b = scrim(b, **(upload_scrim_kw or scrim_kw))
+        return b
+    base = grade(safe_crop(cover, w, h, D, **crop), **grade_kw)
+    return scrim(base, **scrim_kw)
+
+
 def design_back2(cover, w, h, D, album="", artist="", tracks=None, seed=0,
                  quote=None, company="", barcode_code="", copyright_text="", release_year="",
-                 back_layout="auto", copy_settings=None):
+                  back_layout="auto", copy_settings=None,
+                  base_image=None, elements=None, ink_override=None, text_scale=None, text_font=None,
+                  text_style=None):
+    """封底。text_scale 是「这一面所有程序文字」的字号倍率（1.0=原始版式）；
+    text_font 是这一面统一使用的字体（auto/空 = 沿用各角色的默认字体）；
+    text_style 是这一面的加粗 / 斜体（normal / bold / italic / boldItalic）。"""
+    with part_text_font(text_font), part_text_scale(text_scale), part_text_style(text_style):
+        return _design_back2_impl(cover, w, h, D, album, artist, tracks, seed, quote, company,
+                                  barcode_code, copyright_text, release_year, back_layout,
+                                  copy_settings, base_image, elements, ink_override)
+
+
+def _design_back2_impl(cover, w, h, D, album="", artist="", tracks=None, seed=0,
+                       quote=None, company="", barcode_code="", copyright_text="", release_year="",
+                       back_layout="auto", copy_settings=None,
+                       base_image=None, elements=None, ink_override=None):
     """封底（v2）：整幅照片做底 + 左侧压暗信息栏 + 曲目 + 金句 + 版权层 + EAN-13。
 
     版式取实体唱片的通用解法：**照片通铺、信息分区**。硬切左右两半会显得像
     两张图拼的；用「渐变压暗让出对比度」才能真正像一张封底。
+
+    base_image：用户上传的底图 —— 用它替代封面取景，但**信息层照常绘制**
+    （2026-10-30 用户要求：换底图不等于删掉曲目/条码/版权，删留交给用户决定）。
+    elements：逐元素开关，键见下方 el_on 调用；None = 全画。
     """
     w, h = int(w), int(h)
+    if base_image is not None:
+        # 上传图先按原比例规整到版面 —— 与内盘底同一套做法（2026-10-31）。
+        # 下面的取景算式是按「源图接近正方形」推的，专辑封面正好 1:1 所以一直没露馅；
+        # 相机照片多是 4:3 / 3:2，套进去窗口不再是版面比例，画面会被纵向拉长约 25%
+        # （人变瘦高、圆变椭圆）。先规整成版面尺寸，后面取景就不会二次裁切了。
+        base_image = _cover_fit(base_image, w, h)
     g = _key_grade(D)
     key = D.get("main", (128, 128, 128))
     tracks = normalized_tracks(tracks)
@@ -1173,9 +1349,11 @@ def design_back2(cover, w, h, D, album="", artist="", tracks=None, seed=0,
 
     # 🔴 取景避开封面**自带的标题字**：封面标题/歌手名几乎都压在上缘，
     #    fy 偏小会把「周杰伦」这种字切一半带进来，看着像失误。压到画面中部取。
-    base = grade(safe_crop(cover, w, h, D, fx=0.55, fy=0.53, zoom=1.30),
-                 sat=g["sat"] * 1.0, bright=g["bright"], contrast=g["contrast"])
-    base = scrim(base, left=0.70, bottom=0.46, top=0.08, power=1.6, veil=0.10)
+    scrim_kw = dict(left=0.70, bottom=0.46, top=0.08, power=1.6, veil=0.10)
+    base = resolve_substrate(base_image, cover, w, h, D,
+                             dict(fx=0.55, fy=0.53, zoom=1.30),
+                             dict(sat=g["sat"] * 1.0, bright=g["bright"], contrast=g["contrast"]),
+                             scrim_kw, elements)
     d = ImageDraw.Draw(base)
 
     # 封底是一个独立的印刷版面：所有生产文字共用同一墨色，不能让标题、
@@ -1183,6 +1361,8 @@ def design_back2(cover, w, h, D, album="", artist="", tracks=None, seed=0,
     # 选择深墨；由统一的 scrim 保证可读性。
     local_luma = lum(tuple(np.asarray(base.convert("RGB").resize((1, 1)))[0, 0]))
     ink = (248, 247, 245) if local_luma < 142 else (28, 29, 31)
+    if ink_override:          # 用户手选墨色优先于自动判深浅
+        ink = ink_override
     pad = max(5, int(w * 0.048))
     sx, sy = w / SP.BACK_PANEL_W, h / SP.BACK_PANEL_H
     px = lambda mm: int(round(mm * sx))
@@ -1193,34 +1373,39 @@ def design_back2(cover, w, h, D, album="", artist="", tracks=None, seed=0,
     title_x, title_y, title_w = px(3.70), py(2.45), px(42.0)
     # 标题与歌手是两个独立的字体角色。不能因为内容是中文就绕过工作台选择，
     # 否则用户在字体库换了毛笔体，封底却仍然显示旧的默认字体。
-    f, t = fit_tracked(d, album or "", title_w, py(2.82), "serif", 0.55,
-                      min_s=max(10, py(1.60)))
-    tracked(d, (title_x, title_y), t, f, ink, 0.55, "left", title_w)
+    if el_on(elements, "albumTitle"):
+        f, t = fit_tracked(d, album or "", title_w, py(2.82), "serif", 0.55,
+                          min_s=max(10, py(1.60)))
+        tracked(d, (title_x, title_y), t, f, ink, 0.55, "left", title_w)
     artist_y = title_y + py(3.50)
-    f2, t2 = fit_tracked(d, artist or "", px(25.0), py(1.63), "artist", 0.15,
-                         min_s=max(9, py(1.15)))
-    tracked(d, (title_x, artist_y), t2, f2, ink, 0.15, "left", px(25.0))
+    if el_on(elements, "artist"):
+        f2, t2 = fit_tracked(d, artist or "", px(25.0), py(1.63), "artist", 0.15,
+                             min_s=max(9, py(1.15)))
+        tracked(d, (title_x, artist_y), t2, f2, ink, 0.15, "left", px(25.0))
     rule_y = py(8.42)
-    hairline(d, title_x, rule_y, px(22.0), ink, 1)
+    if el_on(elements, "rule"):
+        hairline(d, title_x, rule_y, px(22.0), ink, 1)
 
     # 两套 Golden Reference 预设：仅信息区发生变化，49×38mm 封底和版权/条码坐标不变。
     # 单列保留右侧横向留白；双列将 10 首稳定拆为 01–05 / 06–10。
-    if tracks:
-        back_cover_track_table(d, w, h, tracks, layout, ink)
-    else:
-        # 🔴 以前这里再印一遍 artist：标题块 + 这行 + 金句落款 = 无曲目时歌手名
-        #    出现三次（用户实测指出的重复）。实体封底这个位置通常印的是
-        #    「COMPACT DISC DIGITAL AUDIO」格式标识 —— 印这个，不再重复人名。
-        f3, t3 = fit_tracked(d, "COMPACT DISC DIGITAL AUDIO", px(25.0), py(1.30), "sans", 1.2)
-        tracked(d, (title_x, py(10.0)), t3, f3, ink, 1.2, "left", px(25.0))
+    if el_on(elements, "tracks"):
+        if tracks:
+            back_cover_track_table(d, w, h, tracks, layout, ink)
+        else:
+            # 🔴 以前这里再印一遍 artist：标题块 + 这行 + 金句落款 = 无曲目时歌手名
+            #    出现三次（用户实测指出的重复）。实体封底这个位置通常印的是
+            #    「COMPACT DISC DIGITAL AUDIO」格式标识 —— 印这个，不再重复人名。
+            f3, t3 = fit_tracked(d, "COMPACT DISC DIGITAL AUDIO", px(25.0), py(1.30), "sans", 1.2)
+            tracked(d, (title_x, py(10.0)), t3, f3, ink, 1.2, "left", px(25.0))
 
     # 版权区严格锁在封底局部坐标 (1.5, 31, 26, 5) mm；不参与封面构图运算。
     # 三行文字在这个区域内贴底对齐，和右侧条码的底边保持同一视觉基线。
-    cr = SP.copyright_rect_px(w, h)
-    copy_h = copyright_height(d, cr["w"], artist, company, copyright_text, release_year)
-    copy_y = cr["y"] + max(0, cr["h"] - copy_h)
-    copyright_block(d, cr["x"], copy_y, cr["w"], ink, ink, artist, album,
-                    company, copyright_text, release_year)
+    if el_on(elements, "copyright"):
+        cr = SP.copyright_rect_px(w, h)
+        copy_h = copyright_height(d, cr["w"], artist, company, copyright_text, release_year)
+        copy_y = cr["y"] + max(0, cr["h"] - copy_h)
+        copyright_block(d, cr["x"], copy_y, cr["w"], ink, ink, artist, album,
+                        company, copyright_text, release_year)
 
     # 手写金句：压在右侧亮部的中下方（左上角留出照片的呼吸）
     # 双列预设把整块横向空间交给两组曲目，避免金句压住第 06–10 首。
@@ -1230,7 +1415,7 @@ def design_back2(cover, w, h, D, album="", artist="", tracks=None, seed=0,
     tag = str(concept.get("secondaryEnglish") or concept.get("shortEnglish") or "").strip()
     # English editorial copy uses distinct safe zones for the two tracklist presets.
     # It is always wrapped as a compact two-line block; never one long line over tracks/copyright.
-    if tag:
+    if tag and el_on(elements, "conceptTag"):
         if layout == "single":
             tag_x, tag_y, tag_w, tag_align = px(46.0), py(15.0), px(13.0), "right"
         else:
@@ -1243,7 +1428,7 @@ def design_back2(cover, w, h, D, album="", artist="", tracks=None, seed=0,
     # Chinese primary copy is optional on the single-column back. Default leaves the right safe zone
     # to the English editorial block above the barcode, matching the approved Golden Reference.
     q = primary if (layout == "single" and bool((copy_settings or {}).get("showBackChineseCopy"))) else ""
-    if q:
+    if q and el_on(elements, "conceptQuote"):
         qs = max(9, int(h * 0.058))
         # 单列曲目时，三栏列表固定占至 x=29mm；金句必须从约 33mm
         # 才开始，不能借由自动换行侵入时长列。
@@ -1261,15 +1446,16 @@ def design_back2(cover, w, h, D, album="", artist="", tracks=None, seed=0,
 
     # 条码：由 Mini CD 规格真源以「封底 49×38mm」局部坐标固定定位。
     # 不从整条 111.2mm 展开图推坐标，亦不允许 AI 或构图逻辑自行挪动。
-    rect = SP.barcode_rect_px(w, h)
-    bx, by, bw, bh = rect["x"], rect["y"], rect["w"], rect["h"]
-    code = "".join(c for c in str(barcode_code or "") if c.isdigit())
-    if len(code) >= 12:
-        code = code[:12] + ean13_check(code[:12])
-    else:
-        code = make_ean(seed)
-    ean13(d, bx, by, bw, bh, code,
-          quiet=0.075, paper=(250, 250, 250))
+    if el_on(elements, "barcode"):
+        rect = SP.barcode_rect_px(w, h)
+        bx, by, bw, bh = rect["x"], rect["y"], rect["w"], rect["h"]
+        code = "".join(c for c in str(barcode_code or "") if c.isdigit())
+        if len(code) >= 12:
+            code = code[:12] + ean13_check(code[:12])
+        else:
+            code = make_ean(seed)
+        ean13(d, bx, by, bw, bh, code,
+              quiet=0.075, paper=(250, 250, 250))
 
     return base
 
@@ -1389,27 +1575,48 @@ def _angled_tag(im, xy, text, size, color, align="left", width=None, angle=-3.0)
     else: im.paste(fg, (0, 0), fg)
 
 
-def design_disc2(cover, d_px, hole_px, D, album="", artist="", company="", copy_settings=None):
+def design_disc2(cover, d_px, hole_px, D, album="", artist="", company="", copy_settings=None,
+                 base_image=None, elements=None, ink_override=None, text_scale=None, text_font=None,
+                 text_style=None):
+    """盘面。text_scale 字号倍率、text_font 整面统一字体、text_style 加粗/斜体，缺省沿用原版式。"""
+    with part_text_font(text_font), part_text_scale(text_scale), part_text_style(text_style):
+        return _design_disc2_impl(cover, d_px, hole_px, D, album, artist, company, copy_settings,
+                                  base_image, elements, ink_override)
+
+
+def _design_disc2_impl(cover, d_px, hole_px, D, album="", artist="", company="", copy_settings=None,
+                       base_image=None, elements=None, ink_override=None):
     """盘面（v2）：先做**亮度归一**再去糊 —— v1 最大的毛病就是盘面发灰发闷。
 
     实体盘面的观感 = 主图够亮够透 + 银色聚碳酸酯内环 + 细密勾槽 +
     一道窄扇形高光 + 外沿暗边。缺了「银色内环」就会像贴纸；
     内环画得**太大太白**又会变成「白甜甜圈」（实测踩过）。
+
+    base_image：用户上传的盘面底图 —— 套圆形遮罩后当盘面主体，标题 / 歌手 /
+    英文文案 / 格式标识照常叠加，逐项由 elements 控制删留。
     """
-    # 盘面沿用原封面的干净白底画面：不再人为加入磨砂、凹槽、高光或塑料膜效果。
-    # 只裁到花与花瓶上半部，避开原封面下方已经烘焙的标题。
-    ss = 3
-    big = max(240, int(d_px) * ss)
-    preset = _copy_preset(copy_settings)
-    # 两套模板只改变主视觉的左右位置，纵向取景一致。
-    art = safe_crop(cover, big, big, D,
-                    fx=(0.66 if preset == "editorial" else 0.34), fy=0.45, zoom=1.75)
-    m = Image.new("L", (big, big), 0)
-    ImageDraw.Draw(m).ellipse([0, 0, big - 1, big - 1], fill=255)
-    art.putalpha(m)
     out = Image.new("RGB", (int(d_px), int(d_px)), (255, 255, 255))
-    art = art.resize((int(d_px), int(d_px)), Image.LANCZOS)
-    out.paste(art, (0, 0), art)
+    if base_image is not None:
+        # 上传图：直接当盘面主体，只统一裁到版面并套圆形遮罩，不改画面颜色。
+        art = safe_crop(base_image, int(d_px), int(d_px)).convert("RGBA")
+        cm = Image.new("L", art.size, 0)
+        ImageDraw.Draw(cm).ellipse([0, 0, art.width - 1, art.height - 1], fill=255)
+        # 与图片自带的 alpha 相乘：上传图若是已抠圆的 PNG，不能被我这层遮罩
+        # 又把透明区填回来。
+        art.putalpha(ImageChops.multiply(art.split()[-1], cm))
+        out.paste(art, (0, 0), art)
+    else:
+        # 盘面沿用原封面的干净白底画面：不再人为加入磨砂、凹槽、高光或塑料膜效果。
+        # 只裁到花与花瓶上半部，避开原封面下方已经烘焙的标题。
+        ss = 3
+        big = max(240, int(d_px) * ss)
+        fx0 = (0.66 if _copy_preset(copy_settings) == "editorial" else 0.34)
+        art = safe_crop(cover, big, big, D, fx=fx0, fy=0.45, zoom=1.75)
+        m = Image.new("L", (big, big), 0)
+        ImageDraw.Draw(m).ellipse([0, 0, big - 1, big - 1], fill=255)
+        art.putalpha(m)
+        art = art.resize((int(d_px), int(d_px)), Image.LANCZOS)
+        out.paste(art, (0, 0), art)
 
     # 两个盘面模板只固定构图位置；字体则分别读取工作台的标题、中文、英文选择。
     # A / Editorial：花材左、标题右、英文右下（两行以内）。
@@ -1428,139 +1635,204 @@ def design_disc2(cover, d_px, hole_px, D, album="", artist="", company="", copy_
         artist_gap = 1.38
         tag = _copy_text(copy_settings)[1] or _copy_text(copy_settings)[2]
 
-    ink = (36, 33, 30)
+    # 自行上传的盘面深浅不可预判：固定深墨会印成“看不见的字”，
+    # 所以上传模式下按盘面主色自动选墨；程序衍生件沿用原固定墨色不变。
+    ink = ink_on(palette(out.convert("RGB"), 3)[0]) if base_image is not None else (36, 33, 30)
+    if ink_override:          # 用户手选墨色优先于自动判深浅（同样作用于 CD 标识）
+        ink = ink_override
     # serif -> 专辑标题选择；artist -> 歌手名字体选择；editorial -> 英文文案选择。
-    fs, tt = fit_tracked(dtext, album or "", title_w, max(10, int(d_px * 0.095)),
-                         "serif", 0.88, min_s=max(10, int(d_px * 0.050)))
-    fs2, tt2 = fit_tracked(dtext, artist or "", title_w, max(8, int(d_px * 0.055)),
-                           "artist", 0.45, min_s=max(8, int(d_px * 0.031)))
-    tracked(dtext, (title_x, title_y), tt, fs, ink, 0.88, title_align, title_w)
-    tracked(dtext, (title_x, title_y + int(fs.size * artist_gap)), tt2, fs2, ink, 0.45, title_align, title_w)
+    if el_on(elements, "albumTitle") or el_on(elements, "artist"):
+        fs, tt = fit_tracked(dtext, album or "", title_w, max(10, int(d_px * 0.095)),
+                             "serif", 0.88, min_s=max(10, int(d_px * 0.050)))
+        fs2, tt2 = fit_tracked(dtext, artist or "", title_w, max(8, int(d_px * 0.055)),
+                               "artist", 0.45, min_s=max(8, int(d_px * 0.031)))
+    if el_on(elements, "albumTitle"):
+        tracked(dtext, (title_x, title_y), tt, fs, ink, 0.88, title_align, title_w)
+    if el_on(elements, "artist"):
+        tracked(dtext, (title_x, title_y + int(fs.size * artist_gap)), tt2, fs2, ink, 0.45, title_align, title_w)
 
     tag_size = max(7, int(d_px * 0.030))
-    for i, line in enumerate(disc_tag_lines(dtext, tag, preset, tag_w, tag_size)):
-        ftag, fitted = fit_tracked(dtext, line, tag_w, tag_size, "editorial", 0.80,
-                                   min_s=max(6, int(d_px * 0.020)))
-        tracked(dtext, (tag_x, tag_y + i * int(tag_size * 1.34)), fitted, ftag, ink,
-                0.80, tag_align, tag_w)
+    if el_on(elements, "conceptTag"):
+        for i, line in enumerate(disc_tag_lines(dtext, tag, preset, tag_w, tag_size)):
+            ftag, fitted = fit_tracked(dtext, line, tag_w, tag_size, "editorial", 0.80,
+                                       min_s=max(6, int(d_px * 0.020)))
+            tracked(dtext, (tag_x, tag_y + i * int(tag_size * 1.34)), fitted, ftag, ink,
+                    0.80, tag_align, tag_w)
 
     # CD 格式标识固定在中心孔下方；它使用功能字体，不参与标题/文案字体选择。
-    mark = "COMPACT\nDISC"
-    mark_font = _t("num", max(6, int(d_px * 0.025)), mark)
-    mark_y = int(d_px * 0.805)
-    for i, line in enumerate(mark.splitlines()):
-        tracked(dtext, (d_px / 2.0, mark_y + i * int(mark_font.size * 1.04)), line,
-                mark_font, ink, 0.45, "center", int(d_px * 0.18))
+    if el_on(elements, "formatMark"):
+        mark = "COMPACT\nDISC"
+        mark_font = _t("num", max(6, int(d_px * 0.025)), mark)
+        mark_y = int(d_px * 0.805)
+        for i, line in enumerate(mark.splitlines()):
+            tracked(dtext, (d_px / 2.0, mark_y + i * int(mark_font.size * 1.04)), line,
+                    mark_font, ink, 0.45, "center", int(d_px * 0.18))
 
     # 中心孔（Ø5mm，打穿）
-    c = d_px / 2.0
-    ring = max(1, int(d_px * 0.010))
-    line = max(1, int(d_px * 0.0035))
-    dout = ImageDraw.Draw(out)
-    dout.ellipse([line, line, d_px - line - 1, d_px - line - 1], outline=(88, 84, 78), width=line)
-    dout.ellipse([c - hole_px / 2 - ring, c - hole_px / 2 - ring,
-                  c + hole_px / 2 + ring, c + hole_px / 2 + ring], outline=(105, 100, 94), width=line)
-    dout.ellipse([c - hole_px / 2, c - hole_px / 2,
-                  c + hole_px / 2, c + hole_px / 2], fill=(255, 255, 255), outline=(105, 100, 94), width=line)
+    if el_on(elements, "rings"):
+        c = d_px / 2.0
+        ring = max(1, int(d_px * 0.010))
+        line = max(1, int(d_px * 0.0035))
+        dout = ImageDraw.Draw(out)
+        dout.ellipse([line, line, d_px - line - 1, d_px - line - 1], outline=(88, 84, 78), width=line)
+        dout.ellipse([c - hole_px / 2 - ring, c - hole_px / 2 - ring,
+                      c + hole_px / 2 + ring, c + hole_px / 2 + ring], outline=(105, 100, 94), width=line)
+        dout.ellipse([c - hole_px / 2, c - hole_px / 2,
+                      c + hole_px / 2, c + hole_px / 2], fill=(255, 255, 255), outline=(105, 100, 94), width=line)
     return out
 
 
-def design_inner2(cover, w, h, D, album="", artist="", tracks=None, quote=None, copy_settings=None):
+def design_inner2(cover, w, h, D, album="", artist="", tracks=None, quote=None,
+                  copy_settings=None, base_image=None, elements=None, ink_override=None,
+                  text_scale=None, text_font=None, text_style=None):
+    """封面背面 / 内页。text_scale 字号倍率、text_font 整面统一字体、text_style 加粗/斜体，缺省沿用原版式。"""
+    with part_text_font(text_font), part_text_scale(text_scale), part_text_style(text_style):
+        return _design_inner2_impl(cover, w, h, D, album, artist, tracks, quote, copy_settings,
+                                   base_image, elements, ink_override)
+
+
+def _design_inner2_impl(cover, w, h, D, album="", artist="", tracks=None, quote=None,
+                        copy_settings=None, base_image=None, elements=None, ink_override=None):
     """内页左半（折进盒里的那一面）：整幅写真 + 手写金句 + 落款。
 
     v1 这里是「压暗的封面 + 一坨曲目」，等于把封面又印了一遍；
     真唱片内页放的是**同一次拍摄的另一张照片**，所以这里改用高倍裁切。
+
+    base_image：用户上传的内页图当写真用，金句 / 落款 / 英文 / 顶部小标题
+    照常叠加、逐项可关；上传态只做轻量压暗（沿用内页原本的重压暗会把用户
+    自己的照片整幅压灰）。
     """
     g = _key_grade(D)
     # 内页有自己独立的主文案。取景上移并收紧，避开原封面下沿自带标题，
     # 防止源图文字和程序排出的文案重叠。
-    base = grade(safe_crop(cover, w, h, D, fx=0.38, fy=0.31, zoom=1.72),
-                 sat=g["sat"] * 0.86, bright=g["bright"] * 0.96,
-                 contrast=g["contrast"] * 1.04,
-                 tint=tuple(int(c * 0.55 + 26) for c in D.get("main", (90, 90, 90))),
-                 tint_k=0.22)                       # 偏主色的冷调版本
-    # 🔴 顶部压暗必须够狠：标题（白色衬线）落在 y≈0.075h 处，top 太小的话
-    #    浅色封面（白背景写真）上标题直接隐形。0.24 实测只有 21% 压暗 → 提到 0.42
-    #    （同 power 下标题行压暗 ~39%），压到中部才归零，不影响照片主体。
-    base = scrim(base, bottom=0.62, top=0.42, power=1.5)
+    scrim_kw = dict(bottom=0.62, top=0.42, power=1.5)
+    base = resolve_substrate(
+        base_image, cover, w, h, D, dict(fx=0.38, fy=0.31, zoom=1.72),
+        dict(sat=g["sat"] * 0.86, bright=g["bright"] * 0.96, contrast=g["contrast"] * 1.04,
+             tint=tuple(int(c * 0.55 + 26) for c in D.get("main", (90, 90, 90))), tint_k=0.22),
+        scrim_kw, elements, upload_scrim_kw=dict(bottom=0.16, top=0.14, power=1.5))
     d = ImageDraw.Draw(base)
     pad = max(4, int(w * 0.075))
+    # 原本的白墨依赖上面的重压暗；换成用户自己的图后压暗变轻，浅色图会出现白字。
+    # 上传态按画面主色自动选墨，程序衍生件沿用原色不变。
+    if base_image is not None:
+        _sw = palette(base.convert("RGB"), 3)[0]
+        ink = ink_on(_sw)
+        dim = dim_ink(ink, _sw, 0.72)
+        tag_ink = dim
+    else:
+        ink, dim, tag_ink = (250, 250, 248), (222, 224, 228), (224, 226, 230)
+    if ink_override:
+        # 用户手选墨色：主墨用它，落款/英文的淡墨按画面主色统一派生，
+        # 保持「同一块面上只有一种墨色家族」的规则。
+        ink = ink_override
+        dim = dim_ink(ink, palette(base.convert("RGB"), 3)[0], 0.72)
+        tag_ink = dim
     _primary, _secondary, _short = _copy_text(copy_settings)
     q = _primary or quote or pick_quote(None, D)
     if q:
         qs = max(9, int(h * 0.070))
+        # 行数始终照算：下面英文块的位置是从金句行数推算的，
+        # 关掉金句时也要保证英文块不跳位。
         lines = _wrap_hand(d, q, w - pad * 2, qs, 3)
         y0 = int(h * 0.48)
-        for i, ln in enumerate(lines):
-            hand_text(base, (pad, y0 + int(i * qs * 1.35)), ln, qs,
-                      (250, 250, 248), 1.2, "left", angle=_copy_angle(copy_settings, D), shadow=(0, 0, 0, 160))
-        d = ImageDraw.Draw(base)
-        if artist:                       # 没填歌手就别印一根孤零零的「—」
+        if el_on(elements, "quote"):
+            for i, ln in enumerate(lines):
+                hand_text(base, (pad, y0 + int(i * qs * 1.35)), ln, qs,
+                          ink, 1.2, "left", angle=_copy_angle(copy_settings, D), shadow=(0, 0, 0, 160))
+            d = ImageDraw.Draw(base)
+        if artist and el_on(elements, "credit"):     # 没填歌手就别印一根孤零零的「—」
             fs = max(8, int(h * 0.062))
             # 内页落款也属于歌手名，跟随「歌手名字体」选择。
             fm = _t("artist", fs, artist)
             tracked(d, (pad, y0 + int(len(lines) * qs * 1.35) + int(h * 0.035)),
-                    "— %s" % artist, fm, (222, 224, 228), 1.0, "left")
+                    "— %s" % artist, fm, dim, 1.0, "left")
         # Editorial secondary copy is a separate true-font layer, never generated in artwork.
         # Keep the English tag as a separate baseline layer. Rotating a full-size
         # mask around this lower corner was pulling it up into the artist credit.
-        tag_size = max(7, int(h * 0.029))
-        tag_y = min(h - int(tag_size * 3.5), y0 + int(len(lines) * qs * 1.35) + int(h * 0.12))
-        for i, line in enumerate(editorial_tag_lines(d, _secondary or _short, w - pad * 2, tag_size)):
-            _angled_tag(base, (pad, tag_y + i * int(tag_size * 1.48)), line, tag_size,
-                        (224, 226, 230), "left", w - pad * 2,
-                        angle=_copy_angle(copy_settings, D))
-        d = ImageDraw.Draw(base)
+        if el_on(elements, "conceptTag"):
+            tag_size = max(7, int(h * 0.029))
+            tag_y = min(h - int(tag_size * 3.5), y0 + int(len(lines) * qs * 1.35) + int(h * 0.12))
+            for i, line in enumerate(editorial_tag_lines(d, _secondary or _short, w - pad * 2, tag_size)):
+                _angled_tag(base, (pad, tag_y + i * int(tag_size * 1.48)), line, tag_size,
+                            tag_ink, "left", w - pad * 2,
+                            angle=_copy_angle(copy_settings, D))
+            d = ImageDraw.Draw(base)
 
     # 顶部极细标题（内页也要能被认出来是哪张）
-    fs2, tt = fit_tracked(d, album or "", w - pad * 2, int(h * 0.072), "serif", 1.4)
-    tracked(d, (pad, pad), tt, fs2, (250, 250, 248), 1.4, "left", w - pad * 2)
+    if el_on(elements, "albumTitle"):
+        fs2, tt = fit_tracked(d, album or "", w - pad * 2, int(h * 0.072), "serif", 1.4)
+        tracked(d, (pad, pad), tt, fs2, ink, 1.4, "left", w - pad * 2)
     return base
 
 
-def design_tray2(cover, w, h, D, album="", artist="", company="", copy_settings=None):
+def design_tray2(cover, w, h, D, album="", artist="", company="", copy_settings=None,
+                 base_image=None, elements=None, ink_override=None, text_scale=None, text_font=None,
+                 text_style=None):
+    """内盘底。text_scale 字号倍率、text_font 整面统一字体、text_style 加粗/斜体，缺省沿用原版式。"""
+    with part_text_font(text_font), part_text_scale(text_scale), part_text_style(text_style):
+        return _design_tray2_impl(cover, w, h, D, album, artist, company, copy_settings,
+                                  base_image, elements, ink_override)
+
+
+def _design_tray2_impl(cover, w, h, D, album="", artist="", company="", copy_settings=None,
+                       base_image=None, elements=None, ink_override=None):
     """内盘底（v2）：浅色纸面 + 居中衬线标题 + 底部照片条。
 
     托盘不该跟封面抢戏 —— v1 用深色渐变把整块压成一坨糊，摆进盒里像脏了。
+
+    base_image：用户上传的内盘底实拍图当纸面。上传态默认**不再叠底部照片条**
+    （用户自己的图底部往往就是盘托照片，再压一条会糊掉），其余文字照常。
     """
+    uploaded = base_image is not None
+    if uploaded:
+        # 上传图先按原比例规整到版面（只吃掉长边多余的一点点），让取消「底部照片条」
+        # 之后看到的就是自己那张图的本来样子：比例、构图位置都不变。
+        base_image = _cover_fit(base_image, int(w), int(h))
     g = _key_grade(D)
     key = D.get("main", (120, 120, 120))
     tint = tuple(int(c * 0.20 + 196) for c in key)      # 由封面主色调出的浅纸色
-    base = grade(safe_crop(cover, w, h, D, fx=0.5, fy=0.5, zoom=1.45),
-                 sat=0.30, bright=1.0, contrast=1.0, blur=max(1.0, w / 34.0),
-                 tint=tint, tint_k=0.66)
-    base = scrim(base, veil=0.02, top=0.10, bottom=0.06)
+    base = resolve_substrate(
+        base_image, cover, w, h, D, dict(fx=0.5, fy=0.5, zoom=1.45),
+        dict(sat=0.30, bright=1.0, contrast=1.0, blur=max(1.0, w / 34.0), tint=tint, tint_k=0.66),
+        dict(veil=0.02, top=0.10, bottom=0.06), elements,
+        upload_scrim_kw=dict(veil=0.0, top=0.06, bottom=0.04))
     d = ImageDraw.Draw(base)
     sw = palette(base, 3)[0]
-    ink = ink_on(sw)
+    ink = ink_override or ink_on(sw)      # 手选墨色优先，淡墨始终从同一个墨色派生
     dim = dim_ink(ink, sw, 0.62)
 
     # 底部照片条（3:1 裁切，给块留口气）
-    bh = int(h * 0.24)
-    ph = grade(safe_crop(cover, w, bh, D, fx=0.5, fy=0.42, zoom=1.40),
-               sat=g["sat"], bright=g["bright"], contrast=g["contrast"])
-    base.paste(ph, (0, h - ph.height))
-    d = ImageDraw.Draw(base)
+    if el_on(elements, "photoStrip", not uploaded):
+        bh = int(h * 0.24)
+        ph = grade(safe_crop(cover, w, bh, D, fx=0.5, fy=0.42, zoom=1.40),
+                   sat=g["sat"], bright=g["bright"], contrast=g["contrast"])
+        base.paste(ph, (0, h - ph.height))
+        d = ImageDraw.Draw(base)
 
     pad = max(6, int(w * 0.09))
     _primary, _secondary, _short = _copy_text(copy_settings)
     # Inner tray is a concept-copy panel: title stays a small identifier, copy has the visual lead.
-    fs, tt = fit_tracked(d, album or "", w - pad * 2, int(h * 0.060), "serif", 1.4)
-    tracked(d, (int(w * 0.5), int(h * 0.12)), tt, fs, dim, 1.4, "center", w - pad * 2)
+    if el_on(elements, "albumTitle"):
+        fs, tt = fit_tracked(d, album or "", w - pad * 2, int(h * 0.060), "serif", 1.4)
+        tracked(d, (int(w * 0.5), int(h * 0.12)), tt, fs, dim, 1.4, "center", w - pad * 2)
     q = _primary or album or ""
     qs = max(9, int(h * 0.075))
+    # 行数照算（下面的厂牌行不依赖它，但保留可让未来定位稳定）
     lines = _wrap_hand(d, q, int(w * 0.68), qs, 3)
     y0 = int(h * 0.34)
-    for i, line in enumerate(lines):
-        hand_text(base, (int(w * 0.74), y0 + int(i * qs * 1.34)), line, qs, ink, 1.1, "right", angle=_copy_angle(copy_settings, D))
-    d = ImageDraw.Draw(base)
-    tag_size = max(7, int(h * 0.032))
-    tag_x, tag_y, tag_w = int(w * 0.84), int(h * 0.67), int(w * 0.42)
-    for i, line in enumerate(editorial_tag_lines(d, _secondary or _short, tag_w, tag_size)):
-        _angled_tag(base, (tag_x, tag_y + i * int(tag_size * 1.48)), line,
-                    tag_size, dim, "right", tag_w, angle=_copy_angle(copy_settings, D))
-    d = ImageDraw.Draw(base)
-    if company:
+    if el_on(elements, "quote"):
+        for i, line in enumerate(lines):
+            hand_text(base, (int(w * 0.74), y0 + int(i * qs * 1.34)), line, qs, ink, 1.1, "right", angle=_copy_angle(copy_settings, D))
+        d = ImageDraw.Draw(base)
+    if el_on(elements, "conceptTag"):
+        tag_size = max(7, int(h * 0.032))
+        tag_x, tag_y, tag_w = int(w * 0.84), int(h * 0.67), int(w * 0.42)
+        for i, line in enumerate(editorial_tag_lines(d, _secondary or _short, tag_w, tag_size)):
+            _angled_tag(base, (tag_x, tag_y + i * int(tag_size * 1.48)), line,
+                        tag_size, dim, "right", tag_w, angle=_copy_angle(copy_settings, D))
+        d = ImageDraw.Draw(base)
+    if company and el_on(elements, "company"):
         # 厂牌是功能信息，固定在底部照片条上方；此前引用了未定义的 ty/fs2，
         # 填写厂牌时会让内盘底渲染失败。
         fL = _t("num", max(6, int(h * 0.038)), company)
@@ -1815,14 +2087,19 @@ def _rotated_spine_label(base, x, y, text, font, fill, max_h):
     return int(y + label.height)
 
 
-def spine_overlay(base, variant, album="", artist="", company="", copy_settings=None):
+def spine_overlay(base, variant, album="", artist="", company="", copy_settings=None, elements=None):
     """给三条 4.4mm 窄封分配不同职责，不生成独立的小海报。
 
     ``right`` 是外侧识别边：标题和歌手名；``left`` 只保留相邻画面的延续；
     ``left-back`` 面向盒内，以标题或短英文连接内盘底。所有底图由调用方从相邻
     面板延展而来，文字只是最后一层，不会破坏整条展开图的同源关系。
+
+    elements 可关掉整层（enabled）或只留标题/歌手之一（title / artist）——
+    用户上传了自带文字的实拍侧封时需要这个出口。
     """
     if base is None:
+        return base
+    if not el_on(elements, "enabled", True):
         return base
     d = ImageDraw.Draw(base)
     w, h = base.size
@@ -1848,7 +2125,7 @@ def spine_overlay(base, variant, album="", artist="", company="", copy_settings=
     has_custom_fill = str(appearance.get("color") or "auto").lower() != "auto"
     custom_text = str(((copy_settings or {}).get("spineText") or {}).get(zone_key) or "").strip()
     character_styles = ((copy_settings or {}).get("spineCharacterStyles") or {}).get(zone_key) or {}
-    if custom_text:
+    if custom_text and el_on(elements, "title"):
         # 自定义文字的字号：优先「全部(sizeMm)」，其次「标题(titleSizeMm)」。
         # 工具栏的字号作用对象默认是「标题」，改动落在 titleSizeMm 里——
         # 旧版只读 sizeMm，导致改字号永远不生效（2026-10-29 修复）。
@@ -1865,19 +2142,22 @@ def spine_overlay(base, variant, album="", artist="", company="", copy_settings=
     template = templates.get(zone_key, "title-artist-classic")
     if template == "title-artist-classic":
         # 固定模板只固定标题与歌手的位置；文字外观完全服从当前侧封工具栏。
-        title_font = _spine_font(appearance.get("font"), title_size_px, album)
-        after_title = _vertical_spine_text(d, x, int(h * 0.29), album, title_font, custom_fill,
-                                            int(h * 0.27), 1.06,
-                                            bold=style in {"bold", "boldItalic"},
-                                            italic=style in {"italic", "boldItalic"},
-                                            char_styles=character_styles.get("title"), pixels_per_mm=w / 4.4)
-        artist_font = _spine_font(appearance.get("font"), artist_size_px, artist)
-        artist_fill = custom_fill if has_custom_fill else dim
-        _vertical_spine_text(d, x, max(int(h * 0.62), after_title + int(h * 0.06)),
-                              artist, artist_font, artist_fill, int(h * 0.20), 1.04,
-                              bold=style in {"bold", "boldItalic"},
-                              italic=style in {"italic", "boldItalic"},
-                              char_styles=character_styles.get("artist"), pixels_per_mm=w / 4.4)
+        after_title = int(h * 0.29)
+        if el_on(elements, "title"):
+            title_font = _spine_font(appearance.get("font"), title_size_px, album)
+            after_title = _vertical_spine_text(d, x, int(h * 0.29), album, title_font, custom_fill,
+                                                int(h * 0.27), 1.06,
+                                                bold=style in {"bold", "boldItalic"},
+                                                italic=style in {"italic", "boldItalic"},
+                                                char_styles=character_styles.get("title"), pixels_per_mm=w / 4.4)
+        if el_on(elements, "artist"):
+            artist_font = _spine_font(appearance.get("font"), artist_size_px, artist)
+            artist_fill = custom_fill if has_custom_fill else dim
+            _vertical_spine_text(d, x, max(int(h * 0.62), after_title + int(h * 0.06)),
+                                  artist, artist_font, artist_fill, int(h * 0.20), 1.04,
+                                  bold=style in {"bold", "boldItalic"},
+                                  italic=style in {"italic", "boldItalic"},
+                                  char_styles=character_styles.get("artist"), pixels_per_mm=w / 4.4)
         return base
 
     if variant == "right":

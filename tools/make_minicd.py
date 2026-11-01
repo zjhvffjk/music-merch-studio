@@ -217,7 +217,8 @@ def _solid_block(cover_im, w_px, h_px, album, artist):
 def make_back_strip(back_im, tray_im, w_px, h_px, cover_im, album, artist,
                     D=None, tracks=None, seed=0, company="", inner_copy="",
                     barcode_code="", copyright_text="", release_year="", back_layout="auto", copy_settings=None,
-                    side_right_im=None, side_left_im=None, side_back_im=None):
+                    side_right_im=None, side_left_im=None, side_back_im=None, side_elements=None,
+                    part_ink=None, part_scale=None, part_font=None, part_style=None):
     """[右侧封][封底][左侧封][背脊][内盘底] 一条连续展开图。
 
     封底与内盘底缺件时走**封面衍生设计**（design_back / design_tray）；
@@ -227,7 +228,25 @@ def make_back_strip(back_im, tray_im, w_px, h_px, cover_im, album, artist,
     side_right_im / side_left_im / side_back_im：右侧封 / 左侧封 / 左侧封背面
     的用户上传图 —— 裁到段尺寸当底图，画面不走边缘延展；但侧封文字层
     照常叠加（2026-10-29 约定：上传件也要能自定义文字/字体，走侧封工具栏）。
+
+    side_elements：三条窄封各自的图层开关 {"right": {...}, "left": {...},
+    "left-back": {...}} —— 用户上传了自带文字的实拍侧封时，可以整层关掉，
+    或只留标题/歌手（2026-10-30）。
     """
+    side_elements = side_elements if isinstance(side_elements, dict) else {}
+    # part_ink：{"back": "#ffffff", "tray": "#ffffff"} 之类用户手选墨色。
+    # 没选的段为 None，下面 design_*2 收到 None 就继续按画面深浅自动选墨。
+    part_ink = part_ink if isinstance(part_ink, dict) else {}
+    # part_scale：{"back": 1.15, "tray": 0.9} 之类用户手选字号倍率。
+    part_scale = part_scale if isinstance(part_scale, dict) else {}
+    # part_font：{"back": "serif-cn-bold"} 之类用户手选的「整面统一字体」。
+    # 没选的段为 None，下面 design_*2 收到 None 就仍按各文字角色取默认字体。
+    part_font = part_font if isinstance(part_font, dict) else {}
+    # part_style：{"back": "bold", "tray": "italic"} 之类用户手选的加粗 / 斜体。
+    part_style = part_style if isinstance(part_style, dict) else {}
+    el_right = side_elements.get("right")
+    el_left = side_elements.get("left")
+    el_back = side_elements.get("left-back")
     p = [mm(s, _dpi[0]) for s in BACK_SEGS]
     total = sum(p)
     out = Image.new("RGB", (total, h_px), "white")
@@ -240,7 +259,9 @@ def make_back_strip(back_im, tray_im, w_px, h_px, cover_im, album, artist,
         b = DP.design_back2(cover_im, p[1], h_px, D, album, artist, tracks,
                             seed, quote=inner_copy or None, company=company,
                             barcode_code=barcode_code, copyright_text=copyright_text,
-                            release_year=release_year, back_layout=back_layout, copy_settings=copy_settings)
+                            release_year=release_year, back_layout=back_layout, copy_settings=copy_settings,
+                             ink_override=part_ink.get("back"), text_scale=part_scale.get("back"),
+                             text_font=part_font.get("back"), text_style=part_style.get("back"))
     else:
         b = _solid_block(cover_im, p[1], h_px, album, artist)
     out.paste(b, (p[0], 0))
@@ -249,7 +270,9 @@ def make_back_strip(back_im, tray_im, w_px, h_px, cover_im, album, artist,
     if tray_im is not None:
         t = cover_crop(tray_im, p[4], h_px)
     elif use_dp:
-        t = DP.design_tray2(cover_im, p[4], h_px, D, album, artist, company, copy_settings=copy_settings)
+        t = DP.design_tray2(cover_im, p[4], h_px, D, album, artist, company, copy_settings=copy_settings,
+                             ink_override=part_ink.get("tray"), text_scale=part_scale.get("tray"),
+                             text_font=part_font.get("tray"), text_style=part_style.get("tray"))
     else:
         t = _solid_block(cover_im, p[4], h_px, album, artist)
     out.paste(t, (p[0] + p[1] + p[2] + p[3], 0))
@@ -264,19 +287,19 @@ def make_back_strip(back_im, tray_im, w_px, h_px, cover_im, album, artist,
     else:
         right_spine = _edge_stretch(b, p[0], h_px)
     if use_dp:
-        right_spine = DP.spine_overlay(right_spine, "right", album, artist, company, copy_settings)
+        right_spine = DP.spine_overlay(right_spine, "right", album, artist, company, copy_settings, elements=el_right)
     if side_left_im is not None:
         left_spine = cover_crop(side_left_im, p[2], h_px)
     else:
         left_spine = _edge_stretch(t, p[2], h_px)
     if use_dp:
-        left_spine = DP.spine_overlay(left_spine, "left", album, artist, company, copy_settings)
+        left_spine = DP.spine_overlay(left_spine, "left", album, artist, company, copy_settings, elements=el_left)
     if side_back_im is not None:
         left_spine_back = cover_crop(side_back_im, p[3], h_px)
     else:
         left_spine_back = _edge_stretch(t, p[3], h_px)
     if use_dp:
-        left_spine_back = DP.spine_overlay(left_spine_back, "left-back", album, artist, company, copy_settings)
+        left_spine_back = DP.spine_overlay(left_spine_back, "left-back", album, artist, company, copy_settings, elements=el_back)
     out.paste(right_spine, (0, 0))
     out.paste(left_spine, (p[0] + p[1], 0))
     out.paste(left_spine_back, (p[0] + p[1] + p[2], 0))

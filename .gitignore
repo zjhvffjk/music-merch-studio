@@ -33,3 +33,4 @@ tools/test_qwen_official_edit_chain.py
 
 # 代码旧版本由 Git 历史保存，不再跟踪编辑器备份
 *.py.bak-*
+.tmp_server.log

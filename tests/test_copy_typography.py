@@ -15,6 +15,16 @@ class CopyTypographyTests(unittest.TestCase):
         from copy_typography import normalize_copy_settings
         self.assertEqual(normalize_copy_settings({})["conceptCopy"], {"primaryChinese": "", "secondaryEnglish": "", "shortEnglish": ""})
 
+    def test_part_text_style_only_accepts_the_four_spine_style_values(self):
+        """四个印面的加粗 / 斜体：认不出的一律回落 normal（与侧封同一套取值）。"""
+        from copy_typography import normalize_copy_settings
+        self.assertEqual(normalize_copy_settings({})["partTextStyle"],
+                         {"disc": "normal", "fold": "normal", "back": "normal", "tray": "normal"})
+        self.assertEqual(normalize_copy_settings({"partTextStyle": {"disc": "bold", "tray": "boldItalic"}})["partTextStyle"],
+                         {"disc": "bold", "fold": "normal", "back": "normal", "tray": "boldItalic"})
+        dirty = normalize_copy_settings({"partTextStyle": {"disc": "SUPER-BOLD", "back": None, "tray": 7}})["partTextStyle"]
+        self.assertEqual(dirty, {"disc": "normal", "fold": "normal", "back": "normal", "tray": "normal"})
+
     def test_editorial_tagline_splits_into_a_compact_two_line_block(self):
         from PIL import Image, ImageDraw
         from design_parts import editorial_tag_lines
