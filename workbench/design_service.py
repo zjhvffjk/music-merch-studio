@@ -128,6 +128,36 @@ def _safe_jid(jid):
     return jid
 
 
+def zip_download_name(jid):
+    """导出 ZIP 的落盘文件名：优先「歌手-专辑名」，拿不到才退回 jid 形态。
+
+    以前不管哪张专辑都叫「迷你CD设计-<jid>」，下载一堆之后根本分不清谁是谁
+    （2026-11-01 用户要求：名字要对应歌手和专辑名，例如「郑润泽-旷野」）。
+    批量任务没有单一专辑名，退化为「<歌手>-批量<N>张」。
+    """
+    jid = _safe_jid(jid)
+    fallback = "迷你CD设计-%s.zip" % (jid or "未知")
+    mp = (OUT_DIR / jid / "meta.json") if jid else None
+    if not mp or not mp.is_file():
+        return fallback
+    try:
+        m = json.loads(mp.read_text(encoding="utf-8"))
+    except Exception:
+        return fallback
+    artist = re.sub(r"\s+", " ", str(m.get("artist") or "")).strip()
+    album = re.sub(r"\s+", " ", str(m.get("album") or "")).strip()
+    if m.get("kind") == "minicd-design-batch":
+        n = m.get("count") or 0
+        base = "-".join([p for p in (artist, "批量%d张" % n if n else "批量") if p])
+    else:
+        base = "-".join([p for p in (artist, album) if p])
+    # Windows 文件名禁用的字符换成下划线，再去掉首尾空格与末尾的点（末尾带点会被系统吃掉）。
+    base = re.sub(r'[\\/:*?"<>|\r\n\t]', "_", base).strip().strip(".")[:80].strip()
+    if not base:
+        return fallback
+    return "%s.zip" % base
+
+
 def mm(v, dpi):
     return int(round(v * dpi / 25.4))
 
@@ -1501,7 +1531,7 @@ def handle(handler, path, query, method):
             if not zp.is_file():
                 handler._json({"error": "任务尚未生成或已清理"}, 404)
                 return True
-            handler._file(str(zp), name="迷你CD设计-%s.zip" % jid)
+            handler._file(str(zp), name=zip_download_name(jid))
             return True
         if path == "/api/design/state":
             jid = _safe_jid(value("jid"))

@@ -2700,17 +2700,12 @@ class Handler(BaseHTTPRequestHandler):
                         zp = os.path.join(os.path.realpath(str(DSDESIGN.OUT_DIR)),
                                           zj + ".zip") if zj else ""
                         if zp and os.path.isfile(zp):
-                            title = ""
-                            dd = design_dir_of(jid)
-                            if dd:
-                                try:
-                                    with open(os.path.join(dd, "meta.json"),
-                                              encoding="utf-8") as fh:
-                                        mm = json.load(fh)
-                                    title = mm.get("album") or mm.get("title") or ""
-                                except Exception:
-                                    title = ""
-                            items.append((zp, safe_name(title or f"迷你CD设计-{jid}")))
+                            # 名字跟着「歌手-专辑名」走，跟单独下载 ZIP 时看到的一致
+                            # （2026-11-01：以前一律叫「迷你CD设计-<jid>」，分不清是哪张专辑）。
+                            stem = DSDESIGN.zip_download_name(zj or "")
+                            if stem.endswith(".zip"):
+                                stem = stem[:-4]
+                            items.append((zp, safe_name(stem)))
                         else:
                             missing.append(jid)
                         continue
