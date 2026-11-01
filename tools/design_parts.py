@@ -1303,6 +1303,12 @@ def _design_back2_impl(cover, w, h, D, album="", artist="", tracks=None, seed=0,
     elements：逐元素开关，键见下方 el_on 调用；None = 全画。
     """
     w, h = int(w), int(h)
+    if base_image is not None:
+        # 上传图先按原比例规整到版面 —— 与内盘底同一套做法（2026-10-31）。
+        # 下面的取景算式是按「源图接近正方形」推的，专辑封面正好 1:1 所以一直没露馅；
+        # 相机照片多是 4:3 / 3:2，套进去窗口不再是版面比例，画面会被纵向拉长约 25%
+        # （人变瘦高、圆变椭圆）。先规整成版面尺寸，后面取景就不会二次裁切了。
+        base_image = _cover_fit(base_image, w, h)
     g = _key_grade(D)
     key = D.get("main", (128, 128, 128))
     tracks = normalized_tracks(tracks)
