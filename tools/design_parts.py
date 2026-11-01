@@ -483,6 +483,10 @@ except Exception:  # pragma: no cover
 # 见 part_text_scale()：倍率为 1 时不入栈，所有字号算式原样不动。
 _TS = [1.0]
 
+# 部件级「加粗 / 斜体」的运行栈。默认 normal —— 只有用户在这一面开了
+# 加粗或斜体时才变化；normal 时画法和加这两个开关之前完全一致。
+_TS_STYLE = ["normal"]
+
 
 def _scaled_size(size):
     """按「当前这一出版面」的字号倍率缩放一个字号。
@@ -528,6 +532,29 @@ def part_text_font(font_id):
         yield
 
 
+@contextmanager
+def part_text_style(style):
+    """作用域式的「整面加粗 / 斜体」：包住某块版面的绘制过程。
+
+    取值 normal / bold / italic / boldItalic，认不出的一律当 normal ——
+    与侧封（spineAppearance.style）同一套写法，用户在哪一面都看到一样的效果。
+    """
+    s = str(style or "normal").strip().lower()
+    if s not in ("normal", "bold", "italic", "bolditalic"):
+        s = "normal"
+    _TS_STYLE.append(s)
+    try:
+        yield
+    finally:
+        _TS_STYLE.pop()
+
+
+def _style_flags():
+    """当前这一面的 (bold, italic)。normal 时为 (False, False)，走原绘制路径。"""
+    s = _TS_STYLE[-1]
+    return s in ("bold", "bolditalic"), s in ("italic", "bolditalic")
+
+
 def _t(role, size, text=None):
     size = _scaled_size(size)
     if _typo is None:
@@ -539,7 +566,11 @@ def tracked(d, xy, text, f, fill, tracking=0.0, anchor_x="left", limit=None):
     if _typo is None:
         d.text(xy, text, font=f, fill=fill)
         return d.textlength(text, font=f)
-    return _typo.tracked(d, xy, text, f, fill, tracking, anchor_x, limit)
+    bold, italic = _style_flags()
+    if not bold and not italic:
+        return _typo.tracked(d, xy, text, f, fill, tracking, anchor_x, limit)
+    return _typo.tracked(d, xy, text, f, fill, tracking, anchor_x, limit,
+                         bold=bold, italic=italic)
 
 
 def fit_tracked(d, text, box_w, start, role, tracking=0.0, min_s=7):
@@ -1279,11 +1310,13 @@ def resolve_substrate(base_image, cover, w, h, D, crop, grade_kw, scrim_kw,
 
 def design_back2(cover, w, h, D, album="", artist="", tracks=None, seed=0,
                  quote=None, company="", barcode_code="", copyright_text="", release_year="",
-                 back_layout="auto", copy_settings=None,
-                 base_image=None, elements=None, ink_override=None, text_scale=None, text_font=None):
+                  back_layout="auto", copy_settings=None,
+                  base_image=None, elements=None, ink_override=None, text_scale=None, text_font=None,
+                  text_style=None):
     """封底。text_scale 是「这一面所有程序文字」的字号倍率（1.0=原始版式）；
-    text_font 是这一面统一使用的字体（auto/空 = 沿用各角色的默认字体）。"""
-    with part_text_font(text_font), part_text_scale(text_scale):
+    text_font 是这一面统一使用的字体（auto/空 = 沿用各角色的默认字体）；
+    text_style 是这一面的加粗 / 斜体（normal / bold / italic / boldItalic）。"""
+    with part_text_font(text_font), part_text_scale(text_scale), part_text_style(text_style):
         return _design_back2_impl(cover, w, h, D, album, artist, tracks, seed, quote, company,
                                   barcode_code, copyright_text, release_year, back_layout,
                                   copy_settings, base_image, elements, ink_override)
@@ -1543,9 +1576,10 @@ def _angled_tag(im, xy, text, size, color, align="left", width=None, angle=-3.0)
 
 
 def design_disc2(cover, d_px, hole_px, D, album="", artist="", company="", copy_settings=None,
-                 base_image=None, elements=None, ink_override=None, text_scale=None, text_font=None):
-    """盘面。text_scale 字号倍率、text_font 整面统一字体，缺省沿用原版式。"""
-    with part_text_font(text_font), part_text_scale(text_scale):
+                 base_image=None, elements=None, ink_override=None, text_scale=None, text_font=None,
+                 text_style=None):
+    """盘面。text_scale 字号倍率、text_font 整面统一字体、text_style 加粗/斜体，缺省沿用原版式。"""
+    with part_text_font(text_font), part_text_scale(text_scale), part_text_style(text_style):
         return _design_disc2_impl(cover, d_px, hole_px, D, album, artist, company, copy_settings,
                                   base_image, elements, ink_override)
 
@@ -1650,9 +1684,9 @@ def _design_disc2_impl(cover, d_px, hole_px, D, album="", artist="", company="",
 
 def design_inner2(cover, w, h, D, album="", artist="", tracks=None, quote=None,
                   copy_settings=None, base_image=None, elements=None, ink_override=None,
-                  text_scale=None, text_font=None):
-    """封面背面 / 内页。text_scale 字号倍率、text_font 整面统一字体，缺省沿用原版式。"""
-    with part_text_font(text_font), part_text_scale(text_scale):
+                  text_scale=None, text_font=None, text_style=None):
+    """封面背面 / 内页。text_scale 字号倍率、text_font 整面统一字体、text_style 加粗/斜体，缺省沿用原版式。"""
+    with part_text_font(text_font), part_text_scale(text_scale), part_text_style(text_style):
         return _design_inner2_impl(cover, w, h, D, album, artist, tracks, quote, copy_settings,
                                    base_image, elements, ink_override)
 
@@ -1733,9 +1767,10 @@ def _design_inner2_impl(cover, w, h, D, album="", artist="", tracks=None, quote=
 
 
 def design_tray2(cover, w, h, D, album="", artist="", company="", copy_settings=None,
-                 base_image=None, elements=None, ink_override=None, text_scale=None, text_font=None):
-    """内盘底。text_scale 字号倍率、text_font 整面统一字体，缺省沿用原版式。"""
-    with part_text_font(text_font), part_text_scale(text_scale):
+                 base_image=None, elements=None, ink_override=None, text_scale=None, text_font=None,
+                 text_style=None):
+    """内盘底。text_scale 字号倍率、text_font 整面统一字体、text_style 加粗/斜体，缺省沿用原版式。"""
+    with part_text_font(text_font), part_text_scale(text_scale), part_text_style(text_style):
         return _design_tray2_impl(cover, w, h, D, album, artist, company, copy_settings,
                                   base_image, elements, ink_override)
 

@@ -8,6 +8,9 @@ ROLES = ("display", "artist", "chineseCopy", "englishCopy", "metadata", "spine")
 _FONT_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_:.\-]{0,63}$")
 # 可让用户手选「这一面文字用什么颜色」的印刷面（侧封另走 spineAppearance）。
 PART_TEXT_COLOR_PARTS = ("disc", "fold", "back", "tray")
+# 四个印面的加粗 / 斜体取值，与侧封 spineAppearance.style 完全一致
+# （键是小写形式，值是存档里写的规范形式 —— 比较一律先 lower）。
+PART_TEXT_STYLES = {"normal": "normal", "bold": "bold", "italic": "italic", "bolditalic": "boldItalic"}
 # 三条物理侧封尺寸完全相同，因此共用一套模板库；位置只决定它贴在哪一条边。
 SPINE_TEMPLATE_DEFAULTS = {"right": "title-artist-classic", "left": "title-artist-classic", "leftBack": "title-artist-classic"}
 COMMON_SPINE_TEMPLATE_OPTIONS = {"title-artist-classic"}
@@ -90,6 +93,19 @@ def _part_text_font(raw):
     return out
 
 
+def _part_text_style(raw):
+    """每个出版面的「加粗 / 斜体」：{"disc": "bold", ...}。
+
+    只认 normal / bold / italic / boldItalic 四个值（与侧封 spineAppearance.style
+    同一套写法），其它一律回落 normal。
+    """
+    raw = raw if isinstance(raw, dict) else {}
+    out = {}
+    for part in PART_TEXT_COLOR_PARTS:
+        out[part] = PART_TEXT_STYLES.get(str(raw.get(part) or "").strip().lower(), "normal")
+    return out
+
+
 def _spine_character_styles(raw):
     raw = raw if isinstance(raw, dict) else {}
     result = {}
@@ -136,6 +152,7 @@ def normalize_copy_settings(raw):
             "partTextColor": _part_text_color(raw.get("partTextColor")),
             "partTextScale": _part_text_scale(raw.get("partTextScale")),
             "partTextFont": _part_text_font(raw.get("partTextFont")),
+            "partTextStyle": _part_text_style(raw.get("partTextStyle")),
             "spineCharacterStyles": _spine_character_styles(spine_character_styles_raw),
             "typography": {k: str(typo.get(k) or "auto") for k in ROLES}}
 
