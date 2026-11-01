@@ -1490,6 +1490,9 @@ def handle(handler, path, query, method):
             if path == "/api/design/ai/test":
                 handler._json(AI.test_profile(str(data.get("id") or "")))
                 return True
+            if path == "/api/design/ai/models":
+                handler._json(AI.list_models(str(data.get("id") or "")))
+                return True
             if path == "/api/design/ai/generate":
                 pic = str(data.get("pic") or "")
                 cover = _fetch_cover(pic)

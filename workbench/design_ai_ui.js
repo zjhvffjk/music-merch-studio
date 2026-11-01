@@ -41,14 +41,18 @@
     for (const model of providerInfo[provider]?.models || []) {
       list.append(new Option(model, model));
     }
-    el('aiModelHint').textContent = provider === 'gemini'
+    el('aiModelHint').textContent = provider === 'volcengine'
+      ? '填写已开通的 Seedream Model ID 或 ep- 接入点 ID。支持参考封面出图和单张重绘。'
+      : provider === 'custom'
+      ? '填写服务商提供的图片接口地址、协议和模型 ID；普通文字对话接口不能代替图片编辑接口。'
+      : provider === 'gemini'
       ? '选择 Gemini 图片模型，也可填其他模型 ID。Google AI 会员与 API Key 额度分开；具体出图额度以密钥所属项目为准。'
       : '选择 OpenAI 图片模型，也可填其他支持图片编辑的模型 ID。';
   }
 
   function showKeyHint() {
     const profile = selectedProfile();
-    const changedProvider = profile && profile.provider !== el('aiProvider').value;
+    const changedProvider = profile && (profile.provider !== el('aiProvider').value || profile.baseUrl !== el('aiBaseUrl').value.trim().replace(/\/+$/, ''));
     el('aiApiKey').placeholder = changedProvider ? '切换服务商后须填写新 API Key'
       : profile?.hasKey ? '已保存密钥；留空则保留' : '输入 API Key';
     el('aiKeyHint').textContent = changedProvider
@@ -100,6 +104,9 @@
     const profile = selectedProfile();
     el('aiProfileName').value = profile?.name || '';
     el('aiProvider').value = profile?.provider || 'gemini';
+    const preset = providerInfo[el('aiProvider').value] || {};
+    el('aiProtocol').value = profile?.protocol || preset.protocol || 'gemini';
+    el('aiBaseUrl').value = profile?.baseUrl || preset.baseUrl || '';
     el('aiModel').value = profile?.model || defaults.gemini;
     showModelChoices();
     el('aiApiKey').value = '';
@@ -112,6 +119,9 @@
     const data = await api('profiles');
     profiles = data.profiles || []; defaultId = data.default || '';
     providerInfo = data.providers || {};
+    const providerSelect = el('aiProvider');
+    providerSelect.replaceChildren();
+    for (const [id, provider] of Object.entries(providerInfo)) providerSelect.add(new Option(provider.name, id));
     const select = el('aiProfileSelect');
     select.replaceChildren(new Option('选择图片模型', ''));
     for (const profile of profiles) {
@@ -129,9 +139,25 @@
   el('aiDialogClose').onclick = () => el('aiConfigDialog').close();
   el('aiEditProfile').onchange = fillEdit;
   el('aiProvider').onchange = () => {
-    el('aiModel').value = providerInfo[el('aiProvider').value]?.model || defaults[el('aiProvider').value];
+    const preset = providerInfo[el('aiProvider').value] || {};
+    el('aiModel').value = preset.model || '';
+    el('aiProtocol').value = preset.protocol || 'openai';
+    el('aiBaseUrl').value = preset.baseUrl || '';
     showModelChoices();
     showKeyHint();
+  };
+  el('aiBaseUrl').oninput = showKeyHint;
+  el('aiLoadModels').onclick = async () => {
+    if (!el('aiEditProfile').value) return configStatus('请先保存配置，再读取服务商模型列表。');
+    const button = el('aiLoadModels'); button.disabled = true;
+    try {
+      configStatus('正在读取已保存配置的图片模型列表…');
+      const data = await api('models', {id: el('aiEditProfile').value}, 25000);
+      const list = el('aiModelSuggestions'); list.replaceChildren();
+      for (const id of data.models || []) list.append(new Option(id, id));
+      configStatus(data.message + (data.models?.length ? ' 共 ' + data.models.length + ' 个，可在模型名称中选择。' : ''));
+    } catch (error) { configStatus('读取失败：' + error.message, true); }
+    finally { button.disabled = false; }
   };
   el('aiSaveProfile').onclick = async () => {
     try {
@@ -140,6 +166,8 @@
         id: el('aiEditProfile').value,
         name: el('aiProfileName').value,
         provider: el('aiProvider').value,
+        protocol: el('aiProtocol').value,
+        baseUrl: el('aiBaseUrl').value,
         model: el('aiModel').value,
         apiKey: el('aiApiKey').value,
         makeDefault: el('aiMakeDefault').checked

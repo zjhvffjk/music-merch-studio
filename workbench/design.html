@@ -1655,15 +1655,18 @@ async function loadProject(jid){
   if(JID) loadProject(JID);
 })();
 </script>
-<dialog id="aiConfigDialog" aria-label="AI 模型配置">
+<dialog id="aiConfigDialog" aria-label="AI 模型配置" style="max-height:90vh;overflow-y:auto">
   <div class="aiDlgHead"><strong>AI 图片模型配置</strong><button type="button" class="plain sm" id="aiDialogClose">关闭</button></div>
   <div class="aiDlgBody">
     <p class="muted" style="margin:0 0 14px;font-size:12px">可保存多个配置。密钥只保存在本机；验证密钥不出图，无法代替生成额度测试。</p>
     <label>已保存配置<select id="aiEditProfile"><option value="">新建配置</option></select></label>
     <label>配置名称<input id="aiProfileName" placeholder="例如：高画质出图"></label>
-    <label>服务商<select id="aiProvider"><option value="gemini">Google Gemini Images</option><option value="openai">OpenAI Images</option></select></label>
+    <label>服务商<select id="aiProvider"><option value="gemini">Google Gemini Images</option><option value="openai">OpenAI Images</option><option value="volcengine">豆包 · 火山方舟 Seedream</option><option value="custom">自定义图片服务（兼容接口）</option></select></label>
+    <label>图片接口协议<select id="aiProtocol"><option value="openai">OpenAI Images 编辑接口</option><option value="gemini">Gemini generateContent 图片接口</option><option value="ark">火山方舟 Seedream 图片接口</option></select></label>
+    <label>接口地址（Base URL）<input id="aiBaseUrl" placeholder="https://ark.cn-beijing.volces.com/api/v3" autocomplete="off"></label>
     <label>图片模型名称<input id="aiModel" list="aiModelSuggestions" placeholder="gemini-nano-banana-2.1"></label>
     <datalist id="aiModelSuggestions"></datalist><small id="aiModelHint" class="aiKeyHint"></small>
+    <button type="button" class="plain sm" id="aiLoadModels">从已保存配置读取图片模型列表</button>
     <label>API Key<input id="aiApiKey" type="password" autocomplete="off" placeholder="新建时填写；编辑时留空则保留旧密钥"></label>
     <small id="aiKeyHint" class="aiKeyHint"></small>
     <label class="aiCheck"><input id="aiMakeDefault" type="checkbox"> 设为迷你 CD 默认模型</label>

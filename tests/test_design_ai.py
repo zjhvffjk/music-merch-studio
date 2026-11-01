@@ -90,6 +90,53 @@ class DesignAiTests(unittest.TestCase):
         self.assertIn("增加蝴蝶", kwargs["json"]["contents"][0]["parts"][0]["text"])
         self.assertEqual(kwargs["json"]["generationConfig"]["imageConfig"]["aspectRatio"], "1:1")
 
+    def test_ark_receives_cover_and_previous_component_as_reference_images(self):
+        ident = self.create("volcengine")
+        encoded = base64.b64encode(sample_png()).decode("ascii")
+        with mock.patch.object(ai.requests, "post", return_value=FakeResponse({"data": [{"b64_json": encoded}]})) as post:
+            result = ai.generate(ident, Image.new("RGB", (600, 600)), "disc", "增加蝴蝶",
+                                 source=Image.new("RGB", (512, 512)))
+        self.assertEqual(post.call_args.args[0], "https://ark.cn-beijing.volces.com/api/v3/images/generations")
+        body = post.call_args.kwargs["json"]
+        self.assertEqual(body["model"], "doubao-seedream-5-0-flash-260915")
+        self.assertEqual(len(body["image"]), 2)
+        self.assertTrue(body["image"][0].startswith("data:image/png;base64,"))
+        self.assertEqual(body["size"], "2K")
+        self.assertTrue((ai.UPLOAD_DIR / (result["upload"] + ".png")).is_file())
+
+    def test_custom_endpoint_and_protocol_survive_editing(self):
+        profile = ai.save_profile({"provider": "custom", "protocol": "openai",
+            "baseUrl": "https://images.example.com/v1/", "model": "vendor/image-edit",
+            "apiKey": "test-private-key"})["profile"]
+        self.assertEqual(profile["baseUrl"], "https://images.example.com/v1")
+        ai.save_profile({"id": profile["id"], "provider": "custom", "protocol": "openai",
+            "baseUrl": profile["baseUrl"], "model": "vendor/image-edit-v2"})
+        self.assertEqual(ai._profile(profile["id"])[1], "test-private-key")
+        with self.assertRaisesRegex(ai.ModelError, "新 API Key"):
+            ai.save_profile({"id": profile["id"], "provider": "custom", "protocol": "openai",
+                "baseUrl": "https://different.example.com/v1", "model": "image-edit"})
+
+    def test_rejects_endpoint_with_embedded_credentials(self):
+        with self.assertRaises(ai.ModelError):
+            ai.save_profile({"provider": "custom", "protocol": "openai",
+                "baseUrl": "https://name:secret@example.com/v1", "apiKey": "test-private-key", "model": "image"})
+
+    def test_model_list_filters_text_models_without_claiming_access(self):
+        ident = self.create("volcengine")
+        with mock.patch.object(ai.requests, "get", return_value=FakeResponse({"data": [
+            {"id": "doubao-seedream-5-0-flash-260915"}, {"id": "text-chat"}]})):
+            result = ai.list_models(ident)
+        self.assertEqual(result["models"], ["doubao-seedream-5-0-flash-260915"])
+        self.assertIn("开通权限", result["message"])
+
+    def test_upstream_error_does_not_echo_provider_credentials(self):
+        response = FakeResponse({"error": {"message": "Invalid key ark-example-private-12345678"}})
+        response.ok = False
+        response.status_code = 401
+        with self.assertRaises(ai.ModelError) as caught:
+            ai._json_response(response)
+        self.assertNotIn("ark-example-private", str(caught.exception))
+
     def test_quota_error_is_clear(self):
         response = FakeResponse({"error": {"message": "You exceeded your current quota"}})
         response.ok = False
