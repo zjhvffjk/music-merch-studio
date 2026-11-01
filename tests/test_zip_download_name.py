@@ -47,11 +47,31 @@ class ZipDownloadNameTests(unittest.TestCase):
             self.assertNotIn(ch, name)
         self.assertTrue(name.startswith("A_B-"))
 
-    def test_batch_uses_count(self):
-        self._put("b1", {"kind": "minicd-design-batch", "artist": "郑润泽", "count": 5})
-        self.assertEqual(DS.zip_download_name("b1"), "郑润泽-批量5张.zip")
-        self._put("b2", {"kind": "minicd-design-batch", "artist": "", "count": 3})
-        self.assertEqual(DS.zip_download_name("b2"), "批量3张.zip")
+    def test_batch_uses_singer_name(self):
+        """同一位歌手的一整批 → 压缩包就叫他的名字，专辑在里面的文件夹里分。"""
+        self._put("b1", {"kind": "minicd-design-batch", "artist": "郑润泽",
+                         "count": 3,
+                         "albums": [{"no": "01", "album": "旷野", "artist": "郑润泽"},
+                                    {"no": "02", "album": "召唤", "artist": "郑润泽"}]})
+        self.assertEqual(DS.zip_download_name("b1"), "郑润泽.zip")
+
+    def test_batch_of_one(self):
+        self._put("b3", {"kind": "minicd-design-batch", "artist": "周杰伦",
+                         "count": 1,
+                         "albums": [{"no": "01", "album": "范特西", "artist": "周杰伦"}]})
+        self.assertEqual(DS.zip_download_name("b3"), "周杰伦.zip")
+
+    def test_mixed_artists_keep_the_count_suffix(self):
+        """混了好几位歌手 → 光写歌手名会误导，退回带张数的写法。"""
+        self._put("b4", {"kind": "minicd-design-batch", "artist": "", "count": 4,
+                         "albums": [{"no": "01", "album": "A", "artist": "甲"},
+                                    {"no": "02", "album": "B", "artist": "乙"}]})
+        name = DS.zip_download_name("b4")
+        self.assertIn("批量4张", name)
+
+    def test_batch_without_album_list_still_works(self):
+        self._put("b2", {"kind": "minicd-design-batch", "artist": "郑润泽", "count": 3})
+        self.assertEqual(DS.zip_download_name("b2"), "郑润泽.zip")
 
     def test_no_meta_falls_back_to_jid(self):
         self.assertEqual(DS.zip_download_name("ghost"), "迷你CD设计-ghost.zip")
