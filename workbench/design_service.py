@@ -102,7 +102,6 @@ import title_assets as TA
 import title_compositor as TC
 import title_reference as TR
 import make_minicd_sheet as MS
-import design_ai as AI
 
 from PIL import Image, ImageDraw
 
@@ -1594,50 +1593,6 @@ def handle(handler, path, query, method):
             # query 作为兜底合入（个别前端习惯用 query 传参）
             for k, v in query.items():
                 data.setdefault(k, v[0] if isinstance(v, list) and v else v)
-            if path == "/api/design/ai/profile":
-                handler._json(AI.save_profile(data))
-                return True
-            if path == "/api/design/ai/delete":
-                handler._json(AI.delete_profile(str(data.get("id") or "")))
-                return True
-            if path == "/api/design/ai/test":
-                handler._json(AI.test_profile(str(data.get("id") or "")))
-                return True
-            if path == "/api/design/ai/models":
-                handler._json(AI.list_models(str(data.get("id") or "")))
-                return True
-            if path == "/api/design/ai/generate":
-                pic = str(data.get("pic") or "")
-                cover = _fetch_cover(pic)
-                if cover is None:
-                    raise ValueError("请先选择或上传专辑封面")
-                source_uid = str(data.get("sourceUid") or "")
-                source = None
-                if source_uid:
-                    if not re.fullmatch(r"[0-9a-f]{16}", source_uid):
-                        raise ValueError("待修改组件编号无效")
-                    source_file = AI.UPLOAD_DIR / (source_uid + ".png")
-                    if source_file.is_file():
-                        source = Image.open(source_file).convert("RGB")
-                if data.get("sourceUid") and source is None:
-                    raise ValueError("待修改组件图片不存在")
-                tracks = _norm_tracks(data.get("trackData") or data.get("tracks"))
-                _company = str(data.get("company") or "")
-                release_year = ""
-                if data.get("target") == "back":
-                    _company, release_year, _date = _release_metadata(
-                        {"id": data.get("id"), "date": data.get("date")},
-                        str(data.get("artist") or ""), str(data.get("album") or ""),
-                        _company)
-                result = AI.generate(str(data.get("profileId") or ""), cover,
-                                     str(data.get("target") or ""), str(data.get("instruction") or ""),
-                                     str(data.get("album") or ""), str(data.get("artist") or ""),
-                                     tracks, _company, source,
-                                     str(data.get("innerCopy") or ""),
-                                     str(data.get("barcode") or ""),
-                                     str(data.get("copyright") or ""), release_year)
-                handler._json(result)
-                return True
             if path == "/api/design/title-assets":
                 upload = _upload_path(data.get("upload"))
                 if not upload:
@@ -1660,26 +1615,6 @@ def handle(handler, path, query, method):
             return True
 
         # ---------------- GET ----------------
-        if path == "/api/design/ai/profiles":
-            handler._json(AI.list_profiles())
-            return True
-        if path == "/api/design/ai/asset":
-            uid = value("uid")
-            fp = _upload_path(uid)
-            if not uid or not uid.isascii() or not uid.isalnum() or not fp or not fp.lower().endswith(".png"):
-                handler._json({"error": "图片不存在"}, 404)
-            else:
-                handler._file(fp)
-            return True
-        if path == "/api/design/ai/source":
-            uid = value("uid")
-            fp = _upload_path(uid)
-            if not uid or not uid.isascii() or not uid.isalnum() or not fp \
-                    or Path(fp).suffix.lower() not in (".jpg", ".jpeg", ".png", ".webp", ".bmp"):
-                handler._json({"error": "封面不存在"}, 404)
-            else:
-                handler._file(fp)
-            return True
         if path == "/api/design/fonts":
             # 统一字体库：常用推荐 + 这台电脑实际安装、后端能实际渲染的字体文件。
             # UI 中所有文字角色共用这个接口；选择值只落到各自的 typography slot。
