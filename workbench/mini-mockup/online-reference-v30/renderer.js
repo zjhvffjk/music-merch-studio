@@ -25,11 +25,11 @@ export async function prepareAsset(id,src){textureCache.delete(id);if(src)imgCac
 export async function prepareProjectAssets(assets){const entries=await Promise.all(Object.entries(assets).map(async([id,a])=>[id,a.src?await loadImage(a.src):null]));for(const[id,img]of entries){textureCache.delete(id);if(img)imgCache.set(id,img);else imgCache.delete(id)}}
 export function invalidate(id){textureCache.delete(id)}
 export function getQuad(state,view,slot){return state.quads[`${view}:${slot.id}`]||slot.q}
-function texture(state,id){const a=state.assets[id],img=imgCache.get(id);if(!a?.src||!img)return null;const sz=Math.min(3000,Math.max(1200,Math.min(textureResolution,Math.max(img.width,img.height)))),key=sz+JSON.stringify(a);const cached=textureCache.get(id);if(cached?.key===key)return cached.canvas;
+function texture(state,id){const a=state.assets[id],img=imgCache.get(id);if(!a?.src||!img)return null;const sz=Math.min(8192,Math.max(1200,Math.min(textureResolution,Math.max(img.width,img.height)))),key=sz+JSON.stringify(a);const cached=textureCache.get(id);if(cached?.key===key)return cached.canvas;
 const c=document.createElement('canvas');const narrow=['leftSpine','rightSpine','leftSpineInner'].includes(id);const printSize=surfaces.find(s=>s.id===id)?.printSize,aspect=narrow?4.4/38:printSize?printSize[0]/printSize[1]:1;c.width=aspect<1?Math.round(sz*aspect):sz;c.height=aspect>1?Math.round(sz/aspect):sz;const x=c.getContext('2d'),tw=c.width,th=c.height; x.imageSmoothingQuality='high';const factor=(a.fit==='contain'?Math.min(tw/img.width,th/img.height):Math.max(tw/img.width,th/img.height))*a.scale/100;
 if(narrow||printSize){x.fillStyle='#ffffff';x.fillRect(0,0,tw,th)}x.save();x.translate(tw/2+a.x/100*tw/2,th/2+a.y/100*th/2);x.rotate(a.rotation*Math.PI/180);x.drawImage(img,-img.width*factor/2,-img.height*factor/2,img.width*factor,img.height*factor);x.restore();
 if(id==='disc'){x.globalCompositeOperation='destination-in';x.beginPath();x.arc(sz/2,sz/2,sz*DISC.labelDiameter/DISC.diameter/2,0,Math.PI*2);x.fill();x.globalCompositeOperation='destination-out';x.beginPath();x.arc(sz/2,sz/2,sz*DISC.holeDiameter/DISC.diameter/2,0,Math.PI*2);x.fill();}
-textureCache.set(id,{key,canvas:c});return c}
+textureCache.set(id,{key,canvas:c});while(textureCache.size>3)textureCache.delete(textureCache.keys().next().value);return c}
 function slotTexture(state,slot){const full=texture(state,slot.id);if(!full||!slot.sourceCrop)return full;const key=slot.id+'-crop-'+slot.sourceCrop.join(','),cached=textureCache.get(key);if(cached?.source===full)return cached.canvas;const[x,y,w,h]=slot.sourceCrop,c=document.createElement('canvas');c.width=Math.max(1,Math.round(full.width*w));c.height=Math.max(1,Math.round(full.height*h));c.getContext('2d').drawImage(full,x*full.width,y*full.height,w*full.width,h*full.height,0,0,c.width,c.height);textureCache.set(key,{source:full,canvas:c});return c}
 // Isolate local plastic edges and highlights from the photographed grey backdrop.
 // A flat clear area becomes transparent, so adding the carrier cannot tint the paper below.
@@ -58,6 +58,11 @@ function drawInsideRetainers(ctx,state,view){const slot=views[view].slots.find(s
 export function drawInsideRetainersOnQuad(ctx,quad){const img=imgCache.get('inside-retainers');if(!img)return;ctx.save();ctx.globalCompositeOperation='multiply';warp(ctx,img,quad);ctx.restore()}
 // One photographed eyelet, shared by every view; only its projection changes.
 async function prepareUnifiedHooks(){const front=await loadImage('online-reference-v30/assets/front-cover-hq-v3.png'),hook=document.createElement('canvas');hook.width=235;hook.height=145;hook.getContext('2d').drawImage(front,510,140,235,145,0,0,235,145);
+ // Resize only the front eyelet, keeping the photographed shell and its top rail.
+ const frontAdjusted=document.createElement('canvas');frontAdjusted.width=front.width;frontAdjusted.height=front.height;
+ const fx=frontAdjusted.getContext('2d');fx.drawImage(front,0,0);fx.fillStyle='#fff';fx.fillRect(510,140,235,145);
+ const factor=.85,w=235*factor,h=145*factor;fx.imageSmoothingQuality='high';fx.drawImage(hook,627.5-w/2,285-h,w,h);
+ imgCache.set('unified-online-reference-v30/assets/front-cover-hq-v3.png',frontAdjusted);
  const specs=[
   {file:'online-reference-v30/assets/open-inner-reference.png',flat:[[425,20,205,153,525,173,215,130],[1130,20,235,153,1252,173,215,130]]},
   {file:'online-reference-v30/assets/open-outer-reference.png',flat:[[390,10,235,155,507,165,215,130],[1130,10,260,155,1260,165,215,130]]},

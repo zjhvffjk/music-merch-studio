@@ -23,7 +23,7 @@ export async function prepareAsset(id,src){await online.prepareAsset(onlineId(id
 export async function prepareProjectAssets(assets){await online.prepareProjectAssets(Object.fromEntries(Object.entries(assets).map(([id,a])=>[onlineId(id),a])));const entries=await Promise.all(Object.entries(assets).map(async([id,a])=>[id,a.src?await loadImage(a.src):null]));for(const[id,img]of entries){textureCache.delete(id);if(img)imgCache.set(id,img);else imgCache.delete(id)}}
 export function invalidate(id){online.invalidate(onlineId(id));textureCache.delete(id)}
 export function getQuad(state,view,slot){return state.quads[`${view}:${slot.id}`]||slot.q}
-function texture(state,id,plain=false){const a=state.assets[id],img=imgCache.get(id);if(!a?.src||!img)return null;const sz=Math.min(3000,Math.max(1200,Math.min(localResolution,Math.max(img.width,img.height)))),key=JSON.stringify([a,state.lighting,plain,sz]);const cached=textureCache.get(id);if(cached?.key===key)return cached.canvas;
+function texture(state,id,plain=false){const a=state.assets[id],img=imgCache.get(id);if(!a?.src||!img)return null;const sz=Math.min(8192,Math.max(1200,Math.min(localResolution,Math.max(img.width,img.height)))),key=JSON.stringify([a,state.lighting,plain,sz]);const cached=textureCache.get(id);if(cached?.key===key)return cached.canvas;
 const c=document.createElement('canvas');const w=id.startsWith('side')?Math.round(sz*4.4/38):['back','tray'].includes(id)?Math.round(sz*49/38):sz;c.width=w;c.height=sz;const x=c.getContext('2d');const factor=(a.fit==='contain'?Math.min(w/img.width,sz/img.height):Math.max(w/img.width,sz/img.height))*a.scale/100;
 x.save();x.translate(w/2+a.x/100*w/2,sz/2+a.y/100*sz/2);x.rotate(a.rotation*Math.PI/180);x.drawImage(img,-img.width*factor/2,-img.height*factor/2,img.width*factor,img.height*factor);x.restore();
 if(id!=='disc'&&id!=='inside'&&!plain&&state.lighting){
@@ -38,11 +38,11 @@ if(id==='disc'){
   if(state.lighting&&!plain){x.save();x.globalCompositeOperation='source-atop';const g=x.createLinearGradient(0,0,sz,sz*.7);g.addColorStop(0,'rgba(0,0,0,.12)');g.addColorStop(.38,'rgba(255,255,255,.13)');g.addColorStop(.55,'rgba(255,255,255,0)');g.addColorStop(1,'rgba(0,0,0,.12)');x.fillStyle=g;x.fillRect(0,0,sz,sz);x.strokeStyle='rgba(255,255,255,.55)';x.lineWidth=3;x.beginPath();x.arc(sz/2,sz/2,sz*.487,0,Math.PI*2);x.stroke();x.restore()}
   x.globalCompositeOperation='destination-in';x.beginPath();x.arc(sz/2,sz/2,sz*.492,0,Math.PI*2);x.fill();x.globalCompositeOperation='destination-out';x.beginPath();x.arc(sz/2,sz/2,sz*.0625,0,Math.PI*2);x.fill();
 }
-textureCache.set(id,{key,canvas:c});return c}
+textureCache.set(id,{key,canvas:c});while(textureCache.size>3)textureCache.delete(textureCache.keys().next().value);return c}
 function project(q,u,v){const [p0,p1,p2,p3]=q;const dx1=p1[0]-p2[0],dx2=p3[0]-p2[0],dx3=p0[0]-p1[0]+p2[0]-p3[0],dy1=p1[1]-p2[1],dy2=p3[1]-p2[1],dy3=p0[1]-p1[1]+p2[1]-p3[1];let g=0,h=0;const den=dx1*dy2-dx2*dy1;if(Math.abs(den)>1e-9){g=(dx3*dy2-dx2*dy3)/den;h=(dx1*dy3-dx3*dy1)/den}const a=p1[0]-p0[0]+g*p1[0],b=p3[0]-p0[0]+h*p3[0],d=p1[1]-p0[1]+g*p1[1],e=p3[1]-p0[1]+h*p3[1];const z=g*u+h*v+1;return[(a*u+b*v+p0[0])/z,(d*u+e*v+p0[1])/z]}
 function triangle(ctx,img,s,d){const[x0,y0]=s[0],[x1,y1]=s[1],[x2,y2]=s[2],[u0,v0]=d[0],[u1,v1]=d[1],[u2,v2]=d[2];const den=x0*(y1-y2)+x1*(y2-y0)+x2*(y0-y1);if(Math.abs(den)<1e-9)return;const a=(u0*(y1-y2)+u1*(y2-y0)+u2*(y0-y1))/den,b=(v0*(y1-y2)+v1*(y2-y0)+v2*(y0-y1))/den,c=(u0*(x2-x1)+u1*(x0-x2)+u2*(x1-x0))/den,dv=(v0*(x2-x1)+v1*(x0-x2)+v2*(x1-x0))/den,e=(u0*(x1*y2-x2*y1)+u1*(x2*y0-x0*y2)+u2*(x0*y1-x1*y0))/den,f=(v0*(x1*y2-x2*y1)+v1*(x2*y0-x0*y2)+v2*(x0*y1-x1*y0))/den;
 ctx.save();ctx.beginPath();const mx=(u0+u1+u2)/3,my=(v0+v1+v2)/3;const grow=(u,v)=>{const l=Math.hypot(u-mx,v-my)||1;return[u+(u-mx)/l*.8,v+(v-my)/l*.8]};ctx.moveTo(...grow(u0,v0));ctx.lineTo(...grow(u1,v1));ctx.lineTo(...grow(u2,v2));ctx.closePath();ctx.clip();ctx.transform(a,b,c,dv,e,f);ctx.drawImage(img,0,0);ctx.restore()}
-export function warp(ctx,img,quad){const n=14,q=quad.map(p=>p.map(x=>x*BASE));ctx.save();ctx.beginPath();q.forEach((p,i)=>i?ctx.lineTo(...p):ctx.moveTo(...p));ctx.closePath();ctx.clip();for(let row=0;row<n;row++)for(let col=0;col<n;col++){const u=col/n,v=row/n,un=(col+1)/n,vn=(row+1)/n;const uv=[[u,v],[un,v],[un,vn],[u,vn]],src=uv.map(([s,t])=>[s*img.width,t*img.height]),dst=uv.map(([s,t])=>project(q,s,t));triangle(ctx,img,[src[0],src[1],src[2]],[dst[0],dst[1],dst[2]]);triangle(ctx,img,[src[0],src[2],src[3]],[dst[0],dst[2],dst[3]])}ctx.restore()}
+export function warp(ctx,img,quad,sourceX=0){const n=14,q=quad.map(p=>p.map(x=>x*BASE));ctx.save();ctx.beginPath();q.forEach((p,i)=>i?ctx.lineTo(...p):ctx.moveTo(...p));ctx.closePath();ctx.clip();for(let row=0;row<n;row++)for(let col=0;col<n;col++){const u=col/n,v=row/n,un=(col+1)/n,vn=(row+1)/n;const uv=[[u,v],[un,v],[un,vn],[u,vn]],src=uv.map(([s,t])=>[(sourceX+(1-sourceX)*s)*img.width,t*img.height]),dst=uv.map(([s,t])=>project(q,s,t));triangle(ctx,img,[src[0],src[1],src[2]],[dst[0],dst[1],dst[2]]);triangle(ctx,img,[src[0],src[2],src[3]],[dst[0],dst[2],dst[3]])}ctx.restore()}
 function blankDisc(){const c=document.createElement('canvas');c.width=c.height=1200;const x=c.getContext('2d'),g=x.createLinearGradient(0,0,1200,1200);g.addColorStop(0,'#c6ccd1');g.addColorStop(.3,'#eef0f0');g.addColorStop(.5,'#b4bac2');g.addColorStop(.72,'#dce2e4');g.addColorStop(1,'#b1b9bf');x.fillStyle=g;x.beginPath();x.arc(600,600,590,0,Math.PI*2);x.fill();x.globalCompositeOperation='destination-out';x.beginPath();x.arc(600,600,86,0,Math.PI*2);x.fill();return c}const blank=blankDisc();
 let frontGlass;
 const opticsCache=new Map();
@@ -79,11 +79,19 @@ function paperRecess(view,id,lighting){
   }
   recessCache.set(key,c);return c;
 }
-function insertSurface(ctx,tx,q,id){
+function insertSurface(ctx,tx,q,id,sourceX=0){
+  // Draw the artwork at the export resolution, not through the preview-sized layer.
+  if(id!=='disc'){warp(ctx,tx,q,sourceX);return}
   const x=surfaceLayer.getContext('2d');x.clearRect(0,0,BASE,BASE);warp(x,tx,q);
   // Paper sits behind the clear shell: a drop shadow on the shell would
   // imply that the print floats above it. Only the raised disc casts one.
   ctx.save();if(id==='disc'){ctx.shadowColor='rgba(16,20,24,.22)';ctx.shadowBlur=1.4;ctx.shadowOffsetY=.7}ctx.drawImage(surfaceLayer,0,0);ctx.restore();
+}
+function horizontalSlice(source, start, end){
+  const x0=Math.round(source.width*start),x1=Math.round(source.width*end);
+  const c=document.createElement('canvas');c.width=Math.max(1,x1-x0);c.height=source.height;
+  c.getContext('2d').drawImage(source,x0,0,c.width,c.height,0,0,c.width,c.height);
+  return c;
 }
 const insideMasks=new Map();
 const insideRelief=document.createElement('canvas');insideRelief.width=insideRelief.height=BASE;
@@ -160,13 +168,15 @@ export function render(canvas,state,view=state.view,size=1254){
   if(view===1){
     ctx.save();ctx.globalCompositeOperation='multiply';ctx.drawImage(shell,0,0,BASE,BASE);ctx.restore();
     if(state.showDesign){
-      // The strip beside the hinge is the left edge of the tray insert,
-      // continuing the same artwork visible under the disc.
-      const tray=texture(state,'tray');
-      if(tray){const edge=document.createElement('canvas');edge.width=Math.max(1,Math.round(tray.width*.08));edge.height=tray.height;edge.getContext('2d').drawImage(tray,0,0,edge.width,edge.height,0,0,edge.width,edge.height);const q=[[.482,.355],[.522,.355],[.522,.707],[.482,.707]];insertSurface(ctx,edge,q,'tray');ctx.save();clipQuad(ctx,q);ctx.drawImage(photoOptics(shell,1),0,0);ctx.restore()}
+      // The narrow hinge opening and the tray are two visible parts of one
+      // insert. Split the transformed artwork once so neither part repeats.
+      const tray=texture(state,'tray'),edgeQ=[[.482,.355],[.522,.355],[.522,.707],[.482,.707]],traySlot=views[1].slots.find(s=>s.id==='tray');
+      const trayQ=getQuad(state,1,traySlot),edgeWidth=edgeQ[1][0]-edgeQ[0][0],trayWidth=(Math.abs(trayQ[1][0]-trayQ[0][0])+Math.abs(trayQ[2][0]-trayQ[3][0]))/2;
+      const split=edgeWidth/(edgeWidth+trayWidth);
+      if(tray){const edge=horizontalSlice(tray,0,split);insertSurface(ctx,edge,edgeQ,'tray');ctx.save();clipQuad(ctx,edgeQ);ctx.drawImage(photoOptics(shell,1),0,0);ctx.restore()}
       for(const slot of views[1].slots.filter(s=>s.id!=='disc')){
         const tx=texture(state,slot.id);if(!tx)continue;
-        insertSurface(ctx,tx,getQuad(state,1,slot),slot.id);
+        insertSurface(ctx,tx,getQuad(state,1,slot),slot.id,slot.id==='tray'?split:0);
         overlayPlastic(ctx,state,1,slot,shell);
       }
     }
@@ -219,5 +229,5 @@ export function render(canvas,state,view=state.view,size=1254){
   ctx.setTransform(1,0,0,1,0,0);
   if(view===0)calibrateFront(canvas);
 }
-export async function exportPNG(state,size,mode){const c=document.createElement('canvas');if(mode==='current')render(c,state,state.view,size);else if(mode==='individual'){const cell=document.createElement('canvas'),side=size*viewScale(state.view)*Math.min(1,.90/widestViewScale());c.width=c.height=size;const x=c.getContext('2d');x.fillStyle=state.background;x.fillRect(0,0,size,size);render(cell,state,state.view,Math.ceil(side));x.drawImage(cell,(size-side)/2,(size-side)/2,side,side)}else{const cell=document.createElement('canvas'),indices=views.map((v,i)=>v.hidden?-1:i).filter(i=>i>=0),cellSize=size/4;c.width=size;c.height=Math.ceil(indices.length/4)*cellSize;const x=c.getContext('2d');x.fillStyle=state.background;x.fillRect(0,0,c.width,c.height);const common=Math.min(1,.90/widestViewScale());indices.forEach((view,i)=>{render(cell,state,view,Math.ceil(cellSize*viewScale(view)*common));const px=(i%4)*cellSize,py=Math.floor(i/4)*cellSize,side=cellSize*viewScale(view)*common;x.save();x.beginPath();x.rect(px,py,cellSize,cellSize*.91);x.clip();x.drawImage(cell,px+(cellSize-side)/2,py+(cellSize*.91-side)/2,side,side);x.restore();x.fillStyle='#55534e';x.font=`${Math.round(cellSize*.025)}px sans-serif`;x.textAlign='center';x.fillText(views[view].name,px+cellSize/2,py+cellSize*.96)})}
-return new Promise((resolve,reject)=>c.toBlob(b=>b?resolve(b):reject(Error('导出失败，请尝试较小分辨率')),'image/png'))}
+export async function exportPNG(state,size,mode){const c=document.createElement('canvas');if(mode==='current')render(c,state,state.view,size);else if(mode==='individual'){const cell=document.createElement('canvas'),side=size*viewScale(state.view)*Math.min(1,.90/widestViewScale());c.width=c.height=size;const x=c.getContext('2d');x.fillStyle=state.background;x.fillRect(0,0,size,size);render(cell,state,state.view,Math.ceil(side));x.drawImage(cell,(size-side)/2,(size-side)/2,side,side);cell.width=cell.height=0}else{const cell=document.createElement('canvas'),indices=views.map((v,i)=>v.hidden?-1:i).filter(i=>i>=0),cellSize=size/4;c.width=size;c.height=Math.ceil(indices.length/4)*cellSize;const x=c.getContext('2d');x.fillStyle=state.background;x.fillRect(0,0,c.width,c.height);const common=Math.min(1,.90/widestViewScale());indices.forEach((view,i)=>{render(cell,state,view,Math.ceil(cellSize*viewScale(view)*common));const px=(i%4)*cellSize,py=Math.floor(i/4)*cellSize,side=cellSize*viewScale(view)*common;x.save();x.beginPath();x.rect(px,py,cellSize,cellSize*.91);x.clip();x.drawImage(cell,px+(cellSize-side)/2,py+(cellSize*.91-side)/2,side,side);x.restore();x.fillStyle='#55534e';x.font=`${Math.round(cellSize*.025)}px sans-serif`;x.textAlign='center';x.fillText(views[view].name,px+cellSize/2,py+cellSize*.96)})}
+return new Promise((resolve,reject)=>c.toBlob(b=>{c.width=c.height=0;b?resolve(b):reject(Error('导出失败，请尝试较小分辨率'))},'image/png'))}

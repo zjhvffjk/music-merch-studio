@@ -65,14 +65,14 @@ def corner_crosses(d, x, y, w, h, arm=22, gap=8, col=CUT, lw=3):
         d.line([cx, cy + sy * gap, cx, cy + sy * (gap + arm)], fill=col, width=lw)
 
 
-def ruler50(d, x, y, f, col=INK, lbl=DIM):
+def ruler50(d, x, y, f, col=INK, lbl=DIM, dpi=DPI):
     """50mm 校验尺 —— 打印后拿尺子量，不足 50mm 说明被缩放了。"""
-    L = mm(50)
-    d.line([x, y, x + L, y], fill=col, width=max(3, mm(0.6)))
+    L = mm(50, dpi)
+    d.line([x, y, x + L, y], fill=col, width=max(3, mm(0.6, dpi)))
     for i in range(6):
-        tx = x + mm(i * 10.0)
-        d.line([tx, y - mm(2), tx, y + mm(2)], fill=col, width=max(2, mm(0.4)))
-    d.text((x + L + mm(4), y - f.size // 2), "50mm 校验尺（打印后实测）", font=f, fill=lbl)
+        tx = x + mm(i * 10.0, dpi)
+        d.line([tx, y - mm(2, dpi), tx, y + mm(2, dpi)], fill=col, width=max(2, mm(0.4, dpi)))
+    d.text((x + L + mm(4, dpi), y - f.size // 2), "50mm 校验尺（打印后实测）", font=f, fill=lbl)
 
 
 def build_sheet(cover, album, artist, D, tracks, company, out_path, dpi=DPI, png=False,
@@ -105,7 +105,7 @@ def build_sheet(cover, album, artist, D, tracks, company, out_path, dpi=DPI, png
     d.text((M, int(round(74 * dpi / 300))), t + "　迷你CD 印刷版面（展开图）",
            font=F(int(round(58 * dpi / 300)), True), fill=INK)
     d.text((M, int(round(168 * dpi / 300))),
-           "300 DPI · 1:1 实尺寸 · 黑线裁切 / 灰虚线折线 / 十字为对位标记 · "
+           f"{dpi} DPI · 1:1 实尺寸 · 黑线裁切 / 灰虚线折线 / 十字为对位标记 · "
            "标注尺寸未含出血，需要出血请按各边 +3mm 外扩",
            font=F(int(round(28 * dpi / 300))), fill=DIM)
     leg = [("裁切线", CUT), ("折线", FOLD), ("尺寸线", LINE)]
@@ -198,18 +198,19 @@ def build_sheet(cover, album, artist, D, tracks, company, out_path, dpi=DPI, png
     d.line([M, yL, W - M, yL], fill=(222, 219, 215), width=2)
     fl = F(int(round(26 * dpi / 300)))
 
-    d.text((xd, yL + 22), "① 沿黑圆裁切；中心 Ø5mm 打穿（贴片轴）", font=fl, fill=INK)
-    d.text((xd, yL + 58), "盘面图案由封面推导（%s / %s）" % (D["mood"], D["style"]),
+    offset = lambda value: int(round(value * dpi / 300))
+    d.text((xd, yL + offset(22)), "① 沿黑圆裁切；中心 Ø5mm 打穿（贴片轴）", font=fl, fill=INK)
+    d.text((xd, yL + offset(58)), "盘面图案由封面推导（%s / %s）" % (D["mood"], D["style"]),
            font=fl, fill=DIM)
 
-    d.text((xf, yL + 22), "② 左＝封面背面（金句页）／右＝封面正面", font=fl, fill=INK)
-    d.text((xf, yL + 58), "沿中缝对折 → 41×41mm 折成卡套", font=fl, fill=DIM)
+    d.text((xf, yL + offset(22)), "② 左＝封面背面（金句页）／右＝封面正面", font=fl, fill=INK)
+    d.text((xf, yL + offset(58)), "沿中缝对折 → 41×41mm 折成卡套", font=fl, fill=DIM)
 
-    d.text((xs, yL + 22), "③ 分段（左→右）：%s"
+    d.text((xs, yL + offset(22)), "③ 分段（左→右）：%s"
            % " ｜ ".join("%s %gmm" % (n, s) for n, s in
                         zip(("右侧封", "封底", "左侧封", "背脊", "内盘底"), segs)),
            font=fl, fill=INK)
-    d.text((xs, yL + 58), "合计展开 111.2mm × 38mm ｜ 沿四道灰虚线对折后包裹盒身",
+    d.text((xs, yL + offset(58)), "合计展开 111.2mm × 38mm ｜ 沿四道灰虚线对折后包裹盒身",
            font=fl, fill=DIM)
 
     # ---------------- 页脚 ----------------
@@ -217,13 +218,13 @@ def build_sheet(cover, album, artist, D, tracks, company, out_path, dpi=DPI, png
     d.line([M, yF, W - M, yF], fill=(222, 219, 215), width=2)
     ff = F(int(round(26 * dpi / 300)))
     who = " · ".join([s for s in (artist, album) if s]) or "（未填歌手/专辑）"
-    foot = ("%s ｜ 迷你CD 印刷版面总览 ｜ 300dpi ｜ 打印设置选「实际大小 / 100%%」，"
-            "不要选「适应页面」 ｜ 打印后先量左下校验尺是否 = 50mm" % who)
-    d.text((M, yF + 26), foot, font=ff, fill=(120, 117, 113))
-    ruler50(d, M, yF + 92, F(int(round(24 * dpi / 300))))
+    foot = ("%s ｜ 迷你CD 印刷版面总览 ｜ %ddpi ｜ 打印设置选「实际大小 / 100%%」，"
+            "不要选「适应页面」 ｜ 打印后先量左下校验尺是否 = 50mm" % (who, dpi))
+    d.text((M, yF + offset(26)), foot, font=ff, fill=(120, 117, 113))
+    ruler50(d, M, yF + offset(92), F(int(round(24 * dpi / 300))), dpi=dpi)
 
     ext = "png" if png else "jpg"
-    cv.save(out_path, **({"quality": 95} if ext == "jpg" else {}))
+    cv.save(out_path, **({"quality": 95, "dpi": (dpi, dpi)} if ext == "jpg" else {"dpi": (dpi, dpi)}))
     print("已生成：%s  (%dx%d)  = %.1f × %.1f mm"
           % (out_path, cv.width, cv.height, cv.width / dpi * 25.4, cv.height / dpi * 25.4))
     return out_path

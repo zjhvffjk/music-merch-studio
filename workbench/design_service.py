@@ -41,11 +41,13 @@ import json
 import os
 import re
 import shutil
+import subprocess
 import sys
 import threading
 import time
 import uuid
 import zipfile
+from collections import OrderedDict
 from pathlib import Path
 from urllib.parse import quote
 from urllib.request import Request, urlopen
@@ -105,9 +107,9 @@ import make_minicd_sheet as MS
 
 from PIL import Image, ImageDraw
 
-DPI = 300
+DPI = 600
 DEFAULT_COMPANY = "Good Life Music Co., Ltd."
-SHEET_DPI = 300
+SHEET_DPI = 600
 PREVIEW_DPI = 96
 
 
@@ -184,6 +186,37 @@ def mm(v, dpi):
 # 各写一份迟早会长歪。
 SPLIT_PART_NAMES = ("封面.png", "封面背面.png", "右侧封.png", "左侧封.png",
                     "左侧封背面.png", "封底.png", "内盘底.png", "盘面.png")
+THREED_SLOTS = {name.removesuffix(".png"): name for name in SPLIT_PART_NAMES}
+THREED_RATIOS = {"盘面": 1.0, "封面": 1.0, "封面背面": 1.0,
+                 "封底": 49 / 38, "内盘底": 49 / 38,
+                 "右侧封": 4.4 / 38, "左侧封": 4.4 / 38,
+                 "左侧封背面": 4.4 / 38}
+
+
+def _three_d_config(jid):
+    jid = _safe_jid(jid)
+    base = OUT_DIR / jid if jid else None
+    if not base or not (base / "meta.json").is_file():
+        raise ValueError("专辑项目不存在")
+    path = base / "3d-config.json"
+    try:
+        saved = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
+    except (OSError, ValueError):
+        saved = {}
+    overrides = saved.get("overrides", {}) if isinstance(saved, dict) else {}
+    state = saved.get("state", {}) if isinstance(saved, dict) else {}
+    if not isinstance(overrides, dict): overrides = {}
+    if not isinstance(state, dict): state = {}
+    names = {slot: (overrides.get(slot) if overrides.get(slot) == "3d-%s.png" % slot
+                    and (base / overrides[slot]).is_file() else original)
+             for slot, original in THREED_SLOTS.items()}
+    return base, path, overrides, state, names
+
+
+def _save_three_d_config(path, overrides, state):
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps({"overrides": overrides, "state": state}, ensure_ascii=False, indent=2), encoding="utf-8")
+    tmp.replace(path)
 
 
 def _split_part_images(fold, strip, disc):
@@ -280,6 +313,11 @@ def _album_zip_members():
             "打印拼版-A4竖版7套.png", "打印拼版-A4竖版7套.pdf") + SPLIT_PART_NAMES
 
 
+_cover_cache = OrderedDict()
+_cover_cache_lock = threading.Lock()
+_cover_fetch_locks = [threading.Lock() for _ in range(16)]
+
+
 def _fetch_cover(pic):
     """从封面 URL 拉图；本地路径直接打开；失败返回 None。"""
     if not pic:
@@ -289,17 +327,29 @@ def _fetch_cover(pic):
             return Image.open(pic).convert("RGB")
     except Exception:
         pass
-    try:
-        req = Request(pic, headers={
-            "User-Agent": "Mozilla/5.0",
-            "Referer": "https://music.163.com/",
-        })
-        with urlopen(req, timeout=25) as r:
-            data = r.read()
-        return Image.open(io.BytesIO(data)).convert("RGB")
-    except Exception as e:
-        _slog("cover fetch failed:", type(e).__name__, e)
-        return None
+    with _cover_fetch_locks[hash(pic) % len(_cover_fetch_locks)]:
+        with _cover_cache_lock:
+            cached = _cover_cache.get(pic)
+            if cached and time.monotonic() - cached[0] < 600:
+                _cover_cache.move_to_end(pic)
+                return cached[1].copy()
+        try:
+            req = Request(pic, headers={
+                "User-Agent": "Mozilla/5.0",
+                "Referer": "https://music.163.com/",
+            })
+            with urlopen(req, timeout=25) as r:
+                data = r.read()
+            image = Image.open(io.BytesIO(data)).convert("RGB")
+            with _cover_cache_lock:
+                _cover_cache[pic] = (time.monotonic(), image)
+                _cover_cache.move_to_end(pic)
+                while len(_cover_cache) > 12:
+                    _cover_cache.popitem(last=False)
+            return image.copy()
+        except Exception as e:
+            _slog("cover fetch failed:", type(e).__name__, e)
+            return None
 
 
 def _norm_tracks(v):
@@ -748,8 +798,11 @@ def build_preview(data):
     artist = str(data.get("artist") or "")
     album = str(data.get("album") or "")
     pic = data.get("pic") or ""
-    company, release_year, _release_date = _release_metadata(
-        data, artist, album, str(data.get("company") or ""))
+    # Live preview must not wait for optional external metadata lookups.
+    company = str(data.get("company") or "").strip() or DEFAULT_COMPANY
+    preview_date = str(data.get("date") or data.get("releaseDate") or "")
+    year_match = re.search(r"(?:19|20)\d{2}", preview_date)
+    release_year = year_match.group(0) if year_match else ""
     tracks = _norm_tracks(data.get("trackData") if data.get("trackData") is not None else data.get("tracks"))
     inner_copy = str(data.get("innerCopy") or "")
     barcode_code = str(data.get("barcode") or "")
@@ -874,15 +927,15 @@ def build_job(data):
     # A4 打印参考页（程序衍生结构；与三件套同源引擎，无 AI 覆盖时完全一致）
     page_im, sets, _prev = MC.build_page({"cover": (cover, False), **rendered}, DPI, "a4l", 1,
                                           artist, album, D, tracks, 0, company)
-    page_im.save(str(d / "打印拼版-A4.png"), quality=95)
+    page_im.save(str(d / "打印拼版-A4.png"), dpi=(DPI, DPI))
     page_im.save(str(d / "打印拼版-A4.pdf"), "PDF", resolution=DPI)
 
     # 实体专辑打印拼版（默认版式）：竖版 7套/页（封面折件+封底条，无盘面）+ 盘面单独页
     p7 = MC.build_page_portrait7(fold, strip, DPI, artist, album, sets=7)
-    p7.save(str(d / "打印拼版-A4竖版7套.png"))
+    p7.save(str(d / "打印拼版-A4竖版7套.png"), dpi=(DPI, DPI))
     p7.save(str(d / "打印拼版-A4竖版7套.pdf"), "PDF", resolution=DPI)
     dpage = MC.build_disc_page(disc, DPI, artist, album)
-    dpage.save(str(d / "盘面拼版-A4.png"))
+    dpage.save(str(d / "盘面拼版-A4.png"), dpi=(DPI, DPI))
     dpage.save(str(d / "盘面拼版-A4.pdf"), "PDF", resolution=DPI)
 
     notes = DP.design_notes(D, album, artist, tracks, has_lyrics=False)
@@ -1171,13 +1224,13 @@ def build_batch(data):
                  "rendered_fold": (fold, False), "rendered_strip": (strip, False)},
                 DPI, "a4l", 1, artist, album, D, tracks, 0, company)
             pn = tag + "-打印拼版-A4.png"
-            page_im.save(str(d / pn))
+            page_im.save(str(d / pn), dpi=(DPI, DPI))
             written.append(pn)
 
             # 竖版 7套/页（实体专辑排版，无盘面）
             p7 = MC.build_page_portrait7(fold, strip, DPI, artist, album, sets=7)
             p7n = tag + "-打印拼版-A4竖版7套.png"
-            p7.save(str(d / p7n))
+            p7.save(str(d / p7n), dpi=(DPI, DPI))
             written.append(p7n)
             page_im.save(str(d / (tag + "-打印拼版-A4.pdf")), "PDF", resolution=DPI)
             written.append(tag + "-打印拼版-A4.pdf")
@@ -1550,7 +1603,121 @@ def _serve_file(handler, jid, name):
         return handler._json({"error": "not found"}, 404)
     if str(fp) != str(base / name):
         return handler._json({"error": "forbidden"}, 403)
+    suffix = {'打印拼版-A4竖版7套.png': 'png', '打印拼版-A4竖版7套.pdf': 'pdf'}.get(name)
+    if suffix:
+        highres = _ensure_highres_print(jid)
+        if highres:
+            fp = highres[suffix]
+    sheet_match = re.fullmatch(r'(?:(\d{1,3})-)?★版面总览-1比1\.png', name)
+    if sheet_match:
+        fixed = _ensure_fixed_sheet(jid, sheet_match.group(1) or '')
+        if fixed:
+            fp = fixed
     return handler._file(str(fp))
+
+
+_highres_back_lock = threading.Lock()
+_highres_print_lock = threading.Lock()
+_sheet_fix_lock = threading.Lock()
+
+
+def _ensure_fixed_sheet(jid, prefix=''):
+    jid = _safe_jid(jid)
+    if not jid or (prefix and not re.fullmatch(r'\d{1,3}', prefix)):
+        return None
+    base = OUT_DIR / jid
+    name = (prefix + '-' if prefix else '') + '★版面总览-1比1.png'
+    source = base / name
+    target = base / ('sheet-fixed-v2-' + (prefix or 'single') + '.png')
+    with _sheet_fix_lock:
+        try:
+            with Image.open(source) as im:
+                if (im.info.get('dpi') or (0, 0))[0] < 500:
+                    return None
+            names = ([prefix + '-disc.png', prefix + '-cover.png', prefix + '-strip.png', prefix + '-封面.png']
+                     if prefix else ['part-disc.png', 'part-cover.png', 'part-strip.png', '封面.png'])
+            latest = max((base / n).stat().st_mtime for n in [name, 'meta.json', *names])
+            if not target.is_file() or target.stat().st_mtime < latest:
+                subprocess.run([sys.executable, str(Path(HERE) / 'fix_print_sheet.py'), jid, prefix],
+                               check=True, timeout=120, capture_output=True)
+            return target
+        except (OSError, subprocess.SubprocessError):
+            return None
+
+
+def _fixed_sheet_zip_entries(jid):
+    base = OUT_DIR / jid
+    try:
+        meta = json.loads((base / 'meta.json').read_text(encoding='utf-8'))
+        if meta.get('kind') == 'minicd-design-batch':
+            albums = meta.get('albums') or []
+            folders = _batch_album_folders(albums)
+            result = {}
+            for album in albums:
+                no = str(album.get('no') or '')
+                fixed = _ensure_fixed_sheet(jid, no) if no else None
+                if fixed and folders.get(no):
+                    result[folders[no] + '/★版面总览-1比1.png'] = fixed
+            return result
+        fixed = _ensure_fixed_sheet(jid)
+        return {'★版面总览-1比1.png': fixed} if fixed else {}
+    except (OSError, ValueError, TypeError):
+        return {}
+
+
+def _ensure_highres_print(jid):
+    jid = _safe_jid(jid)
+    if not jid:
+        return None
+    base = OUT_DIR / jid
+    paths = {ext: base / ('高清打印拼版-A4竖版7套-v1.' + ext) for ext in ('png', 'pdf')}
+    with _highres_print_lock:
+        try:
+            with Image.open(base / 'part-cover.png') as saved_fold:
+                if saved_fold.width >= mm(SP.COVER_W, 600) - 1:
+                    return None  # Newly generated files already use 600 DPI.
+            latest = max((base / n).stat().st_mtime for n in ('meta.json', 'part-cover.png', 'part-strip.png'))
+            if any(not p.is_file() or p.stat().st_mtime < latest for p in paths.values()):
+                subprocess.run([sys.executable, str(Path(HERE) / 'highres_print.py'), jid],
+                               check=True, timeout=180, capture_output=True)
+            return paths
+        except (OSError, subprocess.SubprocessError):
+            return None
+
+
+def _zip_with_highres_print(jid, original, replacements):
+    target = OUT_DIR / (jid + '-corrected-print-v2.zip')
+    with _highres_print_lock:
+        latest = max(original.stat().st_mtime, *(p.stat().st_mtime for p in replacements.values()))
+        if target.is_file() and target.stat().st_mtime >= latest:
+            return target
+        tmp = OUT_DIR / (jid + '-highres-print-' + uuid.uuid4().hex + '.tmp')
+        with zipfile.ZipFile(original, 'r') as src, zipfile.ZipFile(tmp, 'w') as dst:
+            for item in src.infolist():
+                if item.filename in replacements:
+                    dst.write(replacements[item.filename], item.filename, compress_type=zipfile.ZIP_DEFLATED)
+                else:
+                    dst.writestr(item, src.read(item.filename))
+        os.replace(tmp, target)
+        return target
+
+
+def _serve_highres_back(handler, jid):
+    jid = _safe_jid(jid)
+    if not jid:
+        return handler._json({'error': 'bad jid'}, 400)
+    base = OUT_DIR / jid
+    target = base / '高清商品图封底-v1.png'
+    with _highres_back_lock:
+        try:
+            latest = max((base / 'meta.json').stat().st_mtime,
+                         (base / '封底.png').stat().st_mtime)
+            if not target.is_file() or target.stat().st_mtime < latest:
+                subprocess.run([sys.executable, str(Path(HERE) / 'highres_back.py'), jid],
+                               check=True, timeout=120, capture_output=True)
+        except (OSError, subprocess.SubprocessError):
+            return handler._json({'error': '高清封底不可用，保留原素材'}, 404)
+    return handler._file(str(target))
 
 
 def _serve_preview_file(handler, token, name):
@@ -1593,6 +1760,32 @@ def handle(handler, path, query, method):
             # query 作为兜底合入（个别前端习惯用 query 传参）
             for k, v in query.items():
                 data.setdefault(k, v[0] if isinstance(v, list) and v else v)
+            if path == "/api/design/3d-config":
+                base, cfg, overrides, state, _ = _three_d_config(data.get("jid"))
+                slot = str(data.get("slot") or "")
+                if slot:
+                    if slot not in THREED_SLOTS:
+                        handler._json({"error": "未知组件"}, 400)
+                        return True
+                    source = _upload_path(data.get("upload"))
+                    if not source or os.path.getsize(source) > 20 * 1024 * 1024:
+                        handler._json({"error": "图片不存在或超过 20MB"}, 400)
+                        return True
+                    with Image.open(source) as im:
+                        ratio = im.width / im.height
+                        if abs(ratio / THREED_RATIOS[slot] - 1) > .025:
+                            handler._json({"error": "%s 比例不符，请按印刷组件比例裁好后上传" % slot}, 400)
+                            return True
+                        name = "3d-%s.png" % slot
+                        im.save(base / name, "PNG", icc_profile=im.info.get("icc_profile"))
+                    overrides[slot] = name
+                incoming = data.get("state")
+                if isinstance(incoming, dict):
+                    state = {key: max(0., min(float(incoming.get(key, 0)), limit))
+                             for key, limit in (("open", 1), ("lift", 20), ("explode", 1))}
+                _save_three_d_config(cfg, overrides, state)
+                handler._json({"ok": True})
+                return True
             if path == "/api/design/title-assets":
                 upload = _upload_path(data.get("upload"))
                 if not upload:
@@ -1630,6 +1823,13 @@ def handle(handler, path, query, method):
             # 前端实尺寸画布与「生产规格 JSON」导出共用同一份，杜绝尺寸写死后漂移
             handler._json({"ok": True, "spec": SP.spec_dict()})
             return True
+        if path == "/api/design/3d-config":
+            _, _, _, state, names = _three_d_config(value("jid"))
+            jid = value("jid")
+            urls = {slot: "/api/design/file?jid=%s&name=%s" % (jid, quote(name))
+                    for slot, name in names.items()}
+            handler._json({"ok": True, "images": urls, "state": state})
+            return True
         if path == "/api/design/album":
             artist = value("artist"); album = value("album"); pic = value("pic")
             company = value("company")
@@ -1657,6 +1857,12 @@ def handle(handler, path, query, method):
         if path == "/api/design/file":
             _serve_file(handler, value("jid"), value("name"))
             return True
+        if path == "/api/design/highres-back":
+            _serve_highres_back(handler, value("jid"))
+            return True
+        if path == "/api/design/highres-print-ready":
+            handler._json({'ok': bool(_ensure_highres_print(value('jid')))})
+            return True
         if path == "/api/design/preview-file":
             _serve_preview_file(handler, value("token"), value("name"))
             return True
@@ -1669,6 +1875,14 @@ def handle(handler, path, query, method):
             if not zp.is_file():
                 handler._json({"error": "任务尚未生成或已清理"}, 404)
                 return True
+            highres = _ensure_highres_print(jid)
+            if highres:
+                replacements = {'打印拼版-A4竖版7套.' + ext: path for ext, path in highres.items()}
+            else:
+                replacements = {}
+            replacements.update(_fixed_sheet_zip_entries(jid))
+            if replacements:
+                zp = _zip_with_highres_print(jid, zp, replacements)
             handler._file(str(zp), name=zip_download_name(jid))
             return True
         if path == "/api/design/state":

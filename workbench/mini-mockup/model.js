@@ -41,7 +41,7 @@ export function initialState(){return {version:1,frontLayoutRevision:1,title:'�
 export function validQuad(q){if(!Array.isArray(q)||q.length!==4||!q.every(p=>Array.isArray(p)&&p.length===2&&p.every(n=>Number.isFinite(n)&&n>=0&&n<=1)))return false;const cross=q.map((p,i)=>{const b=q[(i+1)%4],c=q[(i+2)%4];return(b[0]-p[0])*(c[1]-b[1])-(b[1]-p[1])*(c[0]-b[0])});return cross.every(n=>n>.0002)||cross.every(n=>n<-.0002)}
 export function sanitizeState(data){
  if(!data||data.version!==1||!data.assets)throw Error('这不是有效的 Mini CD 项目文件');
- const st=initialState();st.assemblyVersion=data.assemblyVersion===1?1:0;st.title=String(data.title||st.title).slice(0,60);st.view=Number.isInteger(data.view)&&data.view>=0&&data.view<views.length&&!views[data.view].hidden?data.view:0;st.selected=surfaces.some(s=>s.id===data.selected)?data.selected:'front';
+ const st=initialState();st.syncRevision=typeof data.syncRevision==='string'?data.syncRevision:'';st.assemblyVersion=data.assemblyVersion===1?1:0;st.title=String(data.title||st.title).slice(0,60);st.view=Number.isInteger(data.view)&&data.view>=0&&data.view<views.length&&!views[data.view].hidden?data.view:0;st.selected=surfaces.some(s=>s.id===data.selected)?data.selected:'front';
  for(const key of ['showDesign','lighting','discVisible'])if(typeof data[key]==='boolean')st[key]=data[key];if(['#ffffff','#f0efec','#e8edf0'].includes(data.background))st.background=data.background;
  for(const s of surfaces){const a=data.assets[s.id];if(!a)continue;const t=st.assets[s.id];if(typeof a.src==='string'&&/^data:image\/(png|jpeg|webp);base64,/.test(a.src)&&a.src.length<30000000)t.src=a.src;t.fit=a.fit==='contain'?'contain':'cover';for(const [key,min,max]of[['scale',25,250],['x',-100,100],['y',-100,100],['rotation',-180,180]])t[key]=Math.min(max,Math.max(min,Number(a[key])|| (key==='scale'?100:0)));}
  for(const [key,q]of Object.entries(data.quads||{})){if(!/^\d{1,2}:(front|back|inside|tray|disc|sideR|sideL|sideLB)$/.test(key))continue;if(key.startsWith('0:')&&data.frontLayoutRevision!==1)continue;if(validQuad(q))st.quads[key]=q;}
@@ -49,8 +49,14 @@ export function sanitizeState(data){
 }
 const dbReady=new Promise((resolve,reject)=>{const req=indexedDB.open('mini-cd-studio',1);req.onupgradeneeded=()=>req.result.createObjectStore('projects');req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error)});dbReady.catch(()=>{});
 const workbenchJid=new URLSearchParams(location.search).get('jid');
-const projectKey=workbenchJid?'workbench:'+workbenchJid:'current';
+const batchNo=new URLSearchParams(location.search).get('batchNo')||'';
+const projectKey=workbenchJid?'workbench:'+workbenchJid+(batchNo?':batch:'+batchNo:''):'current';
 export async function persist(state){const db=await dbReady;await new Promise((resolve,reject)=>{const tx=db.transaction('projects','readwrite');tx.objectStore('projects').put(state,projectKey);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error)})}
 export async function restore(){const db=await dbReady;return new Promise((resolve,reject)=>{const r=db.transaction('projects').objectStore('projects').get(projectKey);r.onsuccess=()=>resolve(r.result?sanitizeState(r.result):null);r.onerror=()=>reject(r.error)})}
 export function loadImage(src){return new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>resolve(img);img.onerror=()=>reject(Error('图片无法读取'));img.src=src})}
-export async function readUpload(file){if(!['image/png','image/jpeg','image/webp'].includes(file.type))throw Error('请选择 PNG、JPG 或 WebP 图片');if(file.size>20*1024*1024)throw Error('图片不能超过20MB');const url=URL.createObjectURL(file);try{const img=await loadImage(url);const factor=Math.min(1,2400/Math.max(img.width,img.height));const c=document.createElement('canvas');c.width=Math.round(img.width*factor);c.height=Math.round(img.height*factor);c.getContext('2d').drawImage(img,0,0,c.width,c.height);return c.toDataURL(file.type==='image/png'?'image/png':'image/jpeg',.94)}finally{URL.revokeObjectURL(url)}}
+export async function readUpload(file){
+ if(!['image/png','image/jpeg','image/webp'].includes(file.type))throw Error('请选择 PNG、JPG 或 WebP 图片');
+ if(file.size>20*1024*1024)throw Error('图片不能超过20MB');
+ const src=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=()=>reject(Error('图片读取失败'));r.readAsDataURL(file)});
+ await loadImage(src);return src;
+}

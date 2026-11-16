@@ -4,9 +4,9 @@ import{preloadShells,prepareAsset,prepareProjectAssets,invalidate,render,getQuad
 import{createZip}from'./zip-store.js';
 const embedded=new URLSearchParams(location.search).get('embed')==='1';
 if(embedded)document.body.classList.add('embedded');
-const $=s=>document.querySelector(s);let state=initialState(),calibrating=false,zoom=100,ready=false,saveTimer,toastTimer,drag=null,saveRevision=0;const imageIcon='<svg viewBox="0 0 28 28" aria-hidden="true"><rect x="3" y="3" width="22" height="22" rx="2"/><circle cx="10" cy="9" r="2"/><path d="m4 22 7-8 5 5 4-4 5 7"/></svg>';
+const $=s=>document.querySelector(s);let state=initialState(),calibrating=false,zoom=100,ready=false,initializing=true,saveTimer,toastTimer,drag=null,saveRevision=0;const imageIcon='<svg viewBox="0 0 28 28" aria-hidden="true"><rect x="3" y="3" width="22" height="22" rx="2"/><circle cx="10" cy="9" r="2"/><path d="m4 22 7-8 5 5 4-4 5 7"/></svg>';
 function toast(message){$('#toast').textContent=message;$('#toast').classList.add('visible');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('#toast').classList.remove('visible'),3400)}
-function scheduleSave(){if(ready)tellParent({type:'minicd-mockup-changed'});clearTimeout(saveTimer);const revision=++saveRevision;$('#saveStatus').textContent='正在保存到此浏览器…';saveTimer=setTimeout(async()=>{try{await persist(structuredClone(state));if(revision===saveRevision)$('#saveStatus').textContent='已自动保存 · 仅在此浏览器'}catch{if(revision===saveRevision)$('#saveStatus').textContent='浏览器保存不可用，请保存项目文件'}},450)}
+function scheduleSave(){if(ready&&!initializing)tellParent({type:'minicd-mockup-changed'});clearTimeout(saveTimer);const revision=++saveRevision;$('#saveStatus').textContent='正在保存到此浏览器…';saveTimer=setTimeout(async()=>{try{await persist(structuredClone(state));if(revision===saveRevision)$('#saveStatus').textContent='已自动保存 · 仅在此浏览器'}catch{if(revision===saveRevision)$('#saveStatus').textContent='浏览器保存不可用，请保存项目文件'}},450)}
 function draw(){if(!ready)return;const width=$('#canvasWrap').getBoundingClientRect().width;const resolution=Math.min(4096,Math.max(1254,Math.ceil(width*Math.max(1,window.devicePixelRatio||1))));render($('#preview'),state,state.view,resolution);drawAlignment()}
 function refreshAssets(){for(const s of surfaces){const row=$(`[data-surface="${s.id}"]`),a=state.assets[s.id];row.classList.toggle('active',state.selected===s.id);row.setAttribute('aria-pressed',state.selected===s.id);const thumb=row.querySelector('.asset-preview');thumb.replaceChildren();if(a.src){const img=document.createElement('img');img.src=a.src;img.alt=s.name;thumb.append(img)}else thumb.innerHTML=imageIcon;row.querySelector('.asset-action').textContent=a.src?'已上传':'＋ 上传'}$('#selectedName').textContent=surfaces.find(s=>s.id===state.selected).name;$('#assetHint').textContent=surfaces.find(s=>s.id===state.selected).hint;$('#uploadLabel').textContent=state.assets[state.selected].src?'替换当前图片':'点击上传图片';refreshControls()}
 function refreshControls(){const a=state.assets[state.selected];for(const key of ['scale','x','y','rotation']){$(`#${key}`).value=a[key];$(`#${key}Value`).textContent=a[key]+(key==='rotation'?'°':'%')}document.querySelectorAll('[data-fit]').forEach(b=>{b.classList.toggle('active',b.dataset.fit===a.fit);b.setAttribute('aria-pressed',b.dataset.fit===a.fit)});$('#removeSelected').disabled=!a.src;$('#showDesign').checked=state.showDesign;$('#lighting').checked=state.lighting;$('#discVisible').checked=state.discVisible;$('#background').value=state.background;$('#emptyToggle').classList.toggle('active',!state.showDesign);$('#emptyToggle').textContent=state.showDesign?'查看空壳':'返回设计';$('#calibrate').classList.toggle('active',calibrating);$('#calibrate').textContent=calibrating?'完成四角校准':'贴图四角校准';$('#resetQuad').hidden=!calibrating}
@@ -27,14 +27,33 @@ function download(blob,name){const a=document.createElement('a');a.href=URL.crea
 function fileName(){return(state.title||'Mini-CD').replace(/[<>:"/\\|?*\u0000-\u001f]/g,'-').slice(0,60)}
 async function upload(file){try{const id=state.selected,src=await readUpload(file);await prepareAsset(id,src);state.assets[id]={src,...defaultTransform()};state.showDesign=true;if(id==='disc')state.discVisible=true;if(!views[state.view].slots.some(s=>s.id===id))state.view=surfaces.find(s=>s.id===id).view;refreshAssets();refreshView();scheduleSave();toast('图片已应用到样机')}catch(e){toast(e.message)}}
 const workbenchJid=new URLSearchParams(location.search).get('jid');
+const batchNo=new URLSearchParams(location.search).get('batchNo')||'';
+const syncRevision=new URLSearchParams(location.search).get('syncRevision')||'';
 let batchExporting=false;
 function tellParent(message){if(embedded)parent.postMessage(message,location.origin)}
+// Only substitute a freshly rendered insert when the user is still using the
+// exact original workbench image. Uploaded or edited artwork remains untouched.
+async function highresExportState(snapshot){
+  if(!workbenchJid||batchNo||!snapshot.assets.back?.src)return snapshot;
+  try{
+    const query=encodeURIComponent(workbenchJid);
+    const original=await fetch('/api/design/file?jid='+query+'&name='+encodeURIComponent('封底.png'));
+    if(!original.ok)return snapshot;
+    const src=await readUpload(new File([await original.blob()],'封底.png',{type:'image/png'}));
+    if(src!==snapshot.assets.back.src)return snapshot;
+    const response=await fetch('/api/design/highres-back?jid='+query);
+    if(!response.ok)return snapshot;
+    snapshot.assets.back.src=await readUpload(new File([await response.blob()],'封底.png',{type:'image/png'}));
+    await prepareProjectAssets(snapshot.assets);
+  }catch(error){console.warn('高清封底生成失败，使用原素材',error)}
+  return snapshot;
+}
 window.addEventListener('message',async e=>{
   if(!embedded||e.origin!==location.origin||e.source!==parent||e.data?.type!=='minicd-export-eight'||String(e.data.jid)!==String(workbenchJid)||batchExporting)return;
   if(!ready){tellParent({type:'minicd-export-error',message:'样机还未加载完成，请重试。'});return}
   batchExporting=true;
   try{
-    const snapshot=structuredClone(state),indices=views.map((v,i)=>v.hidden?-1:i).filter(i=>i>=0),files=[];
+    const snapshot=await highresExportState(structuredClone(state)),indices=views.map((v,i)=>v.hidden?-1:i).filter(i=>i>=0),files=[];
     tellParent({type:'minicd-export-progress',message:'正在生成八视图总预览图…'});
     await new Promise(resolve=>setTimeout(resolve,0));
     const overview=await exportPNG(snapshot,8192,'sheet'),overviewName='00-八视图总预览.png';
@@ -43,13 +62,14 @@ window.addEventListener('message',async e=>{
     for(let n=0;n<indices.length;n++){
       const i=indices[n];tellParent({type:'minicd-export-progress',message:`正在生成 ${n+1}/${indices.length}：${views[i].name}`});
       await new Promise(resolve=>setTimeout(resolve,0));
-      const blob=await exportPNG({...snapshot,view:i},4096,'individual');
+      const blob=await exportPNG({...snapshot,view:i},8192,'individual');
       const name=`${String(n+1).padStart(2,'0')}-${views[i].name}.png`;files.push({name:'八视图商品图/'+name,blob});tellParent({type:'minicd-export-image',name,label:views[i].name,blob});
     }
-    tellParent({type:'minicd-export-progress',message:'正在合并原有素材和商品图…'});
+    if(e.data.imagesOnly){tellParent({type:'minicd-export-done'});return}
+    tellParent({type:'minicd-export-progress',message:batchNo?'正在合并批量素材和当前专辑商品图…':'正在合并原有素材和商品图…'});
     const response=await fetch('/api/design/zip?jid='+encodeURIComponent(workbenchJid));if(!response.ok)throw Error('原有素材包获取失败，请稍后重试');
     const zip=await createZip(files,await response.blob());tellParent({type:'minicd-export-done',name:`${fileName()}-素材和商品图.zip`,blob:zip});
-  }catch(error){tellParent({type:'minicd-export-error',message:'生成失败：'+error.message})}finally{batchExporting=false}
+  }catch(error){tellParent({type:'minicd-export-error',message:'生成失败：'+error.message})}finally{await prepareProjectAssets(state.assets);batchExporting=false}
 });
 const workbenchSlots={front:'封面',back:'封底',inside:'封面背面',tray:'内盘底',disc:'盘面',sideR:'右侧封',sideL:'左侧封',sideLB:'左侧封背面'};
 async function importWorkbenchAssets(missingAssemblyOnly=false){
@@ -58,11 +78,11 @@ async function importWorkbenchAssets(missingAssemblyOnly=false){
   try{
     const query=encodeURIComponent(workbenchJid),metaResponse=await fetch('/api/design/state?jid='+query);
     if(!metaResponse.ok)throw Error('找不到当前专辑项目');
-    const meta=await metaResponse.json(),nextAssets={},failed=[];
+    const meta=await metaResponse.json(),albumMeta=batchNo?(meta.albums||[]).find(a=>String(a.no)===batchNo):meta,nextAssets={},failed=[];if(!albumMeta)throw Error('找不到批量中的专辑');
     for(const [id,slot] of Object.entries(workbenchSlots)){
       if(missingAssemblyOnly&&(!id.startsWith('side')||state.assets[id]?.src))continue;
       try{
-        const response=await fetch('/api/design/file?jid='+query+'&name='+encodeURIComponent(slot+'.png'));
+        const response=await fetch('/api/design/file?jid='+query+'&name='+encodeURIComponent((batchNo?batchNo+'-':'')+slot+'.png'));
         if(!response.ok)throw Error('图片不可用');
         const image=new File([await response.blob()],slot+'.png',{type:'image/png'});
         nextAssets[id]={src:await readUpload(image),...defaultTransform()};
@@ -72,7 +92,7 @@ async function importWorkbenchAssets(missingAssemblyOnly=false){
     for(const [id,asset] of Object.entries(nextAssets))state.assets[id]=asset;
     await prepareProjectAssets(state.assets);
     state.assemblyVersion=1;
-    if(!missingAssemblyOnly){state.title=[meta.artist,meta.album].filter(Boolean).join(' · ')||state.title;state.view=0;state.selected='front';state.showDesign=true;state.discVisible=!!state.assets.disc.src}
+    if(!missingAssemblyOnly){state.title=[albumMeta.artist,albumMeta.album].filter(Boolean).join(' · ')||state.title;state.view=0;state.selected='front';state.showDesign=true;state.discVisible=!!state.assets.disc.src}
     $('#projectName').value=state.title;refreshAssets();refreshView();scheduleSave();
     toast(`已${missingAssemblyOnly?'补入侧封':'从专辑工作台带入'} ${Object.keys(nextAssets).length} 张组件${failed.length?'；缺少：'+failed.join('、'):''}`);
   }finally{btn.disabled=false;btn.textContent='同步专辑组件'}
@@ -96,7 +116,7 @@ $('#clearAll').onclick=async()=>{if(!surfaces.some(s=>state.assets[s.id].src)){t
 $('#calibrate').onclick=()=>{const a=state.assets[state.selected];if(!a.src){toast('请先上传当前部位的设计图片');return}if(!views[state.view].slots.some(s=>s.id===state.selected))state.view=surfaces.find(s=>s.id===state.selected).view;state.showDesign=true;calibrating=!calibrating;refreshControls();refreshView()};
 $('#resetQuad').onclick=()=>{delete state.quads[`${state.view}:${state.selected}`];draw();scheduleSave()};
 $('#alignment').onpointerdown=e=>{if(e.target.dataset.corner===undefined)return;e.preventDefault();drag={index:+e.target.dataset.corner,id:e.pointerId};$('#alignment').setPointerCapture(e.pointerId)};$('#alignment').onpointermove=e=>{if(!drag)return;const svg=$('#alignment'),p=svg.createSVGPoint();p.x=e.clientX;p.y=e.clientY;const point=p.matrixTransform(svg.getScreenCTM().inverse());const slot=views[state.view].slots.find(s=>s.id===state.selected);const q=getQuad(state,state.view,slot).map(p=>[...p]);q[drag.index]=[Math.max(0,Math.min(1,(state.view===0?frontX(point.x,true):point.x)/BASE)),Math.max(0,Math.min(1,point.y/BASE))];if(validQuad(q)){state.quads[`${state.view}:${state.selected}`]=q;draw()}};for(const key of ['onpointerup','onpointercancel'])$('#alignment')[key]=()=>{if(drag){drag=null;scheduleSave()}};
-$('#exportOpen').onclick=()=>$('#exportDialog').showModal();$('#exportConfirm').onclick=async()=>{const b=$('#exportConfirm');b.disabled=true;b.textContent='正在生成高清图片…';try{await new Promise(r=>setTimeout(r,30));const size=+$('#exportSize').value,mode=$('#exportMode').value,blob=await exportPNG(state,size,mode);download(blob,`${fileName()}-${mode==='sheet'?'八视角总览':views[state.view].name}-${size}.png`);$('#exportStatus').textContent=`PNG · ${size} × ${mode==='sheet'?Math.round(size/2):size}`;$('#exportDialog').close();toast('效果图已导出')}catch(e){toast('导出失败：'+e.message)}finally{b.disabled=false;b.textContent='下载 PNG'}};
+$('#exportOpen').onclick=()=>$('#exportDialog').showModal();$('#exportConfirm').onclick=async()=>{const b=$('#exportConfirm');b.disabled=true;b.textContent='正在生成高清图片…';try{await new Promise(r=>setTimeout(r,30));const size=+$('#exportSize').value,mode=$('#exportMode').value,snapshot=await highresExportState(structuredClone(state)),blob=await exportPNG(snapshot,size,mode);download(blob,`${fileName()}-${mode==='sheet'?'八视角总览':views[state.view].name}-${size}.png`);$('#exportStatus').textContent=`PNG · ${size} × ${mode==='sheet'?Math.round(size/2):size}`;$('#exportDialog').close();toast('效果图已导出')}catch(e){toast('导出失败：'+e.message)}finally{await prepareProjectAssets(state.assets);b.disabled=false;b.textContent='下载 PNG'}};
 document.querySelectorAll('[data-panel]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-panel]').forEach(x=>x.classList.toggle('active',x===b));document.querySelectorAll('.assets-panel,.inspector-panel').forEach(x=>x.classList.toggle('mobile-visible',x.classList.contains(b.dataset.panel+'-panel')))});document.querySelector('[data-panel="assets"]').click();
 $('#demo').onclick=loadDemo;
 }
@@ -105,5 +125,5 @@ buildUI();refreshAssets();refreshView();
 const stage=$('#stage');
 const fitStage=()=>{stage.style.setProperty('--stage-size',Math.max(200,Math.min(stage.clientWidth,stage.clientHeight))+'px');updatePreviewScale();draw()};
 new ResizeObserver(fitStage).observe(stage);fitStage();
-try{await preloadShells();for(const [i,v] of views.entries()){if(v.onlineIndex!==undefined){const image=document.querySelector(`[data-view="${i}"] img`),src=onlineThumbnail(v.onlineIndex);if(image&&src)image.src=src}}ready=true;$('#exportOpen').disabled=false;$('#loading').hidden=true;const saved=await restore().catch(()=>null);if(saved){state=saved;await prepareProjectAssets(state.assets);$('#projectName').value=state.title;$('#stage').style.background=state.background;$('#saveStatus').textContent='已恢复上次项目 · 仅在此浏览器'}refreshAssets();refreshView();if(workbenchJid&&(!saved||state.assemblyVersion!==1))await importWorkbenchAssets(!!saved).catch(e=>toast('自动带入失败：'+e.message));tellParent({type:'minicd-mockup-ready'})}catch(e){$('#loading').textContent='外壳加载失败，请刷新页面重试';toast(e.message);tellParent({type:'minicd-export-error',message:'样机加载失败：'+e.message})}
+try{await preloadShells();for(const [i,v] of views.entries()){if(v.onlineIndex!==undefined){const image=document.querySelector(`[data-view="${i}"] img`),src=onlineThumbnail(v.onlineIndex);if(image&&src)image.src=src}}ready=true;$('#exportOpen').disabled=false;$('#loading').hidden=true;const saved=await restore().catch(()=>null);if(saved){state=saved;await prepareProjectAssets(state.assets);$('#projectName').value=state.title;$('#stage').style.background=state.background;$('#saveStatus').textContent='已恢复上次项目 · 仅在此浏览器'}refreshAssets();refreshView();if(workbenchJid&&syncRevision&&state.syncRevision!==syncRevision){await importWorkbenchAssets(false);state.syncRevision=syncRevision;scheduleSave()}else if(workbenchJid&&(!saved||state.assemblyVersion!==1))await importWorkbenchAssets(!!saved).catch(e=>toast('自动带入失败：'+e.message));initializing=false;tellParent({type:'minicd-mockup-ready'})}catch(e){$('#loading').textContent='外壳加载失败，请刷新页面重试';toast(e.message);tellParent({type:'minicd-export-error',message:'样机加载失败：'+e.message})}
 window.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='s'){e.preventDefault();$('#saveProject').click()}});

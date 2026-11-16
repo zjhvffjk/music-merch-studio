@@ -3,19 +3,20 @@ function crc32(bytes){let c=0xffffffff;for(const b of bytes)c=table[(c^b)&255]^(
 function header(size){const b=new Uint8Array(size);return[b,new DataView(b.buffer)]}
 export async function createZip(files, baseBlob=null){
  const enc=new TextEncoder(),parts=[],central=[];let offset=0,baseCount=0;
- if(baseBlob){
-  const bytes=new Uint8Array(await baseBlob.arrayBuffer()),v=new DataView(bytes.buffer);let end=-1;
+ const bases=Array.isArray(baseBlob)?baseBlob:(baseBlob?[{blob:baseBlob,prefix:'原有素材和打印文件/'}]:[]);
+ for(const base of bases){
+  const bytes=new Uint8Array(await base.blob.arrayBuffer()),v=new DataView(bytes.buffer);let end=-1;
   for(let i=bytes.length-22;i>=Math.max(0,bytes.length-65557);i--){if(v.getUint32(i,true)===0x06054b50&&i+22+v.getUint16(i+20,true)===bytes.length){end=i;break}}
   if(end<0||v.getUint16(end+4,true)||v.getUint16(end+6,true))throw Error('原有素材压缩包无法读取');
-  baseCount=v.getUint16(end+10,true);const centralSize=v.getUint32(end+12,true),centralStart=v.getUint32(end+16,true);
-  if(baseCount===65535||centralStart+centralSize>end)throw Error('原有素材压缩包格式不受支持');
+  const count=v.getUint16(end+10,true);baseCount+=count;const centralSize=v.getUint32(end+12,true),centralStart=v.getUint32(end+16,true);
+  if(count===65535||baseCount+files.length>=65535||centralStart+centralSize>end)throw Error('原有素材压缩包格式不受支持');
   const entries=[];let pos=centralStart;
-  for(let i=0;i<baseCount;i++){
+  for(let i=0;i<count;i++){
    if(pos+46>centralStart+centralSize||v.getUint32(pos,true)!==0x02014b50)throw Error('原有素材压缩包目录损坏');
    const nl=v.getUint16(pos+28,true),el=v.getUint16(pos+30,true),cl=v.getUint16(pos+32,true),local=v.getUint32(pos+42,true),endPos=pos+46+nl+el+cl;
    if(endPos>centralStart+centralSize||local>=centralStart)throw Error('原有素材压缩包目录损坏');
    let original;try{original=new TextDecoder('utf-8',{fatal:true}).decode(bytes.subarray(pos+46,pos+46+nl))}catch{throw Error('原有素材文件名编码不支持')}
-   const name=enc.encode('原有素材和打印文件/'+original);entries.push({pos,nl,el,cl,local,name});pos=endPos;
+   const name=enc.encode(base.prefix+original);entries.push({pos,nl,el,cl,local,name});pos=endPos;
   }
   const sorted=[...entries].sort((a,b)=>a.local-b.local);
   for(let i=0;i<sorted.length;i++){
