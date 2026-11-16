@@ -35,6 +35,11 @@ window.addEventListener('message',async e=>{
   batchExporting=true;
   try{
     const snapshot=structuredClone(state),indices=views.map((v,i)=>v.hidden?-1:i).filter(i=>i>=0),files=[];
+    tellParent({type:'minicd-export-progress',message:'正在生成八视图总预览图…'});
+    await new Promise(resolve=>setTimeout(resolve,0));
+    const overview=await exportPNG(snapshot,8192,'sheet'),overviewName='00-八视图总预览.png';
+    files.push({name:'八视图商品图/'+overviewName,blob:overview});
+    tellParent({type:'minicd-export-image',name:overviewName,label:'八视图总预览',blob:overview});
     for(let n=0;n<indices.length;n++){
       const i=indices[n];tellParent({type:'minicd-export-progress',message:`正在生成 ${n+1}/${indices.length}：${views[i].name}`});
       await new Promise(resolve=>setTimeout(resolve,0));
