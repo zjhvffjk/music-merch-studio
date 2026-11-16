@@ -1,0 +1,6 @@
+export const FOLD_HEIGHT_MM=38;
+export const FOLD_SEGMENTS=[{id:'rightSpine',name:'右侧封',width:4.4},{id:'back',name:'封底',width:49},{id:'leftSpine',name:'左侧封（外）',width:4.4},{id:'leftSpineInner',name:'左侧封（内折）',width:4.4},{id:'tray',name:'内盘底',width:49}];
+export const FOLD_WIDTH_MM=FOLD_SEGMENTS.reduce((n,s)=>n+s.width,0);
+export const REFERENCE_SELECTION={x:1119/2048,y:283/842,width:855/2048,height:290/842};
+export function planFoldCrop(width,height,crop={x:0,y:0,width:1,height:1}){if(![width,height,crop.x,crop.y,crop.width,crop.height].every(Number.isFinite)||width<1||height<1||crop.x<0||crop.y<0||crop.width<=0||crop.height<=0||crop.x+crop.width>1.000001||crop.y+crop.height>1.000001)throw Error('请框选完整的五段展开稿');let offset=0;return FOLD_SEGMENTS.map(s=>{const r={...s,sx:(crop.x+crop.width*offset/FOLD_WIDTH_MM)*width,sy:crop.y*height,sw:crop.width*s.width/FOLD_WIDTH_MM*width,sh:crop.height*height};offset+=s.width;return r})}
+export function sliceFoldArtwork(image,crop){return Object.fromEntries(planFoldCrop(image.width,image.height,crop).map(r=>{const c=document.createElement('canvas');c.width=Math.max(1,Math.round(r.sw));c.height=Math.max(1,Math.round(r.sh));c.getContext('2d').drawImage(image,r.sx,r.sy,r.sw,r.sh,0,0,c.width,c.height);return[r.id,c.toDataURL('image/png')]}))}

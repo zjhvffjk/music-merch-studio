@@ -1,0 +1,223 @@
+import * as online from './online-reference-v30/renderer.js';
+import{views,viewScale,widestViewScale,loadImage}from'./model.js';
+export const BASE=1254;
+const imgCache=new Map();const textureCache=new Map();let localResolution=1200;
+// Use a single continuous photo so case highlights do not break at seams.
+export function frontX(x,inverse=false){return x}
+function calibrateFront(canvas){const copy=document.createElement('canvas');copy.width=canvas.width;copy.height=canvas.height;copy.getContext('2d').drawImage(canvas,0,0);const s=canvas.width/BASE,x=canvas.getContext('2d');x.save();x.setTransform(s,0,0,s,0,0);const a=[0,164,277,1090,BASE],b=a.map(v=>frontX(v));for(let i=0;i<4;i++)x.drawImage(copy,a[i]*s,0,(a[i+1]-a[i])*s,canvas.height,b[i],0,b[i+1]-b[i],BASE);x.restore()}
+function repairFrontClip(c){const patch=document.createElement('canvas');patch.width=patch.height=BASE;const p=patch.getContext('2d');p.translate(423+890,0);p.scale(-1,1);p.drawImage(c,0,0);p.setTransform(1,0,0,1,0,0);p.globalCompositeOperation='destination-in';const g=p.createRadialGradient(890,320,28,890,320,72);g.addColorStop(0,'rgba(0,0,0,1)');g.addColorStop(.75,'rgba(0,0,0,1)');g.addColorStop(1,'rgba(0,0,0,0)');p.fillStyle=g;p.fillRect(818,248,144,144);c.getContext('2d').drawImage(patch,0,0)}
+export async function preloadShells(){await online.preloadShells();return Promise.all(views.filter(v=>v.onlineIndex===undefined).map(async(v,i)=>{
+  if(i!==0){imgCache.set(`shell-${i}`,await loadImage(`assets/shell-${i}.webp`));return}
+  // Keep the photographed frame, hanger and left slot from the supplied
+  // reference. The generated blank replaces only the printed central window.
+  const img=await loadImage('assets/online-front-cover-hq-v3.png');
+  const c=document.createElement('canvas');c.width=c.height=BASE;const x=c.getContext('2d');
+  x.fillStyle='#fff';x.fillRect(0,0,BASE,BASE);
+  const [bx,by,bw,bh]=[170,285,910,745], [dx,dy,dw,dh]=[.15,.23,.70,.70*45/53].map(n=>n*BASE),cut=290,sy=dh/bh,spineWidth=dw*8/53,leftScale=spineWidth/(cut-bx),rightScale=(dw-spineWidth)/(bx+bw-cut);
+  x.drawImage(img,0,0,cut,img.height,dx-bx*leftScale,dy-by*sy,cut*leftScale,img.height*sy);
+  x.drawImage(img,cut,0,img.width-cut,img.height,dx+spineWidth,dy-by*sy,(img.width-cut)*rightScale,img.height*sy);
+  imgCache.set('shell-0',c);
+}))}
+const onlineId=id=>({sideL:'leftSpine',sideR:'rightSpine',sideLB:'leftSpineInner'}[id]||id);
+export async function prepareAsset(id,src){await online.prepareAsset(onlineId(id),src);textureCache.delete(id);if(src)imgCache.set(id,await loadImage(src));else imgCache.delete(id)}
+export async function prepareProjectAssets(assets){await online.prepareProjectAssets(Object.fromEntries(Object.entries(assets).map(([id,a])=>[onlineId(id),a])));const entries=await Promise.all(Object.entries(assets).map(async([id,a])=>[id,a.src?await loadImage(a.src):null]));for(const[id,img]of entries){textureCache.delete(id);if(img)imgCache.set(id,img);else imgCache.delete(id)}}
+export function invalidate(id){online.invalidate(onlineId(id));textureCache.delete(id)}
+export function getQuad(state,view,slot){return state.quads[`${view}:${slot.id}`]||slot.q}
+function texture(state,id,plain=false){const a=state.assets[id],img=imgCache.get(id);if(!a?.src||!img)return null;const sz=Math.min(3000,Math.max(1200,Math.min(localResolution,Math.max(img.width,img.height)))),key=JSON.stringify([a,state.lighting,plain,sz]);const cached=textureCache.get(id);if(cached?.key===key)return cached.canvas;
+const c=document.createElement('canvas');const w=id.startsWith('side')?Math.round(sz*4.4/38):['back','tray'].includes(id)?Math.round(sz*49/38):sz;c.width=w;c.height=sz;const x=c.getContext('2d');const factor=(a.fit==='contain'?Math.min(w/img.width,sz/img.height):Math.max(w/img.width,sz/img.height))*a.scale/100;
+x.save();x.translate(w/2+a.x/100*w/2,sz/2+a.y/100*sz/2);x.rotate(a.rotation*Math.PI/180);x.drawImage(img,-img.width*factor/2,-img.height*factor/2,img.width*factor,img.height*factor);x.restore();
+if(id!=='disc'&&id!=='inside'&&!plain&&state.lighting){
+  // Light falls on the inserted paper as well as the case. Keep this subtle:
+  // the uploaded artwork remains the source of its colour and detail.
+  x.save();x.globalCompositeOperation='source-atop';
+  const shade=x.createLinearGradient(0,0,w,sz);shade.addColorStop(0,'rgba(0,0,0,.035)');shade.addColorStop(.48,'rgba(0,0,0,0)');shade.addColorStop(1,'rgba(0,0,0,.055)');x.fillStyle=shade;x.fillRect(0,0,w,sz);
+  const reflection=x.createLinearGradient(0,0,w,sz*.45);reflection.addColorStop(0,'rgba(255,255,255,0)');reflection.addColorStop(.22,'rgba(255,255,255,.065)');reflection.addColorStop(.48,'rgba(255,255,255,0)');x.fillStyle=reflection;x.fillRect(0,0,w,sz);
+  const edge=x.createLinearGradient(0,0,0,sz);edge.addColorStop(0,'rgba(0,0,0,.16)');edge.addColorStop(.014,'rgba(0,0,0,0)');edge.addColorStop(.985,'rgba(0,0,0,0)');edge.addColorStop(1,'rgba(0,0,0,.10)');x.fillStyle=edge;x.fillRect(0,0,w,sz);x.restore();
+}
+if(id==='disc'){
+  if(state.lighting&&!plain){x.save();x.globalCompositeOperation='source-atop';const g=x.createLinearGradient(0,0,sz,sz*.7);g.addColorStop(0,'rgba(0,0,0,.12)');g.addColorStop(.38,'rgba(255,255,255,.13)');g.addColorStop(.55,'rgba(255,255,255,0)');g.addColorStop(1,'rgba(0,0,0,.12)');x.fillStyle=g;x.fillRect(0,0,sz,sz);x.strokeStyle='rgba(255,255,255,.55)';x.lineWidth=3;x.beginPath();x.arc(sz/2,sz/2,sz*.487,0,Math.PI*2);x.stroke();x.restore()}
+  x.globalCompositeOperation='destination-in';x.beginPath();x.arc(sz/2,sz/2,sz*.492,0,Math.PI*2);x.fill();x.globalCompositeOperation='destination-out';x.beginPath();x.arc(sz/2,sz/2,sz*.0625,0,Math.PI*2);x.fill();
+}
+textureCache.set(id,{key,canvas:c});return c}
+function project(q,u,v){const [p0,p1,p2,p3]=q;const dx1=p1[0]-p2[0],dx2=p3[0]-p2[0],dx3=p0[0]-p1[0]+p2[0]-p3[0],dy1=p1[1]-p2[1],dy2=p3[1]-p2[1],dy3=p0[1]-p1[1]+p2[1]-p3[1];let g=0,h=0;const den=dx1*dy2-dx2*dy1;if(Math.abs(den)>1e-9){g=(dx3*dy2-dx2*dy3)/den;h=(dx1*dy3-dx3*dy1)/den}const a=p1[0]-p0[0]+g*p1[0],b=p3[0]-p0[0]+h*p3[0],d=p1[1]-p0[1]+g*p1[1],e=p3[1]-p0[1]+h*p3[1];const z=g*u+h*v+1;return[(a*u+b*v+p0[0])/z,(d*u+e*v+p0[1])/z]}
+function triangle(ctx,img,s,d){const[x0,y0]=s[0],[x1,y1]=s[1],[x2,y2]=s[2],[u0,v0]=d[0],[u1,v1]=d[1],[u2,v2]=d[2];const den=x0*(y1-y2)+x1*(y2-y0)+x2*(y0-y1);if(Math.abs(den)<1e-9)return;const a=(u0*(y1-y2)+u1*(y2-y0)+u2*(y0-y1))/den,b=(v0*(y1-y2)+v1*(y2-y0)+v2*(y0-y1))/den,c=(u0*(x2-x1)+u1*(x0-x2)+u2*(x1-x0))/den,dv=(v0*(x2-x1)+v1*(x0-x2)+v2*(x1-x0))/den,e=(u0*(x1*y2-x2*y1)+u1*(x2*y0-x0*y2)+u2*(x0*y1-x1*y0))/den,f=(v0*(x1*y2-x2*y1)+v1*(x2*y0-x0*y2)+v2*(x0*y1-x1*y0))/den;
+ctx.save();ctx.beginPath();const mx=(u0+u1+u2)/3,my=(v0+v1+v2)/3;const grow=(u,v)=>{const l=Math.hypot(u-mx,v-my)||1;return[u+(u-mx)/l*.8,v+(v-my)/l*.8]};ctx.moveTo(...grow(u0,v0));ctx.lineTo(...grow(u1,v1));ctx.lineTo(...grow(u2,v2));ctx.closePath();ctx.clip();ctx.transform(a,b,c,dv,e,f);ctx.drawImage(img,0,0);ctx.restore()}
+export function warp(ctx,img,quad){const n=14,q=quad.map(p=>p.map(x=>x*BASE));ctx.save();ctx.beginPath();q.forEach((p,i)=>i?ctx.lineTo(...p):ctx.moveTo(...p));ctx.closePath();ctx.clip();for(let row=0;row<n;row++)for(let col=0;col<n;col++){const u=col/n,v=row/n,un=(col+1)/n,vn=(row+1)/n;const uv=[[u,v],[un,v],[un,vn],[u,vn]],src=uv.map(([s,t])=>[s*img.width,t*img.height]),dst=uv.map(([s,t])=>project(q,s,t));triangle(ctx,img,[src[0],src[1],src[2]],[dst[0],dst[1],dst[2]]);triangle(ctx,img,[src[0],src[2],src[3]],[dst[0],dst[2],dst[3]])}ctx.restore()}
+function blankDisc(){const c=document.createElement('canvas');c.width=c.height=1200;const x=c.getContext('2d'),g=x.createLinearGradient(0,0,1200,1200);g.addColorStop(0,'#c6ccd1');g.addColorStop(.3,'#eef0f0');g.addColorStop(.5,'#b4bac2');g.addColorStop(.72,'#dce2e4');g.addColorStop(1,'#b1b9bf');x.fillStyle=g;x.beginPath();x.arc(600,600,590,0,Math.PI*2);x.fill();x.globalCompositeOperation='destination-out';x.beginPath();x.arc(600,600,86,0,Math.PI*2);x.fill();return c}const blank=blankDisc();
+let frontGlass;
+const opticsCache=new Map();
+function photoOptics(shell,view){
+  if(opticsCache.has(view))return opticsCache.get(view);
+  const c=document.createElement('canvas');c.width=c.height=BASE;const x=c.getContext('2d',{willReadFrequently:true});x.drawImage(shell,0,0,BASE,BASE);const d=x.getImageData(0,0,BASE,BASE);
+  let diffuse;
+  if(view>=3){const blur=document.createElement('canvas');blur.width=blur.height=BASE;const bx=blur.getContext('2d',{willReadFrequently:true});bx.filter='blur(14px)';bx.drawImage(shell,0,0,BASE,BASE);diffuse=bx.getImageData(0,0,BASE,BASE).data}
+  // Empty photographic panels have a neutral grey backing. Remove that
+  // backing while retaining the photographed plastic reflections and relief.
+  for(let i=0;i<d.data.length;i+=4){
+    const l=.2126*d.data[i]+.7152*d.data[i+1]+.0722*d.data[i+2];
+    const neutral=diffuse ? .2126*diffuse[i]+.7152*diffuse[i+1]+.0722*diffuse[i+2] : 234;
+    const delta=l-neutral,hi=delta>0;let a=hi?delta/Math.max(24,255-neutral)*.75:-delta/Math.max(90,neutral)*.95;
+    if(view>=3)a=1-Math.exp(-2.3*a);
+    d.data[i]=d.data[i+1]=d.data[i+2]=hi?255:0;d.data[i+3]=Math.round(Math.min(1,a)*255);
+  }
+  x.putImageData(d,0,0);opticsCache.set(view,c);return c;
+}
+function clipQuad(ctx,q){ctx.beginPath();q.forEach((p,i)=>i?ctx.lineTo(p[0]*BASE,p[1]*BASE):ctx.moveTo(p[0]*BASE,p[1]*BASE));ctx.closePath();ctx.clip()}
+const surfaceLayer=document.createElement('canvas');surfaceLayer.width=surfaceLayer.height=BASE;
+const discRelief=document.createElement('canvas');discRelief.width=discRelief.height=BASE;
+const recessCache=new Map();
+function paperRecess(view,id,lighting){
+  const key=[view,id,lighting].join(':');if(recessCache.has(key))return recessCache.get(key);
+  const c=document.createElement('canvas');c.width=c.height=1200;const x=c.getContext('2d');
+  // The case lip casts inward onto the insert. This screen-independent
+  // layer follows the receiving plane, not the uploaded image transform.
+  for(const [x0,y0,x1,y1,depth,alpha]of[[0,0,0,1200,.024,.30],[0,1200,0,0,.018,.24],[0,0,1200,0,.018,.24],[1200,0,0,0,.016,.20]]){
+    const g=x.createLinearGradient(x0,y0,x1,y1);g.addColorStop(0,`rgba(12,18,23,${alpha})`);g.addColorStop(depth,'rgba(12,18,23,0)');g.addColorStop(1,'rgba(12,18,23,0)');x.fillStyle=g;x.fillRect(0,0,1200,1200);
+  }
+  if(lighting&&id!=='back'){
+    const g=x.createLinearGradient(0,0,1200,420);g.addColorStop(0,'rgba(255,255,255,.02)');g.addColorStop(.20,'rgba(255,255,255,.11)');g.addColorStop(.36,'rgba(255,255,255,.025)');g.addColorStop(.62,'rgba(255,255,255,0)');x.fillStyle=g;x.fillRect(0,0,1200,1200);
+  }
+  recessCache.set(key,c);return c;
+}
+function insertSurface(ctx,tx,q,id){
+  const x=surfaceLayer.getContext('2d');x.clearRect(0,0,BASE,BASE);warp(x,tx,q);
+  // Paper sits behind the clear shell: a drop shadow on the shell would
+  // imply that the print floats above it. Only the raised disc casts one.
+  ctx.save();if(id==='disc'){ctx.shadowColor='rgba(16,20,24,.22)';ctx.shadowBlur=1.4;ctx.shadowOffsetY=.7}ctx.drawImage(surfaceLayer,0,0);ctx.restore();
+}
+const insideMasks=new Map();
+const insideRelief=document.createElement('canvas');insideRelief.width=insideRelief.height=BASE;
+const projectedInsideMask=document.createElement('canvas');projectedInsideMask.width=projectedInsideMask.height=BASE;
+function insideHardwareMask(view){
+  if(insideMasks.has(view))return insideMasks.get(view);
+  const c=document.createElement('canvas');c.width=c.height=1200;const x=c.getContext('2d');
+  x.fillRect(0,0,1200,18);x.fillRect(0,1182,1200,18);x.fillRect(0,0,18,1200);x.fillRect(1182,0,18,1200);
+  const centers=view===3?[.20,.88]:view===2?[.15,.87]:[.17,.87];
+  for(const u of centers){for(const v of [0,1]){x.beginPath();x.ellipse(u*1200,v*1200,78,120,0,0,Math.PI*2);x.fill()}}
+  insideMasks.set(view,c);return c;
+}
+function exposedPaperHardware(ctx,state,view,slot,shell){
+  const q=getQuad(state,view,slot);
+  // The reverse of the cover faces the open case directly. Only retaining
+  // hardware and the rim sit in front of it; the broad lid lies behind it.
+  warp(ctx,paperRecess(view,'inside',false),q);
+  if(view===1){online.drawInsideRetainersOnQuad(ctx,q);return}
+  const mask=projectedInsideMask.getContext('2d');mask.clearRect(0,0,BASE,BASE);warp(mask,insideHardwareMask(view),q);
+  const x=insideRelief.getContext('2d');x.globalCompositeOperation='source-over';x.clearRect(0,0,BASE,BASE);x.drawImage(photoOptics(shell,view),0,0);
+  x.globalCompositeOperation='destination-in';x.drawImage(projectedInsideMask,0,0);ctx.drawImage(insideRelief,0,0);
+}
+function overlayPlastic(ctx,state,view,slot,shell){
+  const q=getQuad(state,view,slot);ctx.save();clipQuad(ctx,q);
+  if(slot.id==='inside'){exposedPaperHardware(ctx,state,view,slot,shell);ctx.restore();return}
+  if(view>=3)warp(ctx,paperRecess(view,slot.id,state.lighting),q);
+  else if(view===0&&slot.id==='front'){
+    // The cover is held beneath the rim, so its contact shadow falls inward.
+    ctx.save();ctx.globalAlpha=.42;warp(ctx,paperRecess(view,slot.id,false),q);ctx.restore();
+  }
+  if(slot.id.startsWith('side')||(slot.id==='front'&&view===4)||slot.id==='tray'){
+    ctx.drawImage(photoOptics(shell,view),0,0);
+  }else if(slot.id==='back'){
+    // An opaque back insert hides the tray ring and hub behind it.
+    // Only the rim in front of the sheet contributes here.
+    const inner=[[.025,.025],[.975,.025],[.975,.975],[.025,.975]].map(([u,v])=>project(q,u,v));
+    ctx.beginPath();ctx.rect(0,0,BASE,BASE);inner.forEach((p,i)=>i?ctx.lineTo(p[0]*BASE,p[1]*BASE):ctx.moveTo(p[0]*BASE,p[1]*BASE));ctx.closePath();ctx.clip('evenodd');ctx.drawImage(photoOptics(shell,view),0,0);
+  }
+  ctx.restore();
+}
+function frontRetainers(shell){
+  if(frontGlass)return frontGlass;
+  const c=document.createElement('canvas');c.width=c.height=BASE;const x=c.getContext('2d',{willReadFrequently:true});x.drawImage(shell,0,0,BASE,BASE);
+  const data=x.getImageData(0,0,BASE,BASE);
+  const smooth=document.createElement('canvas');smooth.width=smooth.height=BASE;const sx=smooth.getContext('2d',{willReadFrequently:true});sx.filter='blur(7px)';sx.drawImage(shell,0,0,BASE,BASE);const soft=sx.getImageData(0,0,BASE,BASE).data;
+  // Preserve the local outlines and highlights, removing the underlying
+  // neutral backing so the paper stays visible through each retainer.
+  for(let i=0;i<data.data.length;i+=4){const l=.2126*data.data[i]+.7152*data.data[i+1]+.0722*data.data[i+2];const b=.2126*soft[i]+.7152*soft[i+1]+.0722*soft[i+2];const d=l-b,light=d>0;const alpha=light?Math.min(.52,d/45):Math.min(.70,-d/75);data.data[i]=data.data[i+1]=data.data[i+2]=light?255:0;data.data[i+3]=Math.round(alpha*255)}
+  x.putImageData(data,0,0);
+  // Only the actual retaining tabs sit in front of the insert. The empty
+  // case's tray ring and hub must never be projected through opaque paper.
+  const mask=document.createElement('canvas');mask.width=mask.height=BASE;const m=mask.getContext('2d');
+  m.beginPath();
+  // Trace the retaining tabs themselves, rather than a large rounded patch
+  // that also collects the neighbouring circular tray grooves.
+  for(const cx of [427,903]){
+    // Upper tabs are drawn separately as clean translucent arcs. Sampling
+    // this area picks up dark printing and creates the stray black fragments.
+    m.moveTo(cx-58,1022);m.lineTo(cx-58,995);
+    m.bezierCurveTo(cx-58,965,cx-35,944,cx,943);
+    m.bezierCurveTo(cx+35,944,cx+58,965,cx+58,995);
+    m.lineTo(cx+58,1022);m.closePath();
+  }
+  m.fill();
+  x.globalCompositeOperation='destination-in';x.filter='blur(1.2px)';x.drawImage(mask,0,0);x.filter='none';
+  frontGlass=c;return c;
+}
+export function render(canvas,state,view=state.view,size=1254){
+  localResolution=size;
+  if(view===0||views[view].onlineIndex!==undefined){const onlineView=view===0?0:views[view].onlineIndex,assets=Object.fromEntries(Object.entries(state.assets).map(([id,a])=>[onlineId(id),a])),quads={};for(const slot of views[view].slots){const q=state.quads[`${view}:${slot.id}`];if(q)quads[`${onlineView}:${onlineId(slot.id)}`]=q}return online.render(canvas,{...state,assets,quads},onlineView,size)}
+  if(canvas.width!==size||canvas.height!==size)canvas.width=canvas.height=size;
+  const ctx=canvas.getContext('2d');ctx.setTransform(size/BASE,0,0,size/BASE,0,0);ctx.globalCompositeOperation='source-over';ctx.fillStyle=state.background;ctx.fillRect(0,0,BASE,BASE);
+  const shell=imgCache.get(`shell-${view}`);if(!shell)return;
+  if(view===1){
+    ctx.save();ctx.globalCompositeOperation='multiply';ctx.drawImage(shell,0,0,BASE,BASE);ctx.restore();
+    if(state.showDesign){
+      // The strip beside the hinge is the left edge of the tray insert,
+      // continuing the same artwork visible under the disc.
+      const tray=texture(state,'tray');
+      if(tray){const edge=document.createElement('canvas');edge.width=Math.max(1,Math.round(tray.width*.08));edge.height=tray.height;edge.getContext('2d').drawImage(tray,0,0,edge.width,edge.height,0,0,edge.width,edge.height);const q=[[.482,.355],[.522,.355],[.522,.707],[.482,.707]];insertSurface(ctx,edge,q,'tray');ctx.save();clipQuad(ctx,q);ctx.drawImage(photoOptics(shell,1),0,0);ctx.restore()}
+      for(const slot of views[1].slots.filter(s=>s.id!=='disc')){
+        const tx=texture(state,slot.id);if(!tx)continue;
+        insertSurface(ctx,tx,getQuad(state,1,slot),slot.id);
+        overlayPlastic(ctx,state,1,slot,shell);
+      }
+    }
+    if(state.discVisible){
+      const hub=[.724,.532,.067,.064,0];
+      ctx.save();ctx.beginPath();ctx.ellipse(hub[0]*BASE,hub[1]*BASE,hub[2]*BASE,hub[3]*BASE,hub[4],0,Math.PI*2);ctx.clip();ctx.drawImage(photoOptics(shell,1),0,0);ctx.restore();
+      const slot=views[1].slots.find(s=>s.id==='disc'),q=getQuad(state,1,slot);
+      warp(ctx,online.clearDisc(1200),q);
+      const label=state.showDesign?texture(state,'disc',true):null;if(label)warp(ctx,label,q);
+      warp(ctx,online.clearDisc(1200,true),q);
+    }
+    ctx.setTransform(1,0,0,1,0,0);return;
+  }
+  if(view===0){
+    ctx.save();ctx.globalCompositeOperation='multiply';ctx.drawImage(shell,0,0,BASE,BASE);ctx.restore();
+    if(state.showDesign){
+      for(const slot of views[0].slots){const tx=texture(state,slot.id,slot.id==='front');if(tx)warp(ctx,tx,getQuad(state,0,slot))}
+      if(state.lighting){ctx.save();ctx.globalCompositeOperation='multiply';ctx.drawImage(shell,0,0,BASE,BASE);ctx.restore()}
+    }
+    ctx.setTransform(1,0,0,1,0,0);return;
+  }
+  ctx.save();ctx.globalCompositeOperation='multiply';ctx.drawImage(shell,0,0,BASE,BASE);ctx.restore();
+  if(state.showDesign){
+    for(const slot of [...views[view].slots].sort((a,b)=>Number(b.id.startsWith('side'))-Number(a.id.startsWith('side')))){
+      if(slot.inBox&&!state.discVisible)continue;let tx=texture(state,slot.id);if(!tx&&slot.inBox)tx=blank;if(!tx)continue;
+      insertSurface(ctx,tx,getQuad(state,view,slot),slot.id);
+      if(slot.id!=='disc')overlayPlastic(ctx,state,view,slot,shell);
+      else if(view===2){const x=discRelief.getContext('2d');x.clearRect(0,0,BASE,BASE);x.globalCompositeOperation='source-over';x.drawImage(photoOptics(shell,view),0,0);x.globalCompositeOperation='destination-in';x.drawImage(surfaceLayer,0,0);ctx.drawImage(discRelief,0,0)}
+    }
+    // The real spindle is in front of both the tray insert and an installed
+    // disc. Drawing it last prevents the artwork from erasing the holder.
+    if(state.discVisible&&[1,3].includes(view)){
+      const hub=view===1?[.724,.532,.067,.064,0]:[.713,.45,.066,.052,.20];
+      ctx.save();ctx.beginPath();ctx.ellipse(hub[0]*BASE,hub[1]*BASE,hub[2]*BASE,hub[3]*BASE,hub[4],0,Math.PI*2);ctx.clip();ctx.drawImage(photoOptics(shell,view),0,0);ctx.restore();
+    }
+    if(view===0&&state.assets.front.src){
+      // Foreground plastic clips remain visible even if studio lighting is off.
+      ctx.save();ctx.beginPath();getQuad(state,view,views[view].slots[0]).forEach((p,i)=>i?ctx.lineTo(p[0]*BASE,p[1]*BASE):ctx.moveTo(p[0]*BASE,p[1]*BASE));ctx.closePath();ctx.clip();ctx.drawImage(frontRetainers(shell),0,0);ctx.restore();
+      // Narrow specular outlines make the transparent retainers legible over
+      // either light or dark artwork without covering the printed paper.
+      ctx.save();clipQuad(ctx,getQuad(state,view,views[view].slots[0]));
+      ctx.lineWidth=1.2;ctx.strokeStyle='rgba(255,255,255,.78)';
+      for(const cx of [427,903]){
+        ctx.beginPath();ctx.ellipse(cx,313,43,37,0,.12,Math.PI-.12);ctx.stroke();
+        ctx.beginPath();ctx.ellipse(cx,999,43,36,0,Math.PI+.12,Math.PI*2-.12);ctx.stroke();
+      }
+      ctx.restore();
+    }
+  }
+  ctx.setTransform(1,0,0,1,0,0);
+  if(view===0)calibrateFront(canvas);
+}
+export async function exportPNG(state,size,mode){const c=document.createElement('canvas');if(mode==='current')render(c,state,state.view,size);else if(mode==='individual'){const cell=document.createElement('canvas'),side=size*viewScale(state.view)*Math.min(1,.90/widestViewScale());c.width=c.height=size;const x=c.getContext('2d');x.fillStyle=state.background;x.fillRect(0,0,size,size);render(cell,state,state.view,Math.ceil(side));x.drawImage(cell,(size-side)/2,(size-side)/2,side,side)}else{const cell=document.createElement('canvas'),indices=views.map((v,i)=>v.hidden?-1:i).filter(i=>i>=0),cellSize=size/4;c.width=size;c.height=Math.ceil(indices.length/4)*cellSize;const x=c.getContext('2d');x.fillStyle=state.background;x.fillRect(0,0,c.width,c.height);const common=Math.min(1,.90/widestViewScale());indices.forEach((view,i)=>{render(cell,state,view,Math.ceil(cellSize*viewScale(view)*common));const px=(i%4)*cellSize,py=Math.floor(i/4)*cellSize,side=cellSize*viewScale(view)*common;x.save();x.beginPath();x.rect(px,py,cellSize,cellSize*.91);x.clip();x.drawImage(cell,px+(cellSize-side)/2,py+(cellSize*.91-side)/2,side,side);x.restore();x.fillStyle='#55534e';x.font=`${Math.round(cellSize*.025)}px sans-serif`;x.textAlign='center';x.fillText(views[view].name,px+cellSize/2,py+cellSize*.96)})}
+return new Promise((resolve,reject)=>c.toBlob(b=>b?resolve(b):reject(Error('导出失败，请尝试较小分辨率')),'image/png'))}

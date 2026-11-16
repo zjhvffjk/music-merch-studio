@@ -327,12 +327,15 @@ body.embed .proj .t small{display:none}   /* 外层已有专辑名，这里不�
 .objectDataCard .body{display:grid;grid-template-columns:repeat(2,minmax(190px,1fr));gap:8px 10px}.objectDataCard .field{margin:0}.objectDataCard .field:has(#tracks),.objectDataCard .adv,.objectDataCard .row2{grid-column:1/-1}.objectDataCard #tracks{min-height:94px}.objectDataCard .backLayoutField,.objectDataCard #spineTemplateDock{display:none}.objectDataCard .adv{margin:0}.objectDataCard .row2{margin-top:0}.objectAiCard .aiSlot{margin:6px 0}.objectAiCard p{display:none}
 @media(max-width:1180px){.objectDataCard,.objectAiCard{flex-basis:100%;padding:0!important}.objectAiCard{margin-top:10px!important;padding-top:10px!important;border-left:0!important;border-top:1px solid var(--line)!important}}.editorRibbon:has(.ribbonPanel[data-ribbon-panel="object"].on){height:auto;min-height:112px;grid-template-rows:28px auto;overflow:visible}/* 侧封工具栏右侧的高频工作动作。 */
 .editorRibbon #spineEditorDock{width:100%}.ribbonActionDock{margin-left:auto;display:flex;align-items:center;gap:7px;padding-left:12px;border-left:1px solid #e2e6e1;white-space:nowrap}.ribbonActionDock .row2{display:flex;align-items:center;gap:7px;margin:0}.ribbonActionDock #buildState{display:none}.ribbonActionDock .plain,.ribbonActionDock .btn{min-height:31px;padding:0 10px;font-size:12px}
-@media(max-width:1180px){.ribbonActionDock{margin-left:0}.editorRibbon #spineEditorDock{flex-wrap:wrap}}.rail{display:none!important}.railCurrent{display:none}.railDetails{padding:0}.railDetails summary{display:flex;align-items:center;gap:6px;padding:12px 14px;list-style:none;color:var(--ink);font-size:12px;font-weight:700;cursor:pointer}.railDetails summary::-webkit-details-marker{display:none}.railDetails summary::before{content:'›';font-size:17px;line-height:12px;color:var(--muted);transition:transform .16s}.railDetails[open] summary{border-bottom:1px solid var(--line)}.railDetails[open] summary::before{transform:rotate(90deg)}.railDetails #segNav,.railDetails #railProj{padding:0 14px 14px}.railDetails #railProj{max-height:360px;overflow:auto}.railPartNav{display:none}.projectDataPopover,.railUtilityPopover,.assetPopover{position:fixed;z-index:1015;max-height:calc(100vh - 100px);overflow:auto;border:1px solid var(--line);border-radius:12px;background:#fff;box-shadow:0 18px 44px rgba(20,30,24,.24)}.projectDataPopover{width:min(470px,calc(100vw - 24px))}.railUtilityPopover{width:min(360px,calc(100vw - 24px))}.assetPopover{width:min(620px,calc(100vw - 24px))}.projectDataPopover[hidden],.railUtilityPopover[hidden],.assetPopover[hidden]{display:none}.projectDataPopover #dataCard{margin:0;border:0;border-radius:0;background:transparent}.projectDataPopover #dataCard .head{padding:13px 15px}.projectDataPopover #dataCard .body{padding:12px 15px 15px}.projectDataPopover #dataCard .field{margin:0 0 9px}.projectDataPopover #dataCard textarea{min-height:118px}.projectDataPopover #dataCard .adv{margin-top:8px}.projectDataPopover #dataCard #buildState{display:none}.railUtilityPopover .railDetails{margin:0;border:0;border-radius:0;background:transparent}.railUtilityPopover .railDetails summary{display:none}.railUtilityPopover .railDetails #segNav,.railUtilityPopover .railDetails #railProj{padding:14px}.railUtilityPopover .railDetails #railProj{max-height:min(480px,calc(100vh - 145px))}.assetPopover #aiCard{display:block!important;margin:0;border:0;border-radius:0;box-shadow:none}.assetPopover #aiCard .head{padding:13px 15px}.assetPopover #aiCard .body{padding:12px 15px 15px}@media(min-width:1181px){.studio{grid-template-columns:minmax(0,1fr) 328px;grid-template-areas:"main insp";max-width:1900px}.studio>main{grid-area:main;min-width:0}.studio>.insp{grid-area:insp;width:328px;min-width:0}.stage{min-width:0;min-height:780px}.stageCanvas{zoom:1.5}}@media(min-width:1081px){body.embed .studio{grid-template-columns:minmax(0,1fr) 300px;grid-template-areas:"main insp"}.studio>main{grid-area:main;min-width:0}body.embed .studio>.insp{grid-area:insp;width:300px;min-width:0}}</style></head><body class="guides">
+@media(max-width:1180px){.ribbonActionDock{margin-left:0}.editorRibbon #spineEditorDock{flex-wrap:wrap}}.rail{display:none!important}.railCurrent{display:none}.railDetails{padding:0}.railDetails summary{display:flex;align-items:center;gap:6px;padding:12px 14px;list-style:none;color:var(--ink);font-size:12px;font-weight:700;cursor:pointer}.railDetails summary::-webkit-details-marker{display:none}.railDetails summary::before{content:'›';font-size:17px;line-height:12px;color:var(--muted);transition:transform .16s}.railDetails[open] summary{border-bottom:1px solid var(--line)}.railDetails[open] summary::before{transform:rotate(90deg)}.railDetails #segNav,.railDetails #railProj{padding:0 14px 14px}.railDetails #railProj{max-height:360px;overflow:auto}.railPartNav{display:none}.projectDataPopover,.railUtilityPopover,.assetPopover{position:fixed;z-index:1015;max-height:calc(100vh - 100px);overflow:auto;border:1px solid var(--line);border-radius:12px;background:#fff;box-shadow:0 18px 44px rgba(20,30,24,.24)}.projectDataPopover{width:min(470px,calc(100vw - 24px))}.railUtilityPopover{width:min(360px,calc(100vw - 24px))}.assetPopover{width:min(620px,calc(100vw - 24px))}.projectDataPopover[hidden],.railUtilityPopover[hidden],.assetPopover[hidden]{display:none}.projectDataPopover #dataCard{margin:0;border:0;border-radius:0;background:transparent}.projectDataPopover #dataCard .head{padding:13px 15px}.projectDataPopover #dataCard .body{padding:12px 15px 15px}.projectDataPopover #dataCard .field{margin:0 0 9px}.projectDataPopover #dataCard textarea{min-height:118px}.projectDataPopover #dataCard .adv{margin-top:8px}.projectDataPopover #dataCard #buildState{display:none}.railUtilityPopover .railDetails{margin:0;border:0;border-radius:0;background:transparent}.railUtilityPopover .railDetails summary{display:none}.railUtilityPopover .railDetails #segNav,.railUtilityPopover .railDetails #railProj{padding:14px}.railUtilityPopover .railDetails #railProj{max-height:min(480px,calc(100vh - 145px))}.assetPopover #aiCard{display:block!important;margin:0;border:0;border-radius:0;box-shadow:none}.assetPopover #aiCard .head{padding:13px 15px}.assetPopover #aiCard .body{padding:12px 15px 15px}@media(min-width:1181px){.studio{grid-template-columns:minmax(0,1fr) 328px;grid-template-areas:"main insp";max-width:1900px}.studio>main{grid-area:main;min-width:0}.studio>.insp{grid-area:insp;width:328px;min-width:0}.stage{min-width:0;min-height:780px}.stageCanvas{zoom:1.5}}@media(min-width:1081px){body.embed .studio{grid-template-columns:minmax(0,1fr) 300px;grid-template-areas:"main insp"}.studio>main{grid-area:main;min-width:0}body.embed .studio>.insp{grid-area:insp;width:300px;min-width:0}}
+body.mockup-mode .studio,body.embed.mockup-mode .studio{display:block;max-width:none;padding:0}body.mockup-mode .studio>.insp,body.mockup-mode #histNote{display:none}body.mockup-mode .studio>main{width:100%}
+</style></head><body class="guides">
 <header class="top">
   <a href="/" class="brand">Minuet</a>
   <nav class="mods" id="mods">
     <button data-mod="design" class="on">设计</button>
     <button data-mod="print">打印制作</button>
+    <button id="btnMini3d" data-mod="mockup" type="button" title="查看八视图商品图样机">八视图样机</button>
     <button data-mod="export">导出</button>
   </nav>
   <div class="editorRibbon" id="editorRibbon" aria-label="设计工具栏">
@@ -545,12 +548,13 @@ body.embed .proj .t small{display:none}   /* 外层已有专辑名，这里不�
         <div class="body">
           <div id="exportEmpty" class="empty">还没有生成物 —— 先去「设计」模块生成三件套。</div>
           <div id="exportBody" hidden>
+            <div class="mockupExport"><h3>八视图商品图</h3><p class="muted">每个视角单独生成一张商品图；全部下载包含原有素材、打印文件和八张商品图。</p><div class="dlRow"><a id="downloadMockupZip" class="btn" hidden>下载全部文件 ZIP</a><button id="refreshMockupImages" class="plain" type="button">重新生成商品图</button><span id="mockupZipStatus" class="muted" role="status"></span></div><div id="mockupGallery" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin:16px 0 24px"></div></div>
             <div id="dlList"></div>
             <div class="dlRow" style="margin-top:12px">
-              <a id="lnkZip" class="btn" href="#">下载 ZIP 打包</a>
+              <a id="lnkZip" href="#" hidden>原素材包</a>
               <button id="btnSpec" class="plain">下载生产规格 JSON</button>
             </div>
-            <p class="cap">ZIP 内含三件 PNG、1:1 版面总览、A4 拼版 PNG/PDF 与 meta。</p>
+            <p class="cap">全部文件 ZIP 包含原有素材、打印文件、项目资料及八张独立商品图。</p>
           </div>
         </div>
       </section>
@@ -567,6 +571,7 @@ body.embed .proj .t small{display:none}   /* 外层已有专辑名，这里不�
         </div>
       </section>
     </section>
+    <section class="mod" id="mod-mockup" hidden><iframe id="mockupFrame" title="八视图样机" style="display:block;width:100%;height:max(720px,calc(100vh - 110px));border:0;background:#fff"></iframe></section>
   </main>
 
   <!-- ==================== 右栏 ==================== -->
@@ -933,10 +938,33 @@ $('#tracks').addEventListener('keydown',e=>{
 /* ---------------- 三模块切换 ---------------- */
 function showMod(name){
   document.querySelectorAll('.mods button').forEach(b=>b.classList.toggle('on', b.dataset.mod===name));
-  ['design','print','export'].forEach(m=>{ $('#mod-'+m).hidden = (m!==name); });
+  ['design','print','export','mockup'].forEach(m=>{ $('#mod-'+m).hidden = (m!==name); });
+  document.body.classList.toggle('mockup-mode',name==='mockup');
   const ribbon=$('#editorRibbon');if(ribbon)ribbon.hidden=(name!=='design');
+  if(name==='export'&&LAST&&LAST.jid&&!mockupPending&&mockupDirty)startMockupExport();
 }
-$('#mods').onclick=e=>{const b=e.target.closest('button[data-mod]');if(b)showMod(b.dataset.mod)};
+let mockupReady=false,mockupPending=false,mockupTimer,mockupDirty=true,mockupChangedDuringExport=false,mockupUrls=[];
+function clearMockupImages(){for(const url of mockupUrls)URL.revokeObjectURL(url);mockupUrls=[];$('#mockupGallery').replaceChildren();$('#downloadMockupZip').hidden=true}
+function ensureMockup(){
+  if(!LAST||!LAST.jid){err('请先生成三件套，再打开八视图样机');return false}
+  const frame=$('#mockupFrame'),jid=String(LAST.jid);
+  if(frame.dataset.jid!==jid){mockupReady=false;mockupDirty=true;clearMockupImages();frame.dataset.jid=jid;frame.src='/mini-mockup/?embed=1&jid='+encodeURIComponent(jid)}
+  return true;
+}
+$('#mods').onclick=e=>{const b=e.target.closest('button[data-mod]');if(!b)return;if(b.dataset.mod==='mockup'&&!ensureMockup())return;showMod(b.dataset.mod)};
+function sendMockupExport(){if(!mockupPending||!mockupReady)return;$('#mockupFrame').contentWindow.postMessage({type:'minicd-export-eight',jid:String(LAST.jid)},location.origin)}
+function startMockupExport(){if(mockupPending||!ensureMockup())return;mockupPending=true;mockupChangedDuringExport=false;clearMockupImages();$('#refreshMockupImages').disabled=true;$('#mockupZipStatus').textContent='正在准备八张商品图…';clearTimeout(mockupTimer);mockupTimer=setTimeout(()=>{mockupPending=false;$('#refreshMockupImages').disabled=false;$('#mockupZipStatus').textContent='生成超时，请点击重新生成。'},180000);sendMockupExport()}
+$('#refreshMockupImages').onclick=startMockupExport;
+window.addEventListener('message',e=>{
+  if(e.origin!==location.origin||e.source!==$('#mockupFrame').contentWindow||!e.data)return;
+  const d=e.data;
+  if(d.type==='minicd-mockup-ready'){mockupReady=true;sendMockupExport()}
+  if(d.type==='minicd-mockup-changed'){mockupDirty=true;if(mockupPending)mockupChangedDuringExport=true;else if(mockupUrls.length)$('#mockupZipStatus').textContent='样机已调整，请重新生成商品图。'}
+  if(d.type==='minicd-export-progress'&&mockupPending)$('#mockupZipStatus').textContent=d.message;
+  if(d.type==='minicd-export-image'&&mockupPending&&d.blob instanceof Blob){const url=URL.createObjectURL(d.blob);mockupUrls.push(url);const card=document.createElement('div'),img=document.createElement('img'),label=document.createElement('div'),link=document.createElement('a');card.style.cssText='border:1px solid #e5e5e5;border-radius:8px;overflow:hidden;padding:8px;text-align:center;background:white';img.src=url;img.alt=d.name;img.style.cssText='width:100%;display:block;aspect-ratio:1;object-fit:contain';label.textContent=d.label;label.style.cssText='margin:8px 0';link.href=url;link.download=d.name;link.textContent='下载单张';card.append(img,label,link);$('#mockupGallery').append(card)}
+  if(d.type==='minicd-export-done'&&mockupPending&&d.blob instanceof Blob){clearTimeout(mockupTimer);mockupPending=false;$('#refreshMockupImages').disabled=false;const url=URL.createObjectURL(d.blob);mockupUrls.push(url);const link=$('#downloadMockupZip');link.href=url;link.download=d.name;link.hidden=false;mockupDirty=mockupChangedDuringExport;$('#mockupZipStatus').textContent=mockupDirty?'生成期间样机有改动，请重新生成商品图。':'八张商品图已生成，可逐张下载，或与原有素材一起下载。'}
+  if(d.type==='minicd-export-error'&&mockupPending){clearTimeout(mockupTimer);mockupPending=false;mockupDirty=true;$('#refreshMockupImages').disabled=false;$('#mockupZipStatus').textContent=d.message}
+});
 
 /* ---------------- 规格（唯一真源 /api/design/spec）---------------- */
 const FALLBACK_SPEC={  // 服务未重启时的兜底，值与 tools/spec_minicd.py 一致

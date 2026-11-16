@@ -2379,6 +2379,14 @@ class Handler(BaseHTTPRequestHandler):
             # 注：/packaging 与 /api/packaging/* 已按用户要求断开（包装工坊是独立工作台）
             if p in ("/design", "/design.html"):
                 return self._file(os.path.join(HERE, "design.html"))
+            if p in ("/mini-mockup", "/mini-mockup/", "/mini-mockup/index.html"):
+                return self._file(os.path.join(HERE, "mini-mockup", "index.html"))
+            if p.startswith("/mini-mockup/"):
+                base = os.path.realpath(os.path.join(HERE, "mini-mockup"))
+                target = os.path.realpath(os.path.join(base, unquote(p[len("/mini-mockup/"):])))
+                if not target.startswith(base + os.sep) or not os.path.isfile(target):
+                    return self._json({"error": "not found"}, 404)
+                return self._file(target)
             if p == "/api/ping":
                 kc_ok, kc_why = keychain_ready()
                 sh_ok, sh_why = shop_ready()
