@@ -16,7 +16,7 @@ export async function createZip(files, baseBlob=null){
   const bytes=new Uint8Array(await base.blob.arrayBuffer()),v=new DataView(bytes.buffer);let end=-1;
   for(let i=bytes.length-22;i>=Math.max(0,bytes.length-65557);i--){if(v.getUint32(i,true)===0x06054b50&&i+22+v.getUint16(i+20,true)===bytes.length){end=i;break}}
   if(end<0||v.getUint16(end+4,true)||v.getUint16(end+6,true))throw Error('原有素材压缩包无法读取');
-  const count=v.getUint16(end+10,true);baseCount+=count;const centralSize=v.getUint32(end+12,true),centralStart=v.getUint32(end+16,true);
+  const count=v.getUint16(end+10,true);const centralSize=v.getUint32(end+12,true),centralStart=v.getUint32(end+16,true);
   if(count===65535||baseCount+files.length>=65535||centralStart+centralSize>end)throw Error('原有素材压缩包格式不受支持');
   const entries=[];let pos=centralStart;
   for(let i=0;i<count;i++){
@@ -24,18 +24,20 @@ export async function createZip(files, baseBlob=null){
    const nl=v.getUint16(pos+28,true),el=v.getUint16(pos+30,true),cl=v.getUint16(pos+32,true),local=v.getUint32(pos+42,true),endPos=pos+46+nl+el+cl;
    if(endPos>centralStart+centralSize||local>=centralStart)throw Error('原有素材压缩包目录损坏');
    let original;try{original=new TextDecoder('utf-8',{fatal:true}).decode(bytes.subarray(pos+46,pos+46+nl))}catch{throw Error('原有素材文件名编码不支持')}
-   const name=enc.encode(base.prefix+original);entries.push({pos,nl,el,cl,local,name});pos=endPos;
+   const name=enc.encode(base.prefix+original),skip=base.exclude?.includes(original);entries.push({pos,nl,el,cl,local,name,skip});if(!skip)baseCount++;pos=endPos;
   }
+  if(baseCount+files.length>=65535)throw Error('压缩包文件数量超出支持范围');
   const sorted=[...entries].sort((a,b)=>a.local-b.local);
   for(let i=0;i<sorted.length;i++){
    const entry=sorted[i],p=entry.local,next=i+1<sorted.length?sorted[i+1].local:centralStart;
+   if(entry.skip)continue;
    if(p+30>next||v.getUint32(p,true)!==0x04034b50)throw Error('原有素材压缩包内容损坏');
    const oldName=v.getUint16(p+26,true),extra=v.getUint16(p+28,true),dataStart=p+30+oldName+extra;
    if(dataStart>next)throw Error('原有素材压缩包内容损坏');
    const h=bytes.slice(p,p+30),hd=new DataView(h.buffer);hd.setUint16(6,hd.getUint16(6,true)|0x800,true);hd.setUint16(26,entry.name.length,true);
    entry.newOffset=offset;parts.push(h,entry.name,bytes.subarray(p+30+oldName,dataStart),bytes.subarray(dataStart,next));offset+=h.length+entry.name.length+(next-(p+30+oldName));
   }
-  for(const entry of entries){const h=bytes.slice(entry.pos,entry.pos+46),hd=new DataView(h.buffer);hd.setUint16(8,hd.getUint16(8,true)|0x800,true);hd.setUint16(28,entry.name.length,true);hd.setUint32(42,entry.newOffset,true);central.push(h,entry.name,bytes.subarray(entry.pos+46+entry.nl,entry.pos+46+entry.nl+entry.el+entry.cl))}
+  for(const entry of entries){if(entry.skip)continue;const h=bytes.slice(entry.pos,entry.pos+46),hd=new DataView(h.buffer);hd.setUint16(8,hd.getUint16(8,true)|0x800,true);hd.setUint16(28,entry.name.length,true);hd.setUint32(42,entry.newOffset,true);central.push(h,entry.name,bytes.subarray(entry.pos+46+entry.nl,entry.pos+46+entry.nl+entry.el+entry.cl))}
  }
  for(const file of files){const name=enc.encode(file.name),data=new Uint8Array(await file.blob.arrayBuffer()),crc=crc32(data),packed=file.name.toLowerCase().endsWith('.png')?await deflatePNG(data):null,body=packed||data,method=packed?8:0,[lh,l]=header(30);l.setUint32(0,0x04034b50,true);l.setUint16(4,20,true);l.setUint16(6,0x800,true);l.setUint16(8,method,true);l.setUint32(14,crc,true);l.setUint32(18,body.length,true);l.setUint32(22,data.length,true);l.setUint16(26,name.length,true);parts.push(lh,name,body);
  const [ch,d]=header(46);d.setUint32(0,0x02014b50,true);d.setUint16(4,20,true);d.setUint16(6,20,true);d.setUint16(8,0x800,true);d.setUint16(10,method,true);d.setUint32(16,crc,true);d.setUint32(20,body.length,true);d.setUint32(24,data.length,true);d.setUint16(28,name.length,true);d.setUint32(42,offset,true);central.push(ch,name);offset+=lh.length+name.length+body.length;
