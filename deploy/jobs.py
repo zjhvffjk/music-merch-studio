@@ -148,8 +148,16 @@ class Queue:
                 for number, result in enumerate(results, 1):
                     name = re.sub(r'[\\/:*?"<>|\x00-\x1f]', '_', result['album'])[:70]
                     base = project_dir(result['jid'])
-                    for file in project_files(result['jid']):
-                        archive.write(OUTPUTS / file['path'], f'{number:02d}-{name}/{file["name"]}')
+                    combined = base / '素材和商品图.zip'
+                    source_bundle = combined if payload.get('mockups', True) else base.with_suffix('.zip')
+                    with zipfile.ZipFile(source_bundle) as source:
+                        for entry in source.infolist():
+                            if entry.is_dir():
+                                continue
+                            import shutil
+                            prefix = '' if source_bundle == combined else '原有素材/'
+                            with source.open(entry) as src, archive.open(f'{number:02d}-{name}/{prefix}{entry.filename}', 'w') as dst:
+                                shutil.copyfileobj(src, dst, 1024 * 1024)
             return {'projects': results, 'bundle': bundle.relative_to(OUTPUTS).as_posix()}
         return {'projects': results}
 

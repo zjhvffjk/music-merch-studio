@@ -7,7 +7,9 @@ import tempfile
 import time
 import unittest
 import uuid
+import zipfile
 from pathlib import Path
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 os.environ.update(STUDIO_WEB_PASSWORD='test-web-' + 'a' * 24,
@@ -15,6 +17,7 @@ os.environ.update(STUDIO_WEB_PASSWORD='test-web-' + 'a' * 24,
                   STUDIO_DOWNLOAD_SECRET='test-sign-' + 'c' * 24)
 from deploy import gateway as g
 from deploy.jobs import Queue
+from deploy import jobs
 from starlette.testclient import TestClient
 
 
@@ -74,6 +77,23 @@ class GatewayTest(unittest.TestCase):
 
 
 class QueueTest(unittest.TestCase):
+    def test_batch_archive_preserves_album_and_material_folders(self):
+        with tempfile.TemporaryDirectory() as directory:
+            outputs = Path(directory)
+            for jid in ('first', 'second'):
+                root = outputs / '迷你CD设计' / jid
+                root.mkdir(parents=True)
+                (root / 'meta.json').write_text('{}')
+                with zipfile.ZipFile(root.with_suffix('.zip'), 'w') as archive:
+                    archive.writestr('封面.png', jid.encode())
+            with patch.object(jobs, 'OUTPUTS', outputs), patch.object(jobs, 'api', side_effect=[{'jid': 'first'}, {'jid': 'second'}]):
+                queue = Queue(outputs / 'tasks.sqlite3')
+                result = queue.execute('testbatch', 'minicd', {'albums': [{'album': 'A'}, {'album': 'B'}], 'mockups': False})
+            with zipfile.ZipFile(outputs / result['bundle']) as archive:
+                self.assertEqual(set(archive.namelist()), {'01-A/原有素材/封面.png', '02-B/原有素材/封面.png'})
+                self.assertEqual(archive.read('01-A/原有素材/封面.png'), b'first')
+                self.assertEqual(archive.read('02-B/原有素材/封面.png'), b'second')
+
     def test_persistence_limits_and_restart(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / 'tasks.sqlite3'
