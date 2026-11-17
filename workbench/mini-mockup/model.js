@@ -26,14 +26,16 @@ views[4].slots.push(
 for(const i of [2,3,4])views[i].hidden=true;
 const onlineIds={leftSpine:'sideL',rightSpine:'sideR',leftSpineInner:'sideLB'};
 for(let i=1;i<=6;i++){const v=onlineViews[i];views.push({...v,onlineIndex:i,slots:v.slots.map(slot=>({...slot,id:onlineIds[slot.id]||slot.id}))})}
+// The flat interior is the same open case as the installed-disc view, with
+// only the clear disc carrier and disc removed.
+views[8].slots=views[1].slots.filter(slot=>slot.id!=='disc').map(slot=>({...slot,q:slot.q.map(p=>[...p])}));
 // Shared visual scale for previews and multi-view exports.
 export function viewScale(view){
  const bodyHeight=.70*45/53,paperHeight=bodyHeight*38/45;
  const installed=paperHeight/.351;
- const insideFlat=paperHeight/(.45*540/887)*(722/815);
  const outsideFlat=paperHeight/(.45*565/887)*(651/629)*(722/815);
  const index=views[view]?.onlineIndex;
- return view===1?installed:index===4?insideFlat:index===5?outsideFlat:[2,3].includes(index)?bodyHeight/.60:1;
+ return view===1||view===8?installed:index===5?outsideFlat:[2,3].includes(index)?bodyHeight/.60:1;
 }
 export function widestViewScale(){return Math.max(viewScale(1)*.90,viewScale(8)*.78,viewScale(9)*.78)}
 export const defaultTransform=()=>({fit:'cover',scale:100,x:0,y:0,rotation:0});

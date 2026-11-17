@@ -2,11 +2,12 @@ import * as online from './online-reference-v30/renderer.js';
 import{views,viewScale,widestViewScale,loadImage}from'./model.js';
 export const BASE=1254;
 const imgCache=new Map();const textureCache=new Map();let localResolution=1200;
+export function shellThumbnail(view){const shell=imgCache.get(view===8?'shell-flat':`shell-${view}`);return shell?.toDataURL?.('image/png')||shell?.src||null}
 // Use a single continuous photo so case highlights do not break at seams.
 export function frontX(x,inverse=false){return x}
 function calibrateFront(canvas){const copy=document.createElement('canvas');copy.width=canvas.width;copy.height=canvas.height;copy.getContext('2d').drawImage(canvas,0,0);const s=canvas.width/BASE,x=canvas.getContext('2d');x.save();x.setTransform(s,0,0,s,0,0);const a=[0,164,277,1090,BASE],b=a.map(v=>frontX(v));for(let i=0;i<4;i++)x.drawImage(copy,a[i]*s,0,(a[i+1]-a[i])*s,canvas.height,b[i],0,b[i+1]-b[i],BASE);x.restore()}
 function repairFrontClip(c){const patch=document.createElement('canvas');patch.width=patch.height=BASE;const p=patch.getContext('2d');p.translate(423+890,0);p.scale(-1,1);p.drawImage(c,0,0);p.setTransform(1,0,0,1,0,0);p.globalCompositeOperation='destination-in';const g=p.createRadialGradient(890,320,28,890,320,72);g.addColorStop(0,'rgba(0,0,0,1)');g.addColorStop(.75,'rgba(0,0,0,1)');g.addColorStop(1,'rgba(0,0,0,0)');p.fillStyle=g;p.fillRect(818,248,144,144);c.getContext('2d').drawImage(patch,0,0)}
-export async function preloadShells(){await online.preloadShells();return Promise.all(views.filter(v=>v.onlineIndex===undefined).map(async(v,i)=>{
+export async function preloadShells(){await online.preloadShells();await Promise.all(views.filter(v=>v.onlineIndex===undefined).map(async(v,i)=>{
   if(i!==0){const raw=await loadImage(`assets/shell-${i}.webp`);if(i!==1){imgCache.set(`shell-${i}`,raw);return}
     const c=document.createElement('canvas');c.width=raw.width;c.height=raw.height;const x=c.getContext('2d');x.drawImage(raw,0,0);
     // Match the eyelets to the front relative to case height, retaining the photographed rail.
@@ -21,7 +22,22 @@ export async function preloadShells(){await online.preloadShells();return Promis
   x.drawImage(img,0,0,cut,img.height,dx-bx*leftScale,dy-by*sy,cut*leftScale,img.height*sy);
   x.drawImage(img,cut,0,img.width-cut,img.height,dx+spineWidth,dy-by*sy,(img.width-cut)*rightScale,img.height*sy);
   imgCache.set('shell-0',c);
-}))}
+}));
+  // The flat view uses the installed view's photographed case. Replace only
+  // the right carrier with the empty inner shell, keeping the lid identical.
+  const empty=await loadImage('online-reference-v30/assets/open-inner-reference.png');
+  const flat=document.createElement('canvas');flat.width=flat.height=BASE;
+  const fx=flat.getContext('2d');fx.drawImage(imgCache.get('shell-1'),0,0);
+  const patch=document.createElement('canvas');patch.width=530;patch.height=500;
+  const px=patch.getContext('2d',{willReadFrequently:true});px.drawImage(empty,830,170,835,650,0,0,530,500);
+  const pixels=px.getImageData(0,0,530,500),fade=18;
+  for(let y=0;y<500;y++)for(let x=0;x<530;x++){
+    const edge=Math.min(x,529-x,y,499-y),t=Math.min(1,edge/fade),alpha=t*t*(3-2*t);
+    pixels.data[(y*530+x)*4+3]=Math.round(pixels.data[(y*530+x)*4+3]*alpha);
+  }
+  px.putImageData(pixels,0,0);fx.drawImage(patch,660,415);
+  imgCache.set('shell-flat',flat);
+}
 const onlineId=id=>({sideL:'leftSpine',sideR:'rightSpine',sideLB:'leftSpineInner'}[id]||id);
 export async function prepareAsset(id,src){await online.prepareAsset(onlineId(id),src);textureCache.delete(id);if(src)imgCache.set(id,await loadImage(src));else imgCache.delete(id)}
 export async function prepareProjectAssets(assets){await online.prepareProjectAssets(Object.fromEntries(Object.entries(assets).map(([id,a])=>[onlineId(id),a])));const entries=await Promise.all(Object.entries(assets).map(async([id,a])=>[id,a.src?await loadImage(a.src):null]));for(const[id,img]of entries){textureCache.delete(id);if(img)imgCache.set(id,img);else imgCache.delete(id)}}
@@ -107,7 +123,7 @@ function exposedPaperHardware(ctx,state,view,slot,shell){
   // The reverse of the cover faces the open case directly. Only retaining
   // hardware and the rim sit in front of it; the broad lid lies behind it.
   warp(ctx,paperRecess(view,'inside',false),q);
-  if(view===1){online.drawInsideRetainersOnQuad(ctx,q);return}
+  if(view===1||view===8){online.drawInsideRetainersOnQuad(ctx,q);return}
   const mask=projectedInsideMask.getContext('2d');mask.clearRect(0,0,BASE,BASE);warp(mask,insideHardwareMask(view),q);
   const x=insideRelief.getContext('2d');x.globalCompositeOperation='source-over';x.clearRect(0,0,BASE,BASE);x.drawImage(photoOptics(shell,view),0,0);
   x.globalCompositeOperation='destination-in';x.drawImage(projectedInsideMask,0,0);ctx.drawImage(insideRelief,0,0);
@@ -159,21 +175,21 @@ function frontRetainers(shell){
 }
 export function render(canvas,state,view=state.view,size=1254){
   localResolution=size;
-  if(view===0||views[view].onlineIndex!==undefined){const onlineView=view===0?0:views[view].onlineIndex,assets=Object.fromEntries(Object.entries(state.assets).map(([id,a])=>[onlineId(id),a])),quads={};for(const slot of views[view].slots){const q=state.quads[`${view}:${slot.id}`];if(q)quads[`${onlineView}:${onlineId(slot.id)}`]=q}return online.render(canvas,{...state,assets,quads},onlineView,size)}
+  if(view===0||(views[view].onlineIndex!==undefined&&view!==8)){const onlineView=view===0?0:views[view].onlineIndex,assets=Object.fromEntries(Object.entries(state.assets).map(([id,a])=>[onlineId(id),a])),quads={};for(const slot of views[view].slots){const q=state.quads[`${view}:${slot.id}`];if(q)quads[`${onlineView}:${onlineId(slot.id)}`]=q}return online.render(canvas,{...state,assets,quads},onlineView,size)}
   if(canvas.width!==size||canvas.height!==size)canvas.width=canvas.height=size;
   const ctx=canvas.getContext('2d');ctx.setTransform(size/BASE,0,0,size/BASE,0,0);ctx.globalCompositeOperation='source-over';ctx.fillStyle=state.background;ctx.fillRect(0,0,BASE,BASE);
-  const shell=imgCache.get(`shell-${view}`);if(!shell)return;
-  if(view===1){
+  const shell=imgCache.get(view===8?'shell-flat':`shell-${view}`);if(!shell)return;
+  if(view===1||view===8){
     ctx.save();ctx.globalCompositeOperation='multiply';ctx.drawImage(shell,0,0,BASE,BASE);ctx.restore();
     if(state.showDesign){
       // The tray insert is one continuous sheet beneath the clear hinge.
-      for(const slot of views[1].slots.filter(s=>s.id!=='disc')){
+      for(const slot of views[view].slots.filter(s=>s.id!=='disc')){
         const tx=texture(state,slot.id);if(!tx)continue;
-        insertSurface(ctx,tx,getQuad(state,1,slot),slot.id);
-        overlayPlastic(ctx,state,1,slot,shell);
+        insertSurface(ctx,tx,getQuad(state,view,slot),slot.id);
+        if(view===1||slot.id==='inside')overlayPlastic(ctx,state,view,slot,shell);
       }
     }
-    if(state.discVisible){
+    if(view===1&&state.discVisible){
       const hub=[.724,.532,.067,.064,0];
       ctx.save();ctx.beginPath();ctx.ellipse(hub[0]*BASE,hub[1]*BASE,hub[2]*BASE,hub[3]*BASE,hub[4],0,Math.PI*2);ctx.clip();ctx.drawImage(photoOptics(shell,1),0,0);ctx.restore();
       const slot=views[1].slots.find(s=>s.id==='disc'),q=getQuad(state,1,slot);
