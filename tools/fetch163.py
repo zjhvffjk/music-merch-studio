@@ -64,10 +64,7 @@ def get_json_ex(url, params=None, retry=3, timeout=12):
             r = S.get(url, params=params, timeout=timeout)
             if r.status_code == 200 and r.text.strip():
                 try:
-                    data = r.json()
-                    if '/search/' in url and isinstance(data, dict) and isinstance(data.get('result'), str):
-                        return {}, '搜索接口返回不可用的结果'
-                    return data, None
+                    return r.json(), None
                 except ValueError:
                     err = "响应不是合法 JSON"
             else:
@@ -89,10 +86,7 @@ def search(kw: str, typ: str = "song", limit: int = 20):
     d = get_json(f"{API}/search/get/web",
                  {"s": kw, "type": TYPE_MAP.get(typ, 1), "limit": limit,
                   "offset": 0, "total": "true"})
-    result = d.get("result") if isinstance(d, dict) else None
-    # Some server IPs receive an opaque string instead of search results.
-    # Keep the empty-result contract so the caller can use its suggest fallback.
-    return result if isinstance(result, dict) else {}
+    return d.get("result", {}) or {}
 
 
 def cover_url(pic_url: str, size: int) -> str:
