@@ -1,6 +1,4 @@
-"""Protected public entry for the existing workbench web application."""
-import base64
-import hmac
+"""Public web entry for the existing workbench application."""
 import os
 from contextlib import asynccontextmanager
 
@@ -13,24 +11,9 @@ from starlette.routing import Route
 
 INTERNAL = 'http://127.0.0.1:8765'
 PUBLIC = os.environ.get('STUDIO_PUBLIC_URL', 'http://localhost:8080').rstrip('/')
-USER = os.environ.get('STUDIO_WEB_USER', '')
-PASSWORD = os.environ.get('STUDIO_WEB_PASSWORD', '')
-if not USER or len(PASSWORD) < 24:
-    raise RuntimeError('Set a web username and password of at least 24 characters')
 
 
-def authorized(headers):
-    value = headers.get('authorization', '')
-    if not value.startswith('Basic '):
-        return False
-    try:
-        username, password = base64.b64decode(value[6:], validate=True).decode().split(':', 1)
-        return hmac.compare_digest(username, USER) and hmac.compare_digest(password, PASSWORD)
-    except (ValueError, UnicodeError):
-        return False
-
-
-class WebAccess:
+class PublicAccess:
     def __init__(self, app):
         self.app = app
 
@@ -44,9 +27,6 @@ class WebAccess:
         # Retired remote API and signed links must never reach the workbench.
         if path == '/mcp' or path.startswith(('/mcp/', '/download/')):
             return await JSONResponse({'error': 'Not found'}, status_code=404)(scope, receive, send)
-        if not authorized(request.headers):
-            return await JSONResponse({'error': 'Login required'}, status_code=401,
-                headers={'WWW-Authenticate': 'Basic realm="Music Studio", charset="UTF-8"'})(scope, receive, send)
         if request.method not in ('GET', 'HEAD', 'OPTIONS'):
             origin = request.headers.get('origin')
             if origin and origin != PUBLIC:
@@ -102,4 +82,4 @@ async def lifespan(app):
 app = Starlette(routes=[Route('/healthz', health),
                         Route('/{path:path}', proxy, methods=['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'])],
                 lifespan=lifespan)
-app.add_middleware(WebAccess)
+app.add_middleware(PublicAccess)

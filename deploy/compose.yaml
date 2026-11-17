@@ -7,7 +7,6 @@ services:
     container_name: music-merch-studio
     restart: unless-stopped
     init: true
-    env_file: ${STUDIO_WEB_ENV_FILE:-../../web.env}
     environment:
       STUDIO_PUBLIC_URL: https://music.haoquanwo.cloud
     volumes:
