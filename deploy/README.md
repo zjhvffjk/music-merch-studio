@@ -11,7 +11,7 @@ MCP：`https://music.haoquanwo.cloud/mcp`，Streamable HTTP，使用独立 Beare
 需要服务器现有的 `dokploy-network`、`web` / `websecure` 入口及 `letsencrypt` 证书配置。
 
 持久文件放在 `/opt/music-merch-studio/outputs`，日志目录为 `/opt/music-merch-studio/logs`，属主为 UID 10001。
-专用配置文件 `/opt/music-merch-studio/secrets.env` 仅允许管理员读取，包含以下变量：
+专用配置文件 `/opt/music-merch-studio/secrets.env` 仅允许管理员读取。Dokploy 的部署进程在容器内运行，还需将该文件复制到 `/etc/dokploy/compose/<服务AppName>/secrets.env`（位于Git代码目录外，重新拉取代码不会覆盖）。Compose默认从此共享目录读取；独立命令行部署可设置 `STUDIO_SECRETS_FILE` 指定文件路径。包含以下变量：
 
 ```
 STUDIO_WEB_USER=studio

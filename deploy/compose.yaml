@@ -7,7 +7,7 @@ services:
     container_name: music-merch-studio
     restart: unless-stopped
     init: true
-    env_file: /opt/music-merch-studio/secrets.env
+    env_file: ${STUDIO_SECRETS_FILE:-../../secrets.env}
     environment:
       STUDIO_PUBLIC_URL: https://music.haoquanwo.cloud
       STUDIO_INTERNAL_URL: http://127.0.0.1:8765
