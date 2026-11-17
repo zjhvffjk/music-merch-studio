@@ -3,7 +3,7 @@ export const BASE=1254;
 const imgCache=new Map();const textureCache=new Map();
 let shellResolutionCache=null,textureResolution=1200;
 export async function preloadShells(){await prepareInsideRetainers();await prepareUnifiedHooks();return Promise.all(views.map(async(v,i)=>{
- let img=imgCache.get('unified-'+v.shell)||(v.shell==='online-reference-v30/assets/open-inner-reference.png'?imgCache.get('sharp-inner-shell'):await loadImage(v.shell||`online-reference-v30/assets/shell-${i}.webp`));
+ let img=(i===1&&imgCache.get('unified-rear'))||imgCache.get('unified-'+v.shell)||(v.shell==='online-reference-v30/assets/open-inner-reference.png'?imgCache.get('sharp-inner-shell'):await loadImage(v.shell||`online-reference-v30/assets/shell-${i}.webp`));
  imgCache.set(`raw-shell-${i}`,img);imgCache.set(`shell-${i}`,composeShell(img,v,BASE));
  if(v.hardware){const raw=await loadImage(v.hardware.shell),[sx,sy,sw,sh]=v.hardware.source,c=document.createElement('canvas');c.width=sw;c.height=sh;c.getContext('2d').drawImage(raw,sx,sy,sw,sh,0,0,sw,sh);imgCache.set(`hardware-${i}`,transparentHardware(c))}
  }))}
@@ -16,7 +16,10 @@ function composeShell(img,v,size){
  // The open photo continues into the hinge at right. Close the isolated rear with its own outer rail.
  if(v.frame.closeRightFromLeft){const rail=dw*2/53,cap=dh*3.5/45;
  x.drawImage(img,105,165,700,55,dx,dy,dw,cap);x.drawImage(img,105,785,700,55,dx,dy+dh-cap,dw,cap);
- x.drawImage(img,bx,by,45,bh,dx,dy,rail,dh);x.save();x.translate(dx+dw,dy);x.scale(-1,1);x.drawImage(img,bx,by,45,bh,0,0,rail,dh);x.restore()}img=c}
+ x.drawImage(img,bx,by,45,bh,dx,dy,rail,dh);x.save();x.translate(dx+dw,dy);x.scale(-1,1);x.drawImage(img,bx,by,45,bh,0,0,rail,dh);x.restore();
+ // Remove the remnant of the neighbouring open-shell rail above the rear's
+ // top-right edge; keep the photographed border itself below the body line.
+ x.fillStyle='#fff';x.fillRect(dx+dw*.72,dy-12,dw*.28+2,11.5)}img=c}
  return img;
 }
 function renderShell(view,size){const raw=imgCache.get(`raw-shell-${view}`);if(!raw)return null;if(!views[view].frame)return raw;if(size===BASE)return imgCache.get(`shell-${view}`);if(shellResolutionCache?.view===view&&shellResolutionCache.size===size)return shellResolutionCache.canvas;const canvas=composeShell(raw,views[view],size);shellResolutionCache={view,size,canvas};return canvas}
@@ -63,6 +66,9 @@ async function prepareUnifiedHooks(){const front=await loadImage('online-referen
  const fx=frontAdjusted.getContext('2d');fx.drawImage(front,0,0);fx.fillStyle='#fff';fx.fillRect(510,140,235,145);
  const factor=.85,w=235*factor,h=145*factor;fx.imageSmoothingQuality='high';fx.drawImage(hook,627.5-w/2,285-h,w,h);
  imgCache.set('unified-online-reference-v30/assets/front-cover-hq-v3.png',frontAdjusted);
+ // Reduce the photographed oblique eyelet around its attachment point; the
+ // sloping rail is excluded from the edit so its perspective stays intact.
+ const angled=await loadImage('online-reference-v30/assets/closed-oblique.png'),adjusted=document.createElement('canvas');adjusted.width=angled.width;adjusted.height=angled.height;const ax=adjusted.getContext('2d');ax.drawImage(angled,0,0);ax.save();ax.beginPath();ax.moveTo(530,40);ax.lineTo(760,40);ax.lineTo(760,215);ax.lineTo(530,252);ax.closePath();ax.clip();ax.fillStyle='#fff';ax.fillRect(530,40,230,212);ax.imageSmoothingQuality='high';ax.translate(645,233);ax.scale(.82,.82);ax.translate(-645,-233);ax.drawImage(angled,0,0);ax.restore();imgCache.set('unified-online-reference-v30/assets/closed-oblique.png',adjusted);
  const specs=[
   {file:'online-reference-v30/assets/open-inner-reference.png',flat:[[425,20,205,153,525,173,215,130],[1130,20,235,153,1252,173,215,130]]},
   {file:'online-reference-v30/assets/open-outer-reference.png',flat:[[390,10,235,155,507,165,215,130],[1130,10,260,155,1260,165,215,130]]},
@@ -71,7 +77,8 @@ async function prepareUnifiedHooks(){const front=await loadImage('online-referen
   {file:'online-reference-v30/assets/shell-4.webp',projected:[{erase:[[295,340],[430,340],[430,480],[295,413]],q:[[300,337],[407,403],[416,483],[308,417]]},{erase:[[735,350],[863,350],[863,429],[735,485]],q:[[740,400],[840,356],[849,430],[749,482]]}]}
  ];
  await Promise.all(specs.map(async spec=>{const raw=spec.file==='online-reference-v30/assets/open-inner-reference.png'?imgCache.get('sharp-inner-shell'):await loadImage(spec.file),c=document.createElement('canvas');c.width=raw.width;c.height=raw.height;const x=c.getContext('2d');x.drawImage(raw,0,0);
-  for(const [ex,ey,ew,eh,cx,base,w,h]of spec.flat||[]){x.fillStyle='#fff';x.fillRect(ex,ey,ew,eh);x.drawImage(hook,cx-w/2,base-h,w,h)}
+  if(spec.file.endsWith('open-outer-reference.png')){const rear=document.createElement('canvas');rear.width=raw.width;rear.height=raw.height;const rx=rear.getContext('2d');rx.drawImage(raw,0,0);for(const [ex,ey,ew,eh,cx,base,w,h]of spec.flat){rx.fillStyle='#fff';rx.fillRect(ex,ey,ew,eh);rx.drawImage(hook,cx-w*factor/2,base-h*factor,w*factor,h*factor)}imgCache.set('unified-rear',rear)}
+  for(const [ex,ey,ew,eh,cx,base,w,h]of spec.flat||[]){x.fillStyle='#fff';x.fillRect(ex,ey,ew,eh);const flatFactor=.75,scaledW=w*flatFactor,scaledH=h*flatFactor;x.drawImage(hook,cx-scaledW/2,base-scaledH,scaledW,scaledH)}
   for(const p of spec.projected||[]){x.save();x.beginPath();p.erase.forEach(([a,b],i)=>i?x.lineTo(a,b):x.moveTo(a,b));x.closePath();x.fillStyle='#fff';x.fill();x.restore();warp(x,hook,p.q.map(([a,b])=>[a/BASE,b/BASE]))}
   imgCache.set('unified-'+spec.file,c);
  }));
