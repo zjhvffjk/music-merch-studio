@@ -1,7 +1,7 @@
 import sys
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
 import fetch163
@@ -9,6 +9,14 @@ import make_album
 
 
 class MusicSearchResponseTests(unittest.TestCase):
+    def test_opaque_upstream_response_is_an_error_for_source_fallback(self):
+        response = Mock(status_code=200, text='{"result":"opaque"}')
+        response.json.return_value = {'result': 'opaque', 'code': 200}
+        with patch.object(fetch163.S, 'get', return_value=response):
+            data, error = fetch163.get_json_ex(fetch163.API + '/search/get/web', retry=1)
+        self.assertEqual(data, {})
+        self.assertIsNotNone(error)
+
     def test_opaque_search_response_uses_artist_suggestion(self):
         artist = {'id': 6452, 'name': '周杰伦'}
         def response(url, params=None, **kwargs):

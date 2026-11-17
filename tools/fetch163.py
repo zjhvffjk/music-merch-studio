@@ -64,7 +64,10 @@ def get_json_ex(url, params=None, retry=3, timeout=12):
             r = S.get(url, params=params, timeout=timeout)
             if r.status_code == 200 and r.text.strip():
                 try:
-                    return r.json(), None
+                    data = r.json()
+                    if '/search/' in url and isinstance(data, dict) and isinstance(data.get('result'), str):
+                        return {}, '搜索接口返回不可用的结果'
+                    return data, None
                 except ValueError:
                     err = "响应不是合法 JSON"
             else:
