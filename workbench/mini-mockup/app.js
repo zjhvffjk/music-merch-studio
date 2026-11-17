@@ -1,6 +1,6 @@
 import {shellThumbnail as onlineThumbnail} from './online-reference-v30/renderer.js';
 import{surfaces,views,viewScale,widestViewScale,initialState,defaultTransform,sanitizeState,validQuad,persist,restore,readUpload}from'./model.js';
-import{preloadShells,prepareAsset,prepareProjectAssets,invalidate,render,getQuad,exportPNG,frontX,shellThumbnail,BASE}from'./renderer.js';
+import{preloadShells,prepareAsset,prepareProjectAssets,invalidate,render,getQuad,exportPNG,exportThreeViewPreview,frontX,shellThumbnail,BASE}from'./renderer.js';
 import{createZip}from'./zip-store.js';
 const embedded=new URLSearchParams(location.search).get('embed')==='1';
 if(embedded)document.body.classList.add('embedded');
@@ -54,16 +54,21 @@ window.addEventListener('message',async e=>{
   batchExporting=true;
   try{
     const snapshot=await highresExportState(structuredClone(state)),indices=views.map((v,i)=>v.hidden?-1:i).filter(i=>i>=0),files=[];
+    tellParent({type:'minicd-export-progress',message:'正在生成三视图总预览图…'});
+    await new Promise(resolve=>setTimeout(resolve,0));
+    const three=await exportThreeViewPreview(snapshot),threeName='00-三视图总预览.png';
+    files.push({name:'八视图商品图/'+threeName,blob:three});
+    tellParent({type:'minicd-export-image',name:threeName,label:'三视图总预览',blob:three});
     tellParent({type:'minicd-export-progress',message:'正在生成八视图总预览图…'});
     await new Promise(resolve=>setTimeout(resolve,0));
-    const overview=await exportPNG(snapshot,8192,'sheet'),overviewName='00-八视图总预览.png';
+    const overview=await exportPNG(snapshot,8192,'sheet'),overviewName='01-八视图总预览.png';
     files.push({name:'八视图商品图/'+overviewName,blob:overview});
     tellParent({type:'minicd-export-image',name:overviewName,label:'八视图总预览',blob:overview});
     for(let n=0;n<indices.length;n++){
       const i=indices[n];tellParent({type:'minicd-export-progress',message:`正在生成 ${n+1}/${indices.length}：${views[i].name}`});
       await new Promise(resolve=>setTimeout(resolve,0));
       const blob=await exportPNG({...snapshot,view:i},8192,'individual');
-      const name=`${String(n+1).padStart(2,'0')}-${views[i].name}.png`;files.push({name:'八视图商品图/'+name,blob});tellParent({type:'minicd-export-image',name,label:views[i].name,blob});
+      const name=`${String(n+2).padStart(2,'0')}-${views[i].name}.png`;files.push({name:'八视图商品图/'+name,blob});tellParent({type:'minicd-export-image',name,label:views[i].name,blob});
     }
     if(e.data.imagesOnly){tellParent({type:'minicd-export-done'});return}
     tellParent({type:'minicd-export-progress',message:batchNo?'正在合并批量素材和当前专辑商品图…':'正在合并原有素材和商品图…'});

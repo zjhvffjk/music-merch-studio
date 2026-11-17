@@ -553,13 +553,13 @@ body.mockup-mode .studio,body.embed.mockup-mode .studio{display:block;max-width:
         <div class="body">
           <div id="exportEmpty" class="empty">还没有生成物 —— 先去「设计」模块生成三件套。</div>
           <div id="exportBody" hidden>
-            <div class="mockupExport"><h3>八视图商品图</h3><p class="muted">包含一张八视图总预览和八张独立商品图；全部下载还包含原有素材及打印文件。</p><div class="dlRow"><a id="downloadMockupZip" class="btn" hidden>下载全部文件 ZIP</a><button id="refreshMockupImages" class="plain" type="button">重新生成商品图</button><span id="mockupZipStatus" class="muted" role="status"></span></div><div id="mockupGallery" style="margin:16px 0 24px"></div></div>
+            <div class="mockupExport"><h3>八视图商品图</h3><p class="muted">包含一张三视图总预览、一张八视图总预览和八张独立商品图；全部下载还包含原有素材及打印文件。</p><div class="dlRow"><a id="downloadMockupZip" class="btn" hidden>下载全部文件 ZIP</a><button id="refreshMockupImages" class="plain" type="button">重新生成商品图</button><span id="mockupZipStatus" class="muted" role="status"></span></div><div id="mockupGallery" style="margin:16px 0 24px"></div></div>
             <div id="dlList"></div>
             <div class="dlRow" style="margin-top:12px">
               <a id="lnkZip" href="#" hidden>原素材包</a>
               <button id="btnSpec" class="plain">下载生产规格 JSON</button>
             </div>
-            <p class="cap">全部文件 ZIP 包含原有素材、打印文件、项目资料、八视图总预览及八张独立商品图。</p>
+            <p class="cap">全部文件 ZIP 包含原有素材、打印文件、项目资料、三视图总预览、八视图总预览及八张独立商品图。</p>
           </div>
         </div>
       </section>
@@ -960,7 +960,7 @@ function queueMockupPreparation(delay=1000){
 }
 function makeProductRow(data,url){
  const row=document.createElement('div'),icon=document.createElement('div'),text=document.createElement('div'),title=document.createElement('b'),detail=document.createElement('small'),open=document.createElement('a');
- row.className='dlItem';icon.className='ic';icon.textContent='PNG';text.className='t';title.textContent=data.label;detail.textContent=data.name.startsWith('00-')?'八视图总预览 · 8192 × 4096':'独立商品图 · 8192 × 8192';text.append(title,detail);open.className='plain sm';open.href=url;open.target='_blank';open.rel='noopener';open.textContent='打开';row.append(icon,text,open);return row;
+ row.className='dlItem';icon.className='ic';icon.textContent='PNG';text.className='t';title.textContent=data.label;detail.textContent=data.name.includes('三视图总预览')?'三视图总预览 · 8192 × 8192':data.name.includes('八视图总预览')?'八视图总预览 · 8192 × 4096':'独立商品图 · 8192 × 8192';text.append(title,detail);open.className='plain sm';open.href=url;open.target='_blank';open.rel='noopener';open.textContent='打开';row.append(icon,text,open);return row;
 }
 function clearMockupImages(){for(const url of mockupUrls)URL.revokeObjectURL(url);mockupUrls=[];$('#mockupGallery').replaceChildren();$('#downloadMockupZip').hidden=true}
 function ensureMockup(){
@@ -980,7 +980,7 @@ window.addEventListener('message',e=>{
   if(d.type==='minicd-mockup-changed'){if(LAST?.batchKey){if(allProductRunning)allProductRerun=true;else if(!$('#batchProductDownload').hidden){batchProductsDirty=true;$('#batchProductDownload').hidden=true;$('#batchProductStatus').textContent='样机已调整，返回导出页时将更新商品图。'}}mockupDirty=true;if(mockupPending)mockupChangedDuringExport=true;else if(mockupUrls.length){$('#downloadMockupZip').hidden=true;$('#mockupZipStatus').textContent='样机已调整，商品图将在后台更新。'}if($('#mod-mockup').hidden)queueMockupPreparation()}
   if(d.type==='minicd-export-progress'&&mockupPending)$('#mockupZipStatus').textContent=d.message;
   if(d.type==='minicd-export-image'&&mockupPending&&d.blob instanceof Blob){const url=URL.createObjectURL(d.blob);mockupUrls.push(url);$('#mockupGallery').append(makeProductRow(d,url))}
-  if(d.type==='minicd-export-done'&&mockupPending&&d.blob instanceof Blob){clearTimeout(mockupTimer);mockupPending=false;$('#refreshMockupImages').disabled=false;mockupDirty=mockupChangedDuringExport||mockupExportKey!==currentMockupKey();if(mockupExportKey!==currentMockupKey())clearMockupImages();else{const url=URL.createObjectURL(d.blob);mockupUrls.push(url);const link=$('#downloadMockupZip');link.href=url;link.download=d.name;link.hidden=mockupDirty}$('#mockupZipStatus').textContent=mockupDirty?'样机已调整，商品图将在后台更新。':'总预览和八张商品图已生成，可打开查看，或与原有素材一起下载。';if(mockupDirty&&$('#mod-mockup').hidden)queueMockupPreparation()}
+  if(d.type==='minicd-export-done'&&mockupPending&&d.blob instanceof Blob){clearTimeout(mockupTimer);mockupPending=false;$('#refreshMockupImages').disabled=false;mockupDirty=mockupChangedDuringExport||mockupExportKey!==currentMockupKey();if(mockupExportKey!==currentMockupKey())clearMockupImages();else{const url=URL.createObjectURL(d.blob);mockupUrls.push(url);const link=$('#downloadMockupZip');link.href=url;link.download=d.name;link.hidden=mockupDirty}$('#mockupZipStatus').textContent=mockupDirty?'样机已调整，商品图将在后台更新。':'两张总预览和八张商品图已生成，可打开查看，或与原有素材一起下载。';if(mockupDirty&&$('#mod-mockup').hidden)queueMockupPreparation()}
   if(d.type==='minicd-export-error'&&mockupPending){clearTimeout(mockupTimer);mockupPending=false;mockupDirty=true;$('#refreshMockupImages').disabled=false;$('#mockupZipStatus').textContent=d.message}
 });
 

@@ -240,3 +240,26 @@ export function render(canvas,state,view=state.view,size=1254){
 }
 export async function exportPNG(state,size,mode){const c=document.createElement('canvas');if(mode==='current')render(c,state,state.view,size);else if(mode==='individual'){const cell=document.createElement('canvas'),side=size*viewScale(state.view)*Math.min(1,.90/widestViewScale());c.width=c.height=size;const x=c.getContext('2d');x.fillStyle=state.background;x.fillRect(0,0,size,size);render(cell,state,state.view,Math.ceil(side));x.drawImage(cell,(size-side)/2,(size-side)/2,side,side);cell.width=cell.height=0}else{const cell=document.createElement('canvas'),indices=views.map((v,i)=>v.hidden?-1:i).filter(i=>i>=0),cellSize=size/4;c.width=size;c.height=Math.ceil(indices.length/4)*cellSize;const x=c.getContext('2d');x.fillStyle=state.background;x.fillRect(0,0,c.width,c.height);const common=Math.min(1,.90/widestViewScale());indices.forEach((view,i)=>{render(cell,state,view,Math.ceil(cellSize*viewScale(view)*common));const px=(i%4)*cellSize,py=Math.floor(i/4)*cellSize,side=cellSize*viewScale(view)*common;x.save();x.beginPath();x.rect(px,py,cellSize,cellSize*.91);x.clip();x.drawImage(cell,px+(cellSize-side)/2,py+(cellSize*.91-side)/2,side,side);x.restore();x.fillStyle='#55534e';x.font=`${Math.round(cellSize*.025)}px sans-serif`;x.textAlign='center';x.fillText(views[view].name,px+cellSize/2,py+cellSize*.96)})}
 return new Promise((resolve,reject)=>c.toBlob(b=>{c.width=c.height=0;b?resolve(b):reject(Error('导出失败，请尝试较小分辨率'))},'image/png'))}
+export async function exportThreeViewPreview(state,size=8192){
+ const c=document.createElement('canvas');c.width=c.height=size;
+ const x=c.getContext('2d');x.fillStyle=state.background;x.fillRect(0,0,size,size);
+ const layoutSize=Math.round(size*.82),margin=(size-layoutSize)/2;
+ x.translate(margin,margin);
+ const cell=document.createElement('canvas'),top=Math.round(layoutSize*.54),bottom=layoutSize-top,half=layoutSize/2;
+ const openSide=Math.round(layoutSize*.90);
+ render(cell,state,1,openSide);
+ x.drawImage(cell,0,Math.round(openSide*.205),openSide,top,(layoutSize-openSide)/2,0,openSide,top);
+ // Match the visible shell rails, not the paper apertures used by viewScale.
+ // The open-case photograph's body is about 4% shorter after that conversion.
+ const closedSide=Math.round(openSide/viewScale(1)*.96);
+ for(const [view,column] of [[0,0],[5,1]]){
+  render(cell,state,view,closedSide);
+  x.drawImage(cell,(closedSide-half)/2,(closedSide-bottom)/2,half,bottom,column*half,top,half,bottom);
+ }
+ x.fillStyle='#55534e';x.font=`${Math.round(layoutSize*.025)}px sans-serif`;
+ x.textAlign='center';x.textBaseline='middle';
+ x.fillText(views[1].name,layoutSize/2,top-layoutSize*.016);
+ for(const [view,column] of [[0,0],[5,1]])x.fillText(views[view].name,column*half+half/2,layoutSize*1.022);
+ cell.width=cell.height=0;
+ return new Promise((resolve,reject)=>c.toBlob(b=>{c.width=c.height=0;b?resolve(b):reject(Error('三视图预览导出失败'))},'image/png'));
+}
