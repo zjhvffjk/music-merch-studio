@@ -535,6 +535,9 @@ def build_disc_page(disc_im, dpi, artist="", album="", cols=4, rows=6):
     用户排版约定：A4 拼版不放盘面，盘面用这页单独出。每个盘带裁切圆、
     内孔参考圈与十字对位（同 build_page 的盘面标注风格）。返回 page_im。
     """
+    import design_parts as DP
+
+    disc_im = DP.clip_disc_to_cut(disc_im, mm(DISC_HOLE, dpi))
     W, H = mm(210.0, dpi), mm(297.0, dpi)
     m = mm(10.0, dpi)
     d_px = disc_im.size[0]
@@ -544,14 +547,13 @@ def build_disc_page(disc_im, dpi, artist="", album="", cols=4, rows=6):
 
     page_im = Image.new("RGB", (W, H), "white")
     draw = ImageDraw.Draw(page_im)
-    mask = disc_im.split()[3] if disc_im.mode == "RGBA" else None
     hole_r = mm(DISC_HOLE, dpi) // 2
 
     for r in range(rowsN):
         for c in range(cols):
             x = m + c * (d_px + gap_x)
             y = m + r * (d_px + gap_y)
-            page_im.paste(disc_im, (x, y), mask)
+            page_im.paste(disc_im, (x, y))
             cx, cy = x + d_px // 2, y + d_px // 2
             draw.ellipse([x, y, x + d_px - 1, y + d_px - 1], outline=LINE, width=2)
             rr = hole_r + mm(1.2, dpi)

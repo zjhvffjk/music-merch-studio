@@ -18,6 +18,7 @@ import os
 import re
 import time
 from contextlib import contextmanager
+from functools import lru_cache
 
 import numpy as np
 from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageChops
@@ -1575,6 +1576,59 @@ def _angled_tag(im, xy, text, size, color, align="left", width=None, angle=-3.0)
     else: im.paste(fg, (0, 0), fg)
 
 
+@lru_cache(maxsize=16)
+def _disc_cut_mask(d_px, hole_px):
+    """Anti-aliased physical disc cut: outer Ø40 mm and center Ø5 mm."""
+    scale = 4
+    size = int(d_px) * scale
+    hole = int(hole_px) * scale
+    mask = Image.new("L", (size, size), 0)
+    draw = ImageDraw.Draw(mask)
+    draw.ellipse((0, 0, size - 1, size - 1), fill=255)
+    center = (size - 1) / 2
+    radius = hole / 2
+    draw.ellipse((center - radius, center - radius,
+                  center + radius, center + radius), fill=0)
+    return mask.resize((int(d_px), int(d_px)), Image.Resampling.LANCZOS)
+
+
+def clip_disc_to_cut(image, hole_px):
+    """Keep every layer, including later text/artwork, inside the physical disc."""
+    if image.width != image.height:
+        raise ValueError("disc image must be square")
+    disc = image.convert("RGB")
+    white = Image.new("RGB", disc.size, (255, 255, 255))
+    return Image.composite(disc, white, _disc_cut_mask(disc.width, hole_px))
+
+
+def _clean_generated_disc_edge(image):
+    """Repair only stray cover glyphs that touch the disc trim edge."""
+    source = image.convert("RGB")
+    arr = np.asarray(source)
+    height, width = arr.shape[:2]
+    yy, xx = np.indices((height, width))
+    cx, cy = width / 2, height / 2
+    dx, dy = xx + 0.5 - cx, yy + 0.5 - cy
+    radius = np.hypot(dx, dy)
+    sample_radius = width / 2 - max(2, round(width * 0.04))
+    repair_inner = sample_radius
+    factor = np.minimum(1.0, sample_radius / np.maximum(radius, 1.0))
+    sx = np.clip(np.rint(cx - 0.5 + dx * factor).astype(np.intp), 0, width - 1)
+    sy = np.clip(np.rint(cy - 0.5 + dy * factor).astype(np.intp), 0, height - 1)
+    smooth = np.asarray(source.filter(ImageFilter.GaussianBlur(max(2, width * 0.006))))
+    reference = smooth[sy, sx]
+    current_lum = arr.astype(np.float32).mean(axis=2)
+    reference_lum = reference.astype(np.float32).mean(axis=2)
+    detached_light = (current_lum > 190) & (current_lum - reference_lum > 95)
+    detached_dark = (current_lum < 65) & (reference_lum - current_lum > 130)
+    stray = (radius > repair_inner) & (detached_light | detached_dark)
+    if not np.any(stray):
+        return source
+    alpha = Image.fromarray(np.uint8(stray) * 255, "L")
+    alpha = alpha.filter(ImageFilter.MaxFilter(11)).filter(ImageFilter.GaussianBlur(1.5))
+    return Image.composite(Image.fromarray(reference, "RGB"), source, alpha)
+
+
 def design_disc2(cover, d_px, hole_px, D, album="", artist="", company="", copy_settings=None,
                  base_image=None, elements=None, ink_override=None, text_scale=None, text_font=None,
                  text_style=None):
@@ -1612,11 +1666,8 @@ def _design_disc2_impl(cover, d_px, hole_px, D, album="", artist="", company="",
         big = max(240, int(d_px) * ss)
         fx0 = (0.66 if _copy_preset(copy_settings) == "editorial" else 0.34)
         art = safe_crop(cover, big, big, D, fx=fx0, fy=0.45, zoom=1.75)
-        m = Image.new("L", (big, big), 0)
-        ImageDraw.Draw(m).ellipse([0, 0, big - 1, big - 1], fill=255)
-        art.putalpha(m)
         art = art.resize((int(d_px), int(d_px)), Image.LANCZOS)
-        out.paste(art, (0, 0), art)
+        out.paste(_clean_generated_disc_edge(art), (0, 0))
 
     # 两个盘面模板只固定构图位置；字体则分别读取工作台的标题、中文、英文选择。
     # A / Editorial：花材左、标题右、英文右下（两行以内）。
@@ -1679,7 +1730,7 @@ def _design_disc2_impl(cover, d_px, hole_px, D, album="", artist="", company="",
                       c + hole_px / 2 + ring, c + hole_px / 2 + ring], outline=(105, 100, 94), width=line)
         dout.ellipse([c - hole_px / 2, c - hole_px / 2,
                       c + hole_px / 2, c + hole_px / 2], fill=(255, 255, 255), outline=(105, 100, 94), width=line)
-    return out
+    return clip_disc_to_cut(out, hole_px)
 
 
 def design_inner2(cover, w, h, D, album="", artist="", tracks=None, quote=None,

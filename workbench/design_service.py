@@ -700,6 +700,9 @@ def build_parts(cover, album, artist, D, tracks, company, ai=None, dpi=DPI,
         setattr(build_parts, "last_title_usage", {"assetId": selected_title_asset, "placements": reports})
     else:
         setattr(build_parts, "last_title_usage", {})
+    # Artistic title assets are placed after design_disc2; cut the finished disc
+    # once more so neither those assets nor other overlays can cross its rim.
+    disc = DP.clip_disc_to_cut(disc, hole_d)
     return disc, fold, strip
 
 
