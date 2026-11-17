@@ -192,7 +192,7 @@ async def render_mockups(jid, progress):
             page = await browser.new_page(viewport={'width': 1400, 'height': 1000})
             # A same-origin empty harness avoids starting the interactive app and its background rendering.
             await page.route('**/__mcp-render?*', lambda route: route.fulfill(content_type='text/html', body='<!doctype html><html><body></body></html>'))
-            await page.goto(INTERNAL + '/__mcp-render?' + urlencode({'jid': jid}), wait_until='domcontentloaded', timeout=90000)
+            await page.goto(INTERNAL + '/mini-mockup/__mcp-render?' + urlencode({'jid': jid}), wait_until='domcontentloaded', timeout=90000)
             await page.evaluate('''async () => {
               const model = await import('/mini-mockup/model.js');
               const renderer = await import('/mini-mockup/renderer.js');
