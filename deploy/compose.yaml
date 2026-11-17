@@ -3,14 +3,13 @@ services:
     build:
       context: ..
       dockerfile: deploy/Dockerfile
-    image: music-merch-studio:mcp
+    image: music-merch-studio:web
     container_name: music-merch-studio
     restart: unless-stopped
     init: true
-    env_file: ${STUDIO_SECRETS_FILE:-../../secrets.env}
+    env_file: ${STUDIO_WEB_ENV_FILE:-../../web.env}
     environment:
       STUDIO_PUBLIC_URL: https://music.haoquanwo.cloud
-      STUDIO_INTERNAL_URL: http://127.0.0.1:8765
     volumes:
       - /opt/music-merch-studio/outputs:/app/outputs
       - /opt/music-merch-studio/logs:/app/logs

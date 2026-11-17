@@ -1,4 +1,4 @@
-"""Run the existing private workbench behind the authenticated MCP gateway."""
+"""Run the existing workbench behind its protected web entry."""
 import subprocess
 import sys
 import time
@@ -22,7 +22,7 @@ def main():
         else:
             raise RuntimeError('Workbench startup timed out')
         import uvicorn
-        uvicorn.run('deploy.gateway:app', host='0.0.0.0', port=8080, proxy_headers=True, forwarded_allow_ips='*', access_log=False)
+        uvicorn.run('deploy.web:app', host='0.0.0.0', port=8080, proxy_headers=True, forwarded_allow_ips='*', access_log=False)
     finally:
         backend.terminate()
         try:

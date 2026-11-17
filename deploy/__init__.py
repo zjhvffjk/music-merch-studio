@@ -1,1 +1,1 @@
-"""Independent remote workbench and MCP service."""
+"""Independent web deployment of the existing workbench."""
