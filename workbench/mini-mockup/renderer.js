@@ -1,6 +1,6 @@
 import * as online from './online-reference-v30/renderer.js';
 import {drawWatermark} from './watermark.js';
-import{views,viewScale,widestViewScale,loadImage}from'./model.js';
+import{views,viewScale,widestViewScale,loadImage,REMOVED_DISC_VIEW,removedDiscCase,mapRemovedDiscCase,visibleViewIndices}from'./model.js';
 export const BASE=1254;
 const imgCache=new Map();const textureCache=new Map();let localResolution=1200;
 export function shellThumbnail(view){const shell=imgCache.get(view===8?'shell-flat':`shell-${view}`);return shell?.toDataURL?.('image/png')||shell?.src||null}
@@ -8,7 +8,7 @@ export function shellThumbnail(view){const shell=imgCache.get(view===8?'shell-fl
 export function frontX(x,inverse=false){return x}
 function calibrateFront(canvas){const copy=document.createElement('canvas');copy.width=canvas.width;copy.height=canvas.height;copy.getContext('2d').drawImage(canvas,0,0);const s=canvas.width/BASE,x=canvas.getContext('2d');x.save();x.setTransform(s,0,0,s,0,0);const a=[0,164,277,1090,BASE],b=a.map(v=>frontX(v));for(let i=0;i<4;i++)x.drawImage(copy,a[i]*s,0,(a[i+1]-a[i])*s,canvas.height,b[i],0,b[i+1]-b[i],BASE);x.restore()}
 function repairFrontClip(c){const patch=document.createElement('canvas');patch.width=patch.height=BASE;const p=patch.getContext('2d');p.translate(423+890,0);p.scale(-1,1);p.drawImage(c,0,0);p.setTransform(1,0,0,1,0,0);p.globalCompositeOperation='destination-in';const g=p.createRadialGradient(890,320,28,890,320,72);g.addColorStop(0,'rgba(0,0,0,1)');g.addColorStop(.75,'rgba(0,0,0,1)');g.addColorStop(1,'rgba(0,0,0,0)');p.fillStyle=g;p.fillRect(818,248,144,144);c.getContext('2d').drawImage(patch,0,0)}
-export async function preloadShells(){await online.preloadShells();await Promise.all(views.filter(v=>v.onlineIndex===undefined).map(async(v,i)=>{
+export async function preloadShells(){await online.preloadShells();await Promise.all(views.filter((v,i)=>v.onlineIndex===undefined&&i!==REMOVED_DISC_VIEW).map(async(v,i)=>{
   if(i!==0){const raw=await loadImage(`assets/shell-${i}.webp`);if(i!==1){imgCache.set(`shell-${i}`,raw);return}
     const c=document.createElement('canvas');c.width=raw.width;c.height=raw.height;const x=c.getContext('2d');x.drawImage(raw,0,0);
     // Match the eyelets to the front relative to case height, retaining the photographed rail.
@@ -43,7 +43,15 @@ const onlineId=id=>({sideL:'leftSpine',sideR:'rightSpine',sideLB:'leftSpineInner
 export async function prepareAsset(id,src){await online.prepareAsset(onlineId(id),src);textureCache.delete(id);if(src)imgCache.set(id,await loadImage(src));else imgCache.delete(id)}
 export async function prepareProjectAssets(assets){await online.prepareProjectAssets(Object.fromEntries(Object.entries(assets).map(([id,a])=>[onlineId(id),a])));const entries=await Promise.all(Object.entries(assets).map(async([id,a])=>[id,a.src?await loadImage(a.src):null]));for(const[id,img]of entries){textureCache.delete(id);if(img)imgCache.set(id,img);else imgCache.delete(id)}}
 export function invalidate(id){online.invalidate(onlineId(id));textureCache.delete(id)}
-export function getQuad(state,view,slot){return state.quads[`${view}:${slot.id}`]||slot.q}
+export function getQuad(state,view,slot){
+ const custom=state.quads[`${view}:${slot.id}`];
+ if(custom)return custom;
+ if(view===REMOVED_DISC_VIEW&&slot.id!=='disc'){
+   const installedSlot=views[1].slots.find(s=>s.id===slot.id);
+   return mapRemovedDiscCase(getQuad(state,1,installedSlot));
+ }
+ return slot.q;
+}
 function texture(state,id,plain=false){const a=state.assets[id],img=imgCache.get(id);if(!a?.src||!img)return null;const sz=Math.min(8192,Math.max(1200,Math.min(localResolution,Math.max(img.width,img.height)))),key=JSON.stringify([a,state.lighting,plain,sz]);const cached=textureCache.get(id);if(cached?.key===key)return cached.canvas;
 const c=document.createElement('canvas');const w=id.startsWith('side')?Math.round(sz*4.4/38):['back','tray'].includes(id)?Math.round(sz*49/38):sz;c.width=w;c.height=sz;const x=c.getContext('2d');const factor=(a.fit==='contain'?Math.min(w/img.width,sz/img.height):Math.max(w/img.width,sz/img.height))*a.scale/100;
 x.save();x.translate(w/2+a.x/100*w/2,sz/2+a.y/100*sz/2);x.rotate(a.rotation*Math.PI/180);x.drawImage(img,-img.width*factor/2,-img.height*factor/2,img.width*factor,img.height*factor);x.restore();
@@ -86,20 +94,6 @@ function photoOptics(shell,view){
 function clipQuad(ctx,q){ctx.beginPath();q.forEach((p,i)=>i?ctx.lineTo(p[0]*BASE,p[1]*BASE):ctx.moveTo(p[0]*BASE,p[1]*BASE));ctx.closePath();ctx.clip()}
 const surfaceLayer=document.createElement('canvas');surfaceLayer.width=surfaceLayer.height=BASE;
 const discRelief=document.createElement('canvas');discRelief.width=discRelief.height=BASE;
-const recessCache=new Map();
-function paperRecess(view,id,lighting){
-  const key=[view,id,lighting].join(':');if(recessCache.has(key))return recessCache.get(key);
-  const c=document.createElement('canvas');c.width=c.height=1200;const x=c.getContext('2d');
-  // The case lip casts inward onto the insert. This screen-independent
-  // layer follows the receiving plane, not the uploaded image transform.
-  for(const [x0,y0,x1,y1,depth,alpha]of[[0,0,0,1200,.024,.30],[0,1200,0,0,.018,.24],[0,0,1200,0,.018,.24],[1200,0,0,0,.016,.20]]){
-    const g=x.createLinearGradient(x0,y0,x1,y1);g.addColorStop(0,`rgba(12,18,23,${alpha})`);g.addColorStop(depth,'rgba(12,18,23,0)');g.addColorStop(1,'rgba(12,18,23,0)');x.fillStyle=g;x.fillRect(0,0,1200,1200);
-  }
-  if(lighting&&id!=='back'){
-    const g=x.createLinearGradient(0,0,1200,420);g.addColorStop(0,'rgba(255,255,255,.02)');g.addColorStop(.20,'rgba(255,255,255,.11)');g.addColorStop(.36,'rgba(255,255,255,.025)');g.addColorStop(.62,'rgba(255,255,255,0)');x.fillStyle=g;x.fillRect(0,0,1200,1200);
-  }
-  recessCache.set(key,c);return c;
-}
 function insertSurface(ctx,tx,q,id,sourceX=0){
   // Draw the artwork at the export resolution, not through the preview-sized layer.
   if(id!=='disc'){warp(ctx,tx,q,sourceX);return}
@@ -123,7 +117,7 @@ function exposedPaperHardware(ctx,state,view,slot,shell){
   const q=getQuad(state,view,slot);
   // The reverse of the cover faces the open case directly. Only retaining
   // hardware and the rim sit in front of it; the broad lid lies behind it.
-  warp(ctx,paperRecess(view,'inside',false),q);
+  warp(ctx,online.paperRecess(view,'inside',false),q);
   if(view===1||view===8){online.drawInsideRetainersOnQuad(ctx,q);return}
   const mask=projectedInsideMask.getContext('2d');mask.clearRect(0,0,BASE,BASE);warp(mask,insideHardwareMask(view),q);
   const x=insideRelief.getContext('2d');x.globalCompositeOperation='source-over';x.clearRect(0,0,BASE,BASE);x.drawImage(photoOptics(shell,view),0,0);
@@ -132,10 +126,10 @@ function exposedPaperHardware(ctx,state,view,slot,shell){
 function overlayPlastic(ctx,state,view,slot,shell){
   const q=getQuad(state,view,slot);ctx.save();clipQuad(ctx,q);
   if(slot.id==='inside'){exposedPaperHardware(ctx,state,view,slot,shell);ctx.restore();return}
-  if(view>=3)warp(ctx,paperRecess(view,slot.id,state.lighting),q);
+  if(view>=3)warp(ctx,online.paperRecess(view,slot.id,state.lighting),q);
   else if(view===0&&slot.id==='front'){
     // The cover is held beneath the rim, so its contact shadow falls inward.
-    ctx.save();ctx.globalAlpha=.42;warp(ctx,paperRecess(view,slot.id,false),q);ctx.restore();
+    ctx.save();ctx.globalAlpha=.42;warp(ctx,online.paperRecess(view,slot.id,false),q);ctx.restore();
   }
   if(slot.id.startsWith('side')||(slot.id==='front'&&view===4)||slot.id==='tray'){
     ctx.drawImage(photoOptics(shell,view),0,0);
@@ -174,29 +168,50 @@ function frontRetainers(shell){
   x.globalCompositeOperation='destination-in';x.filter='blur(1.2px)';x.drawImage(mask,0,0);x.filter='none';
   frontGlass=c;return c;
 }
+function drawDisc(ctx,state,quad){
+ warp(ctx,online.clearDisc(1200),quad);
+ const label=state.showDesign?texture(state,'disc',true):null;
+ if(label)warp(ctx,label,quad);
+ warp(ctx,online.clearDisc(1200,true),quad);
+}
 export function render(canvas,state,view=state.view,size=1254){
   localResolution=size;
   if(view===0||(views[view].onlineIndex!==undefined&&view!==8)){const onlineView=view===0?0:views[view].onlineIndex,assets=Object.fromEntries(Object.entries(state.assets).map(([id,a])=>[onlineId(id),a])),quads={};for(const slot of views[view].slots){const q=state.quads[`${view}:${slot.id}`];if(q)quads[`${onlineView}:${onlineId(slot.id)}`]=q}return online.render(canvas,{...state,assets,quads},onlineView,size)}
   if(canvas.width!==size||canvas.height!==size)canvas.width=canvas.height=size;
   const ctx=canvas.getContext('2d');ctx.setTransform(size/BASE,0,0,size/BASE,0,0);ctx.globalCompositeOperation='source-over';ctx.fillStyle=state.background;ctx.fillRect(0,0,BASE,BASE);
-  const shell=imgCache.get(view===8?'shell-flat':`shell-${view}`);if(!shell)return;
-  if(view===1||view===8){
+  const removed=view===REMOVED_DISC_VIEW,caseView=removed?1:view;
+  const shell=imgCache.get(caseView===8?'shell-flat':`shell-${caseView}`);if(!shell)return;
+  if(caseView===1||caseView===8){
+    let caseState=state;
+    if(removed){
+      const {scale,x,y}=removedDiscCase;
+      ctx.save();ctx.translate(x*BASE,y*BASE);ctx.scale(scale,scale);
+      const quads={...state.quads};
+      for(const slot of views[view].slots){
+        const custom=quads[`${view}:${slot.id}`];
+        if(slot.id!=='disc'&&custom)quads[`1:${slot.id}`]=mapRemovedDiscCase(custom,true);
+      }
+      caseState={...state,quads};
+    }
     ctx.save();ctx.globalCompositeOperation='multiply';ctx.drawImage(shell,0,0,BASE,BASE);ctx.restore();
     if(state.showDesign){
       // The tray insert is one continuous sheet beneath the clear hinge.
-      for(const slot of views[view].slots.filter(s=>s.id!=='disc')){
+      for(const slot of views[caseView].slots.filter(s=>s.id!=='disc')){
         const tx=texture(state,slot.id);if(!tx)continue;
-        insertSurface(ctx,tx,getQuad(state,view,slot),slot.id);
-        if(view===1||slot.id==='inside')overlayPlastic(ctx,state,view,slot,shell);
+        insertSurface(ctx,tx,getQuad(caseState,caseView,slot),slot.id);
+        if(caseView===1||slot.id==='inside')overlayPlastic(ctx,caseState,caseView,slot,shell);
       }
     }
     if(view===1&&state.discVisible){
       const hub=[.724,.532,.067,.064,0];
       ctx.save();ctx.beginPath();ctx.ellipse(hub[0]*BASE,hub[1]*BASE,hub[2]*BASE,hub[3]*BASE,hub[4],0,Math.PI*2);ctx.clip();ctx.drawImage(photoOptics(shell,1),0,0);ctx.restore();
       const slot=views[1].slots.find(s=>s.id==='disc'),q=getQuad(state,1,slot);
-      warp(ctx,online.clearDisc(1200),q);
-      const label=state.showDesign?texture(state,'disc',true):null;if(label)warp(ctx,label,q);
-      warp(ctx,online.clearDisc(1200,true),q);
+      drawDisc(ctx,state,q);
+    }
+    if(removed){
+      ctx.restore();
+      const slot=views[view].slots.find(s=>s.id==='disc');
+      drawDisc(ctx,state,getQuad(state,view,slot));
     }
     ctx.setTransform(1,0,0,1,0,0);return;
   }
@@ -239,7 +254,7 @@ export function render(canvas,state,view=state.view,size=1254){
   ctx.setTransform(1,0,0,1,0,0);
   if(view===0)calibrateFront(canvas);
 }
-export async function exportPNG(state,size,mode){const c=document.createElement('canvas');if(mode==='current')render(c,state,state.view,size);else if(mode==='individual'){const cell=document.createElement('canvas'),side=size*viewScale(state.view)*Math.min(1,.90/widestViewScale());c.width=c.height=size;const x=c.getContext('2d');x.fillStyle=state.background;x.fillRect(0,0,size,size);render(cell,state,state.view,Math.ceil(side));x.drawImage(cell,(size-side)/2,(size-side)/2,side,side);cell.width=cell.height=0}else{const cell=document.createElement('canvas'),indices=views.map((v,i)=>v.hidden?-1:i).filter(i=>i>=0),cellSize=size/4;c.width=size;c.height=Math.ceil(indices.length/4)*cellSize;const x=c.getContext('2d');x.fillStyle=state.background;x.fillRect(0,0,c.width,c.height);const common=Math.min(1,.90/widestViewScale());indices.forEach((view,i)=>{render(cell,state,view,Math.ceil(cellSize*viewScale(view)*common));const px=(i%4)*cellSize,py=Math.floor(i/4)*cellSize,side=cellSize*viewScale(view)*common;x.save();x.beginPath();x.rect(px,py,cellSize,cellSize*.91);x.clip();x.drawImage(cell,px+(cellSize-side)/2,py+(cellSize*.91-side)/2,side,side);x.restore();x.fillStyle='#55534e';x.font=`${Math.round(cellSize*.025)}px sans-serif`;x.textAlign='center';x.fillText(views[view].name,px+cellSize/2,py+cellSize*.96)})}
+export async function exportPNG(state,size,mode){const c=document.createElement('canvas');if(mode==='current')render(c,state,state.view,size);else if(mode==='individual'){const cell=document.createElement('canvas'),side=size*viewScale(state.view)*Math.min(1,.90/widestViewScale(state.view));c.width=c.height=size;const x=c.getContext('2d');x.fillStyle=state.background;x.fillRect(0,0,size,size);render(cell,state,state.view,Math.ceil(side));x.drawImage(cell,(size-side)/2,(size-side)/2,side,side);cell.width=cell.height=0}else{const cell=document.createElement('canvas'),indices=visibleViewIndices,columns=3,cellSize=size/columns;c.width=c.height=size;const x=c.getContext('2d');x.fillStyle=state.background;x.fillRect(0,0,c.width,c.height);const common=Math.min(1,.90/widestViewScale());indices.forEach((view,i)=>{render(cell,state,view,Math.ceil(cellSize*viewScale(view)*common));const px=(i%columns)*cellSize,py=Math.floor(i/columns)*cellSize,side=cellSize*viewScale(view)*common;x.save();x.beginPath();x.rect(px,py,cellSize,cellSize*.91);x.clip();x.drawImage(cell,px+(cellSize-side)/2,py+(cellSize*.91-side)/2,side,side);x.restore();x.fillStyle='#55534e';x.font=`${Math.round(cellSize*.025)}px sans-serif`;x.textAlign='center';x.fillText(views[view].name,px+cellSize/2,py+cellSize*.96)})}
 drawWatermark(c,state.watermark);
 return new Promise((resolve,reject)=>c.toBlob(b=>{c.width=c.height=0;b?resolve(b):reject(Error('导出失败，请尝试较小分辨率'))},'image/png'))}
 export async function exportThreeViewPreview(state,size=8192){
@@ -265,4 +280,65 @@ export async function exportThreeViewPreview(state,size=8192){
  cell.width=cell.height=0;
  drawWatermark(c,state.watermark);
  return new Promise((resolve,reject)=>c.toBlob(b=>{c.width=c.height=0;b?resolve(b):reject(Error('三视图预览导出失败'))},'image/png'));
+}
+
+function drawBallChain(ctx,image,cx,cy,height){
+ const width=height*image.naturalWidth/image.naturalHeight;
+ ctx.save();
+ ctx.shadowColor='rgba(24,28,32,.19)';
+ ctx.shadowBlur=height*.017;
+ ctx.shadowOffsetY=height*.009;
+ ctx.translate(cx,cy);
+ ctx.rotate(-Math.PI*50/180);
+ ctx.drawImage(image,-width/2,-height/2,width,height);
+ ctx.restore();
+}
+
+export async function exportAccessoryOverview(state,size=8192){
+ const chain=imgCache.get('accessory-chain')||await loadImage('assets/silver-ball-chain.png');
+ imgCache.set('accessory-chain',chain);
+ const canvas=document.createElement('canvas');canvas.width=canvas.height=size;
+ const ctx=canvas.getContext('2d');
+ ctx.fillStyle=state.background;ctx.fillRect(0,0,size,size);
+ ctx.imageSmoothingQuality='high';
+ const cell=document.createElement('canvas');
+ // Match the measured shell width in the two source photos and align their left rails.
+ const scale=1.055;
+ const horizontal=value=>.5+(value-.5)*scale;
+ const vertical=value=>.5+(value-.51)*scale;
+ const lower={side:.98*scale,x:horizontal(.01),y:vertical(.203)};
+ const upperSide=.98*.607/.792;
+ const upper={
+   side:upperSide*scale,
+   x:lower.x+lower.side*.066-upperSide*scale*.103,
+   y:vertical(.137-upperSide*.306)
+ };
+ const rows=[
+   {view:9,layout:upper,top:.22,bottom:.76},
+   {view:REMOVED_DISC_VIEW,layout:lower,top:.28,bottom:.73}
+ ];
+ for(const {view,layout,top,bottom} of rows){
+   const side=Math.round(size*layout.side),sourceSide=Math.min(size,side);
+   const start=Math.floor(top*sourceSide),end=Math.ceil(bottom*sourceSide);
+   const ratio=side/sourceSide;
+   render(cell,state,view,sourceSide);
+   ctx.drawImage(cell,0,start,sourceSide,end-start,size*layout.x,size*layout.y+start*ratio,side,(end-start)*ratio);
+   cell.width=cell.height=0;
+ }
+ const disc=views[REMOVED_DISC_VIEW].slots.find(slot=>slot.id==='disc');
+ const chainX=lower.x+lower.side*(disc.q[0][0]+disc.q[1][0])/2;
+ drawBallChain(ctx,chain,chainX*size,vertical(.284)*size,.215*scale*size);
+ const caseX=lower.x+lower.side*(.066+.673)/2;
+ ctx.fillStyle='#55534e';
+ ctx.font=`${Math.round(size*.020*scale)}px sans-serif`;
+ ctx.textAlign='center';ctx.textBaseline='middle';
+ ctx.fillText(views[9].name,caseX*size,vertical(.457)*size);
+ ctx.fillText('银色珠链',chainX*size,vertical(.457)*size);
+ ctx.fillText(views[REMOVED_DISC_VIEW].name,caseX*size,vertical(.888)*size);
+ ctx.fillText('光盘',chainX*size,vertical(.888)*size);
+ drawWatermark(canvas,state.watermark);
+ return new Promise((resolve,reject)=>canvas.toBlob(blob=>{
+   canvas.width=canvas.height=0;
+   blob?resolve(blob):reject(Error('内外展开组合图导出失败'));
+ },'image/png'));
 }

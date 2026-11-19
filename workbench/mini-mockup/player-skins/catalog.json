@@ -1,0 +1,2722 @@
+{
+  "source": "网易云音乐 App「装扮中心 → 播放器样式」官方 CDN 原图，用户 iOS Stream 抓包 4 批累计 177 个 URL，去 thumbnail 参数取原图、视觉去重后 117 款。",
+  "source_type": "netease_official_cdn_capture",
+  "captured_at": "2026-11-05",
+  "url_count": 177,
+  "unique_count": 117,
+  "api_note": "图片为网易云官方真实资源，非截图裁切。仅 4 款名称（经典黑胶/全屏封面/唱片封面/心动乐评）来自用户装扮中心截图可辨认的官方文案；其余名称按画面主色标注、分类按主色自动归并，均非装扮中心接口返回的官方文案。VIP/SVIP/NEW 权益角标未从抓包获取（抓到的只有图片 CDN 请求与一个 Lottie 动效包，无列表接口 JSON），未编造权益信息。",
+  "effect_pack": "parts/music_jar.zip（Lottie 动效装扮，data.json + 113 帧分层 PNG，非播放器样式列表）",
+  "panels": [
+    "头像挂件",
+    "皮肤",
+    "播放器样式",
+    "个人主页",
+    "个性装扮"
+  ],
+  "active_panel": "播放器样式",
+  "categories": [
+    "推荐",
+    "经典",
+    "复古",
+    "创意",
+    "限定",
+    "乐迷系列",
+    "艺术家",
+    "音波",
+    "氛围系列",
+    "数字专辑",
+    "好运系列",
+    "星座"
+  ],
+  "skins": [
+    {
+      "id": "nc_001",
+      "name": "靛蓝 · 装扮 001",
+      "category": "音波",
+      "right": "官方装扮",
+      "preview": "real/nc_001.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s001",
+      "source_size": [
+        1124,
+        2001
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "pixel"
+    },
+    {
+      "id": "nc_002",
+      "name": "金黄 · 装扮 002",
+      "category": "复古",
+      "right": "官方装扮",
+      "preview": "real/nc_002.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s002",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "coast"
+    },
+    {
+      "id": "nc_003",
+      "name": "墨黑 · 装扮 003",
+      "category": "经典",
+      "right": "官方装扮",
+      "preview": "real/nc_003.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s003",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "cover"
+    },
+    {
+      "id": "nc_004",
+      "name": "玫粉 · 装扮 004",
+      "category": "限定",
+      "right": "官方装扮",
+      "preview": "real/nc_004.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s004",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "crystal"
+    },
+    {
+      "id": "nc_005",
+      "name": "墨黑 · 装扮 005",
+      "category": "经典",
+      "right": "官方装扮",
+      "preview": "real/nc_005.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s005",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "cover"
+    },
+    {
+      "id": "nc_006",
+      "name": "玫粉 · 装扮 006",
+      "category": "限定",
+      "right": "官方装扮",
+      "preview": "real/nc_006.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s007",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "glow"
+    },
+    {
+      "id": "nc_007",
+      "name": "靛蓝 · 装扮 007",
+      "category": "音波",
+      "right": "官方装扮",
+      "preview": "real/nc_007.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s008",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "glow"
+    },
+    {
+      "id": "nc_008",
+      "name": "靛蓝 · 装扮 008",
+      "category": "音波",
+      "right": "官方装扮",
+      "preview": "real/nc_008.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s009",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "moon"
+    },
+    {
+      "id": "nc_009",
+      "name": "绯红 · 装扮 009",
+      "category": "好运系列",
+      "right": "官方装扮",
+      "preview": "real/nc_009.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s010",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "glow"
+    },
+    {
+      "id": "nc_010",
+      "name": "素白 · 装扮 010",
+      "category": "创意",
+      "right": "官方装扮",
+      "preview": "real/nc_010.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s012",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "crystal"
+    },
+    {
+      "id": "nc_011",
+      "name": "紫罗兰 · 装扮 011",
+      "category": "氛围系列",
+      "right": "官方装扮",
+      "preview": "real/nc_011.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s013",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "halo"
+    },
+    {
+      "id": "nc_012",
+      "name": "绯红 · 装扮 012",
+      "category": "好运系列",
+      "right": "官方装扮",
+      "preview": "real/nc_012.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s014",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "cabinet"
+    },
+    {
+      "id": "nc_013",
+      "name": "灰调 · 装扮 013",
+      "category": "经典",
+      "right": "官方装扮",
+      "preview": "real/nc_013.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s015",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "flora"
+    },
+    {
+      "id": "nc_014",
+      "name": "墨黑 · 装扮 014",
+      "category": "经典",
+      "right": "官方装扮",
+      "preview": "real/nc_014.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s016",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "cover"
+    },
+    {
+      "id": "nc_015",
+      "name": "灰调 · 装扮 015",
+      "category": "经典",
+      "right": "官方装扮",
+      "preview": "real/nc_015.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s018",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "moon"
+    },
+    {
+      "id": "nc_016",
+      "name": "墨黑 · 装扮 016",
+      "category": "经典",
+      "right": "官方装扮",
+      "preview": "real/nc_016.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s019",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "cover"
+    },
+    {
+      "id": "nc_017",
+      "name": "玫粉 · 装扮 017",
+      "category": "限定",
+      "right": "官方装扮",
+      "preview": "real/nc_017.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s021",
+      "source_size": [
+        1125,
+        2001
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "crystal"
+    },
+    {
+      "id": "nc_018",
+      "name": "青绿 · 装扮 018",
+      "category": "艺术家",
+      "right": "官方装扮",
+      "preview": "real/nc_018.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s023",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "collage"
+    },
+    {
+      "id": "nc_019",
+      "name": "素白 · 装扮 019",
+      "category": "创意",
+      "right": "官方装扮",
+      "preview": "real/nc_019.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s025",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "crystal"
+    },
+    {
+      "id": "nc_020",
+      "name": "紫罗兰 · 装扮 020",
+      "category": "氛围系列",
+      "right": "官方装扮",
+      "preview": "real/nc_020.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s026",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "glow"
+    },
+    {
+      "id": "nc_021",
+      "name": "紫罗兰 · 装扮 021",
+      "category": "氛围系列",
+      "right": "官方装扮",
+      "preview": "real/nc_021.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s028",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "glow"
+    },
+    {
+      "id": "nc_022",
+      "name": "素白 · 装扮 022",
+      "category": "创意",
+      "right": "官方装扮",
+      "preview": "real/nc_022.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s029",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "tape"
+    },
+    {
+      "id": "nc_023",
+      "name": "素白 · 装扮 023",
+      "category": "创意",
+      "right": "官方装扮",
+      "preview": "real/nc_023.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s030",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "tape"
+    },
+    {
+      "id": "nc_024",
+      "name": "靛蓝 · 装扮 024",
+      "category": "音波",
+      "right": "官方装扮",
+      "preview": "real/nc_024.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s033",
+      "source_size": [
+        1330,
+        2880
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "glow"
+    },
+    {
+      "id": "nc_025",
+      "name": "紫罗兰 · 装扮 025",
+      "category": "氛围系列",
+      "right": "官方装扮",
+      "preview": "real/nc_025.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s035",
+      "source_size": [
+        1065,
+        2304
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "glow"
+    },
+    {
+      "id": "nc_026",
+      "name": "灰调 · 装扮 026",
+      "category": "经典",
+      "right": "官方装扮",
+      "preview": "real/nc_026.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s038",
+      "source_size": [
+        1331,
+        2880
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "record"
+    },
+    {
+      "id": "nc_027",
+      "name": "灰调 · 装扮 027",
+      "category": "经典",
+      "right": "官方装扮",
+      "preview": "real/nc_027.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s040",
+      "source_size": [
+        1065,
+        2304
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "record"
+    },
+    {
+      "id": "nc_028",
+      "name": "墨黑 · 装扮 028",
+      "category": "经典",
+      "right": "官方装扮",
+      "preview": "real/nc_028.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s041",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "stage"
+    },
+    {
+      "id": "nc_029",
+      "name": "墨黑 · 装扮 029",
+      "category": "经典",
+      "right": "官方装扮",
+      "preview": "real/nc_029.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s042",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "stage"
+    },
+    {
+      "id": "nc_030",
+      "name": "靛蓝 · 装扮 030",
+      "category": "音波",
+      "right": "官方装扮",
+      "preview": "real/nc_030.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s043",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "stage"
+    },
+    {
+      "id": "nc_031",
+      "name": "墨黑 · 装扮 031",
+      "category": "经典",
+      "right": "官方装扮",
+      "preview": "real/nc_031.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s044",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "stage"
+    },
+    {
+      "id": "nc_032",
+      "name": "墨黑 · 装扮 032",
+      "category": "经典",
+      "right": "官方装扮",
+      "preview": "real/nc_032.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s045",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "stage"
+    },
+    {
+      "id": "nc_033",
+      "name": "绯红 · 装扮 033",
+      "category": "好运系列",
+      "right": "官方装扮",
+      "preview": "real/nc_033.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s046",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "stage"
+    },
+    {
+      "id": "nc_034",
+      "name": "墨黑 · 装扮 034",
+      "category": "经典",
+      "right": "官方装扮",
+      "preview": "real/nc_034.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s047",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "stage"
+    },
+    {
+      "id": "nc_035",
+      "name": "暖橙 · 装扮 035",
+      "category": "复古",
+      "right": "官方装扮",
+      "preview": "real/nc_035.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s048",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "stage"
+    },
+    {
+      "id": "nc_036",
+      "name": "暖橙 · 装扮 036",
+      "category": "复古",
+      "right": "官方装扮",
+      "preview": "real/nc_036.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s049",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "stage"
+    },
+    {
+      "id": "nc_037",
+      "name": "靛蓝 · 装扮 037",
+      "category": "音波",
+      "right": "官方装扮",
+      "preview": "real/nc_037.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s050",
+      "source_size": [
+        1125,
+        1999
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "ornate"
+    },
+    {
+      "id": "nc_038",
+      "name": "金黄 · 装扮 038",
+      "category": "复古",
+      "right": "官方装扮",
+      "preview": "real/nc_038.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s051",
+      "source_size": [
+        1125,
+        1999
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "ornate"
+    },
+    {
+      "id": "nc_039",
+      "name": "绯红 · 装扮 039",
+      "category": "好运系列",
+      "right": "官方装扮",
+      "preview": "real/nc_039.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s052",
+      "source_size": [
+        1125,
+        1999
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "ornate"
+    },
+    {
+      "id": "nc_040",
+      "name": "暖橙 · 装扮 040",
+      "category": "复古",
+      "right": "官方装扮",
+      "preview": "real/nc_040.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s053",
+      "source_size": [
+        1125,
+        1999
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "ornate"
+    },
+    {
+      "id": "nc_041",
+      "name": "靛蓝 · 装扮 041",
+      "category": "音波",
+      "right": "官方装扮",
+      "preview": "real/nc_041.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s054",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "cabinet"
+    },
+    {
+      "id": "nc_042",
+      "name": "绯红 · 装扮 042",
+      "category": "好运系列",
+      "right": "官方装扮",
+      "preview": "real/nc_042.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s055",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "cabinet"
+    },
+    {
+      "id": "nc_043",
+      "name": "靛蓝 · 装扮 043",
+      "category": "音波",
+      "right": "官方装扮",
+      "preview": "real/nc_043.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s056",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "cabinet"
+    },
+    {
+      "id": "nc_044",
+      "name": "素白 · 装扮 044",
+      "category": "创意",
+      "right": "官方装扮",
+      "preview": "real/nc_044.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s057",
+      "source_size": [
+        1125,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "crystal"
+    },
+    {
+      "id": "nc_045",
+      "name": "灰调 · 装扮 045",
+      "category": "经典",
+      "right": "官方装扮",
+      "preview": "real/nc_045.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s058",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "cabinet"
+    },
+    {
+      "id": "nc_046",
+      "name": "紫罗兰 · 装扮 046",
+      "category": "氛围系列",
+      "right": "官方装扮",
+      "preview": "real/nc_046.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s059",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "cabinet"
+    },
+    {
+      "id": "nc_047",
+      "name": "靛蓝 · 装扮 047",
+      "category": "音波",
+      "right": "官方装扮",
+      "preview": "real/nc_047.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s060",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "landscape"
+    },
+    {
+      "id": "nc_048",
+      "name": "靛蓝 · 装扮 048",
+      "category": "音波",
+      "right": "官方装扮",
+      "preview": "real/nc_048.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s061",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "landscape"
+    },
+    {
+      "id": "nc_049",
+      "name": "靛蓝 · 装扮 049",
+      "category": "音波",
+      "right": "官方装扮",
+      "preview": "real/nc_049.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s062",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "landscape"
+    },
+    {
+      "id": "nc_050",
+      "name": "绯红 · 装扮 050",
+      "category": "好运系列",
+      "right": "官方装扮",
+      "preview": "real/nc_050.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s063",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "stage"
+    },
+    {
+      "id": "nc_051",
+      "name": "绯红 · 装扮 051",
+      "category": "好运系列",
+      "right": "官方装扮",
+      "preview": "real/nc_051.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s064",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "landscape"
+    },
+    {
+      "id": "nc_052",
+      "name": "暖橙 · 装扮 052",
+      "category": "复古",
+      "right": "官方装扮",
+      "preview": "real/nc_052.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s065",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "landscape"
+    },
+    {
+      "id": "nc_053",
+      "name": "绯红 · 装扮 053",
+      "category": "好运系列",
+      "right": "官方装扮",
+      "preview": "real/nc_053.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s066",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "landscape"
+    },
+    {
+      "id": "nc_054",
+      "name": "靛蓝 · 装扮 054",
+      "category": "音波",
+      "right": "官方装扮",
+      "preview": "real/nc_054.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s067",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "landscape"
+    },
+    {
+      "id": "nc_055",
+      "name": "靛蓝 · 装扮 055",
+      "category": "音波",
+      "right": "官方装扮",
+      "preview": "real/nc_055.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s068",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "landscape"
+    },
+    {
+      "id": "nc_056",
+      "name": "暖橙 · 装扮 056",
+      "category": "复古",
+      "right": "官方装扮",
+      "preview": "real/nc_056.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s069",
+      "source_size": [
+        1125,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "landscape"
+    },
+    {
+      "id": "nc_057",
+      "name": "靛蓝 · 装扮 057",
+      "category": "音波",
+      "right": "官方装扮",
+      "preview": "real/nc_057.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s070",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "illustrated"
+    },
+    {
+      "id": "nc_058",
+      "name": "靛蓝 · 装扮 058",
+      "category": "音波",
+      "right": "官方装扮",
+      "preview": "real/nc_058.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s071",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "glow"
+    },
+    {
+      "id": "nc_059",
+      "name": "紫罗兰 · 装扮 059",
+      "category": "氛围系列",
+      "right": "官方装扮",
+      "preview": "real/nc_059.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s072",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "glow"
+    },
+    {
+      "id": "nc_060",
+      "name": "紫罗兰 · 装扮 060",
+      "category": "氛围系列",
+      "right": "官方装扮",
+      "preview": "real/nc_060.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s073",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "glow"
+    },
+    {
+      "id": "nc_061",
+      "name": "玫粉 · 装扮 061",
+      "category": "限定",
+      "right": "官方装扮",
+      "preview": "real/nc_061.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s074",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "glow"
+    },
+    {
+      "id": "nc_062",
+      "name": "靛蓝 · 装扮 062",
+      "category": "音波",
+      "right": "官方装扮",
+      "preview": "real/nc_062.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s075",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "glow"
+    },
+    {
+      "id": "nc_063",
+      "name": "青绿 · 装扮 063",
+      "category": "艺术家",
+      "right": "官方装扮",
+      "preview": "real/nc_063.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s076",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "glow"
+    },
+    {
+      "id": "nc_064",
+      "name": "紫罗兰 · 装扮 064",
+      "category": "氛围系列",
+      "right": "官方装扮",
+      "preview": "real/nc_064.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s077",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "glow"
+    },
+    {
+      "id": "nc_065",
+      "name": "青绿 · 装扮 065",
+      "category": "艺术家",
+      "right": "官方装扮",
+      "preview": "real/nc_065.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s078",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "moon"
+    },
+    {
+      "id": "nc_066",
+      "name": "靛蓝 · 装扮 066",
+      "category": "音波",
+      "right": "官方装扮",
+      "preview": "real/nc_066.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s079",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "moon"
+    },
+    {
+      "id": "nc_067",
+      "name": "紫罗兰 · 装扮 067",
+      "category": "氛围系列",
+      "right": "官方装扮",
+      "preview": "real/nc_067.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s080",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "glow"
+    },
+    {
+      "id": "nc_068",
+      "name": "紫罗兰 · 装扮 068",
+      "category": "氛围系列",
+      "right": "官方装扮",
+      "preview": "real/nc_068.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s081",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "cabinet"
+    },
+    {
+      "id": "nc_069",
+      "name": "墨黑 · 装扮 069",
+      "category": "经典",
+      "right": "官方装扮",
+      "preview": "real/nc_069.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s082",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "record"
+    },
+    {
+      "id": "nc_070",
+      "name": "青绿 · 装扮 070",
+      "category": "艺术家",
+      "right": "官方装扮",
+      "preview": "real/nc_070.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s083",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "flora"
+    },
+    {
+      "id": "nc_071",
+      "name": "暖橙 · 装扮 071",
+      "category": "复古",
+      "right": "官方装扮",
+      "preview": "real/nc_071.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s084",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "ornate"
+    },
+    {
+      "id": "nc_072",
+      "name": "绯红 · 装扮 072",
+      "category": "好运系列",
+      "right": "官方装扮",
+      "preview": "real/nc_072.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s085",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "stage"
+    },
+    {
+      "id": "nc_073",
+      "name": "靛蓝 · 装扮 073",
+      "category": "音波",
+      "right": "官方装扮",
+      "preview": "real/nc_073.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s086",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "moon"
+    },
+    {
+      "id": "nc_074",
+      "name": "靛蓝 · 装扮 074",
+      "category": "音波",
+      "right": "官方装扮",
+      "preview": "real/nc_074.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s087",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "glow"
+    },
+    {
+      "id": "nc_075",
+      "name": "靛蓝 · 装扮 075",
+      "category": "音波",
+      "right": "官方装扮",
+      "preview": "real/nc_075.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s088",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "glow"
+    },
+    {
+      "id": "nc_076",
+      "name": "金黄 · 装扮 076",
+      "category": "复古",
+      "right": "官方装扮",
+      "preview": "real/nc_076.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s089",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "coast"
+    },
+    {
+      "id": "nc_077",
+      "name": "靛蓝 · 装扮 077",
+      "category": "音波",
+      "right": "官方装扮",
+      "preview": "real/nc_077.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s091",
+      "source_size": [
+        1125,
+        2001
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "glow"
+    },
+    {
+      "id": "nc_078",
+      "name": "绯红 · 装扮 078",
+      "category": "好运系列",
+      "right": "官方装扮",
+      "preview": "real/nc_078.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s092",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "stage"
+    },
+    {
+      "id": "nc_079",
+      "name": "玫粉 · 装扮 079",
+      "category": "限定",
+      "right": "官方装扮",
+      "preview": "real/nc_079.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s093",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "landscape"
+    },
+    {
+      "id": "nc_080",
+      "name": "暖橙 · 装扮 080",
+      "category": "复古",
+      "right": "官方装扮",
+      "preview": "real/nc_080.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s094",
+      "source_size": [
+        1125,
+        2001
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "pixel"
+    },
+    {
+      "id": "nc_081",
+      "name": "暖橙 · 装扮 081",
+      "category": "复古",
+      "right": "官方装扮",
+      "preview": "real/nc_081.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s095",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "crystal"
+    },
+    {
+      "id": "nc_082",
+      "name": "青绿 · 装扮 082",
+      "category": "艺术家",
+      "right": "官方装扮",
+      "preview": "real/nc_082.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s096",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "collage"
+    },
+    {
+      "id": "nc_083",
+      "name": "玫粉 · 装扮 083",
+      "category": "限定",
+      "right": "官方装扮",
+      "preview": "real/nc_083.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s097",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "crystal"
+    },
+    {
+      "id": "nc_084",
+      "name": "紫罗兰 · 装扮 084",
+      "category": "氛围系列",
+      "right": "官方装扮",
+      "preview": "real/nc_084.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s098",
+      "source_size": [
+        1124,
+        2004
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "cabinet"
+    },
+    {
+      "id": "nc_085",
+      "name": "紫罗兰 · 装扮 085",
+      "category": "氛围系列",
+      "right": "官方装扮",
+      "preview": "real/nc_085.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s099",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "glow"
+    },
+    {
+      "id": "nc_086",
+      "name": "全屏封面",
+      "category": "经典",
+      "right": "官方装扮",
+      "preview": "real/nc_086.jpg",
+      "name_pending": false,
+      "name_source": "官方截图可辨",
+      "layer": "full",
+      "source_id": "s101",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "经典",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "outputTheme": "moon"
+    },
+    {
+      "id": "nc_087",
+      "name": "心动乐评",
+      "category": "经典",
+      "right": "官方装扮",
+      "preview": "real/nc_087.jpg",
+      "name_pending": false,
+      "name_source": "官方截图可辨",
+      "layer": "full",
+      "source_id": "s102",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "经典",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "outputTheme": "cover"
+    },
+    {
+      "id": "nc_088",
+      "name": "靛蓝 · 装扮 088",
+      "category": "音波",
+      "right": "官方装扮",
+      "preview": "real/nc_088.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s103",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "record"
+    },
+    {
+      "id": "nc_089",
+      "name": "唱片封面",
+      "category": "经典",
+      "right": "官方装扮",
+      "preview": "real/nc_089.jpg",
+      "name_pending": false,
+      "name_source": "官方截图可辨，当前『使用中』",
+      "layer": "full",
+      "source_id": "s104",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "经典",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "outputTheme": "cover"
+    },
+    {
+      "id": "nc_090",
+      "name": "绯红 · 装扮 090",
+      "category": "好运系列",
+      "right": "官方装扮",
+      "preview": "real/nc_090.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s105",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "cabinet"
+    },
+    {
+      "id": "nc_091",
+      "name": "素白 · iPod 随身听",
+      "category": "复古",
+      "right": "官方装扮",
+      "preview": "real/nc_091.jpg",
+      "name_pending": false,
+      "name_source": "按画面标注（截图底部名称被裁切，未获取官方文案）",
+      "layer": "full",
+      "source_id": "s106",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "复古",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "outputTheme": "pixel"
+    },
+    {
+      "id": "nc_092",
+      "name": "金黄 · 装扮 092",
+      "category": "复古",
+      "right": "官方装扮",
+      "preview": "real/nc_092.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s107",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "tape"
+    },
+    {
+      "id": "nc_093",
+      "name": "经典黑胶",
+      "category": "经典",
+      "right": "官方装扮",
+      "preview": "real/nc_093.jpg",
+      "name_pending": false,
+      "name_source": "官方截图可辨，含『可自定义』角标",
+      "layer": "full",
+      "source_id": "s108",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "经典",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "outputTheme": "record"
+    },
+    {
+      "id": "nc_094",
+      "name": "靛蓝 · 装扮 094",
+      "category": "音波",
+      "right": "官方装扮",
+      "preview": "real/nc_094.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s109",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "crystal"
+    },
+    {
+      "id": "nc_095",
+      "name": "暖橙 · 装扮 095",
+      "category": "复古",
+      "right": "官方装扮",
+      "preview": "real/nc_095.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s110",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "record"
+    },
+    {
+      "id": "nc_096",
+      "name": "素白 · 装扮 096",
+      "category": "创意",
+      "right": "官方装扮",
+      "preview": "real/nc_096.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s111",
+      "source_size": [
+        1125,
+        1999
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "ornate"
+    },
+    {
+      "id": "nc_097",
+      "name": "靛蓝 · 装扮 097",
+      "category": "音波",
+      "right": "官方装扮",
+      "preview": "real/nc_097.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s112",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "flora"
+    },
+    {
+      "id": "nc_098",
+      "name": "暖橙 · 装扮 098",
+      "category": "复古",
+      "right": "官方装扮",
+      "preview": "real/nc_098.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s113",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "landscape"
+    },
+    {
+      "id": "nc_099",
+      "name": "素白 · 装扮 099",
+      "category": "创意",
+      "right": "官方装扮",
+      "preview": "real/nc_099.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s114",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "crystal"
+    },
+    {
+      "id": "nc_100",
+      "name": "墨黑 · 装扮 100",
+      "category": "经典",
+      "right": "官方装扮",
+      "preview": "real/nc_100.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s115",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "record"
+    },
+    {
+      "id": "nc_101",
+      "name": "青绿 · 装扮 101",
+      "category": "艺术家",
+      "right": "官方装扮",
+      "preview": "real/nc_101.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s116",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "flora"
+    },
+    {
+      "id": "nc_102",
+      "name": "靛蓝 · 装扮 102",
+      "category": "音波",
+      "right": "官方装扮",
+      "preview": "real/nc_102.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s117",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "flora"
+    },
+    {
+      "id": "nc_103",
+      "name": "暖橙 · 装扮 103",
+      "category": "复古",
+      "right": "官方装扮",
+      "preview": "real/nc_103.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s119",
+      "source_size": [
+        1242,
+        2208
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "flora"
+    },
+    {
+      "id": "nc_104",
+      "name": "靛蓝 · 装扮 104",
+      "category": "音波",
+      "right": "官方装扮",
+      "preview": "real/nc_104.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s121",
+      "source_size": [
+        1242,
+        2208
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "crystal"
+    },
+    {
+      "id": "nc_105",
+      "name": "靛蓝 · 装扮 105",
+      "category": "音波",
+      "right": "官方装扮",
+      "preview": "real/nc_105.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s123",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "glow"
+    },
+    {
+      "id": "nc_106",
+      "name": "素白 · 装扮 106",
+      "category": "创意",
+      "right": "官方装扮",
+      "preview": "real/nc_106.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s128",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "illustrated"
+    },
+    {
+      "id": "nc_107",
+      "name": "素白 · 装扮 107",
+      "category": "创意",
+      "right": "官方装扮",
+      "preview": "real/nc_107.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s132",
+      "source_size": [
+        1242,
+        2208
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "illustrated"
+    },
+    {
+      "id": "nc_108",
+      "name": "素白 · 装扮 108",
+      "category": "创意",
+      "right": "官方装扮",
+      "preview": "real/nc_108.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s134",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "crystal"
+    },
+    {
+      "id": "nc_109",
+      "name": "紫罗兰 · 装扮 109",
+      "category": "氛围系列",
+      "right": "官方装扮",
+      "preview": "real/nc_109.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s136",
+      "source_size": [
+        1242,
+        2208
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "flora"
+    },
+    {
+      "id": "nc_110",
+      "name": "靛蓝 · 装扮 110",
+      "category": "音波",
+      "right": "官方装扮",
+      "preview": "real/nc_110.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s139",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "illustrated"
+    },
+    {
+      "id": "nc_111",
+      "name": "灰调 · 装扮 111",
+      "category": "经典",
+      "right": "官方装扮",
+      "preview": "real/nc_111.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s141",
+      "source_size": [
+        1372,
+        2438
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "illustrated"
+    },
+    {
+      "id": "nc_112",
+      "name": "紫罗兰 · 装扮 112",
+      "category": "氛围系列",
+      "right": "官方装扮",
+      "preview": "real/nc_112.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s160",
+      "source_size": [
+        1406,
+        1702
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "cover"
+    },
+    {
+      "id": "nc_113",
+      "name": "紫罗兰 · 装扮 113",
+      "category": "氛围系列",
+      "right": "官方装扮",
+      "preview": "real/nc_113.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s172",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "cover"
+    },
+    {
+      "id": "nc_114",
+      "name": "绯红 · 装扮 114",
+      "category": "好运系列",
+      "right": "官方装扮",
+      "preview": "real/nc_114.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s174",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "cabinet"
+    },
+    {
+      "id": "nc_115",
+      "name": "青绿 · 装扮 115",
+      "category": "艺术家",
+      "right": "官方装扮",
+      "preview": "real/nc_115.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s175",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "stage"
+    },
+    {
+      "id": "nc_116",
+      "name": "墨黑 · 装扮 116",
+      "category": "经典",
+      "right": "官方装扮",
+      "preview": "real/nc_116.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s176",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "stage"
+    },
+    {
+      "id": "nc_117",
+      "name": "紫罗兰 · 装扮 117",
+      "category": "氛围系列",
+      "right": "官方装扮",
+      "preview": "real/nc_117.jpg",
+      "name_pending": false,
+      "name_source": "按画面主色标注，非官方文案",
+      "layer": "unknown",
+      "source_id": "s177",
+      "source_size": [
+        1124,
+        2000
+      ],
+      "render": {
+        "family": "推荐",
+        "disc": "netease_official",
+        "artwork": null,
+        "accent": null
+      },
+      "category_source": "按画面主色自动归并，非装扮中心官方分类",
+      "outputTheme": "stage"
+    }
+  ],
+  "source_short": "网易云官方 CDN 原图 · 4 批抓包 177 URL，去重 117 款（1124×2000）",
+  "source_note": "4 款名称来自装扮中心截图官方文案，其余按画面主色标注；分类为视觉自动归并，非官方分类；权益角标未获取",
+  "usage": "renderable-reference"
+}

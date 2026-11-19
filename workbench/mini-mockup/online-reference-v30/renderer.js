@@ -10,7 +10,25 @@ export async function preloadShells(){await prepareInsideRetainers();await prepa
 function composeShell(img,v,size){
  if(v.frame){const c=document.createElement('canvas');c.width=c.height=size;const x=c.getContext('2d');x.setTransform(size/BASE,0,0,size/BASE,0,0);x.imageSmoothingQuality='high';x.fillStyle='#ffffff';x.fillRect(0,0,BASE,BASE);
  const [bx,by,bw,bh]=v.frame.body,[dx,dy,dw,dh]=v.frame.destination.map(n=>n*BASE),sx=dw/bw,sy=dh/bh;
- if(v.frame.spineSplit){const cut=v.frame.spineSplit,spineWidth=dw*v.frame.spineMM/(v.frame.spineMM+v.frame.coverMM),leftScale=spineWidth/(cut-bx),rightScale=(dw-spineWidth)/(bx+bw-cut);x.drawImage(img,0,0,cut,img.height,dx-bx*leftScale,dy-by*sy,cut*leftScale,img.height*sy);x.drawImage(img,cut,0,img.width-cut,img.height,dx+spineWidth,dy-by*sy,(img.width-cut)*rightScale,img.height*sy)}
+ if(v.frame.spineSplit){
+ const cut=v.frame.spineSplit,spineWidth=dw*v.frame.spineMM/(v.frame.spineMM+v.frame.coverMM),leftScale=spineWidth/(cut-bx),rightScale=(dw-spineWidth)/(bx+bw-cut);
+ const y=dy-by*sy,h=img.height*sy;
+ const drawBands=(source,target)=>{
+   for(let i=0;i<source.length-1;i++){
+     x.drawImage(img,source[i],0,source[i+1]-source[i],img.height,target[i],y,target[i+1]-target[i],h);
+   }
+ };
+ const left=v.frame.leftRail,right=v.frame.rightRail;
+ const leftSource=[0,bx,left.inner,left.anchor,cut];
+ const leftTarget=leftSource.map(p=>dx+(p-bx)*leftScale);
+ const rightSource=[cut,right.anchor,right.inner,bx+bw,img.width];
+ const rightTarget=rightSource.map(p=>dx+spineWidth+(p-cut)*rightScale);
+ // Widen the outer rails toward the artwork while the hinge stays fixed.
+ leftTarget[2]+=left.inset*BASE;
+ rightTarget[2]-=right.inset*BASE;
+ drawBands(leftSource,leftTarget);
+ drawBands(rightSource,rightTarget);
+ }
  else if(v.frame.source){const [cx,cy,cw,ch]=v.frame.source;x.drawImage(img,cx,cy,cw,ch,dx+(cx-bx)*sx,dy+(cy-by)*sy,cw*sx,ch*sy)}
  else x.drawImage(img,dx-bx*sx,dy-by*sy,img.width*sx,img.height*sy);
  // The open photo continues into the hinge at right. Close the isolated rear with its own outer rail.
@@ -40,6 +58,87 @@ export function transparentHardware(c){const x=c.getContext('2d'),w=c.width,h=c.
  for(let y=0;y<h;y++){let row=0;for(let a=0;a<w;a++){const i=y*w+a,k=i*4;gray[i]=(p.data[k]+p.data[k+1]+p.data[k+2])/3;row+=gray[i];sum[(y+1)*stride+a+1]=sum[y*stride+a+1]+row}}
  for(let y=0;y<h;y++)for(let a=0;a<w;a++){const l=Math.max(0,a-18),r=Math.min(w,a+19),t=Math.max(0,y-18),b=Math.min(h,y+19),mean=(sum[b*stride+r]-sum[t*stride+r]-sum[b*stride+l]+sum[t*stride+l])/((r-l)*(b-t)),delta=gray[y*w+a]-mean,k=(y*w+a)*4,light=delta>0;p.data[k]=p.data[k+1]=p.data[k+2]=light?255:55;p.data[k+3]=Math.min(light?210:190,Math.max(0,Math.abs(delta)-2)*(light?5:1.35))}
  x.putImageData(p,0,0);return c}
+const recessCache=new Map();
+export function paperRecess(view,id,lighting){
+  const key=[view,id,lighting].join(':');if(recessCache.has(key))return recessCache.get(key);
+  const c=document.createElement('canvas');c.width=c.height=1200;const x=c.getContext('2d');
+  // The case lip casts inward onto the insert. This screen-independent
+  // layer follows the receiving plane, not the uploaded image transform.
+  const narrow=view===0&&id==='tray';
+  for(const [x0,y0,x1,y1,depth,alpha]of[[0,0,0,1200,.024,.30],[0,1200,0,0,.018,.24],[0,0,1200,0,narrow?.12:.018,narrow?.34:.24],[1200,0,0,0,narrow?.10:.016,narrow?.30:.20]]){
+    const g=x.createLinearGradient(x0,y0,x1,y1);g.addColorStop(0,`rgba(12,18,23,${alpha})`);g.addColorStop(depth,'rgba(12,18,23,0)');g.addColorStop(1,'rgba(12,18,23,0)');x.fillStyle=g;x.fillRect(0,0,1200,1200);
+  }
+  if(lighting&&id!=='back'){
+    const g=x.createLinearGradient(0,0,1200,420);g.addColorStop(0,'rgba(255,255,255,.02)');g.addColorStop(.20,'rgba(255,255,255,.11)');g.addColorStop(.36,'rgba(255,255,255,.025)');g.addColorStop(.62,'rgba(255,255,255,0)');x.fillStyle=g;x.fillRect(0,0,1200,1200);
+  }
+  recessCache.set(key,c);return c;
+}
+function frontRimOptics(){
+ const cached=imgCache.get('front-rim-optics');
+ if(cached)return cached;
+ const canvas=document.createElement('canvas');canvas.width=canvas.height=BASE;
+ const ctx=canvas.getContext('2d',{willReadFrequently:true});
+ ctx.drawImage(imgCache.get('shell-0'),0,0);
+ transparentHardware(canvas);
+ const mask=document.createElement('canvas');mask.width=mask.height=BASE;
+ const m=mask.getContext('2d');
+ for(const slot of views[0].slots){
+   const [a,,c]=slot.q;
+   const [left,top]=a.map(n=>n*BASE),[right,bottom]=c.map(n=>n*BASE);
+   const sideDepth=slot.id==='tray'?5:10;
+   for(const [x,y,dx,dy] of [[left,top,sideDepth,0],[right,top,-sideDepth,0],[left,top,0,12],[left,bottom,0,-10]]){
+     const fade=m.createLinearGradient(x,y,x+dx,y+dy);
+     fade.addColorStop(0,'#fff');fade.addColorStop(1,'#fff0');
+     m.fillStyle=fade;
+     m.fillRect(left,top,right-left,bottom-top);
+   }
+ }
+ ctx.globalCompositeOperation='destination-in';
+ ctx.drawImage(mask,0,0);
+ imgCache.set('front-rim-optics',canvas);
+ return canvas;
+}
+function frontChannelReflection(){
+ const cached=imgCache.get('front-channel-reflection');
+ if(cached)return cached;
+ const canvas=document.createElement('canvas');
+ canvas.width=128;canvas.height=256;
+ const ctx=canvas.getContext('2d');
+ const side=ctx.createLinearGradient(0,0,canvas.width,0);
+ side.addColorStop(0,'rgba(255,255,255,0)');
+ side.addColorStop(.15,'rgba(255,255,255,.33)');
+ side.addColorStop(.38,'rgba(240,249,255,.13)');
+ side.addColorStop(.72,'rgba(240,249,255,0)');
+ side.addColorStop(.94,'rgba(255,255,255,.23)');
+ side.addColorStop(1,'rgba(255,255,255,0)');
+ ctx.fillStyle=side;ctx.fillRect(0,0,canvas.width,canvas.height);
+ ctx.globalCompositeOperation='destination-in';
+ const ends=ctx.createLinearGradient(0,0,0,canvas.height);
+ ends.addColorStop(0,'#fff0');ends.addColorStop(.04,'#fff');
+ ends.addColorStop(.95,'#fff');ends.addColorStop(1,'#fff0');
+ ctx.fillStyle=ends;ctx.fillRect(0,0,canvas.width,canvas.height);
+ imgCache.set('front-channel-reflection',canvas);
+ return canvas;
+}
+function drawFrontRecess(ctx,state){
+ for(const slot of views[0].slots){
+   if(!state.assets[slot.id].src)continue;
+   const quad=getQuad(state,0,slot);
+   ctx.save();
+   ctx.globalAlpha=slot.id==='tray'?.32:.48;
+   warp(ctx,paperRecess(0,slot.id,false),quad);
+   if(state.lighting){
+     ctx.globalAlpha=1;
+     if(slot.id==='tray')warp(ctx,frontChannelReflection(),quad);
+     ctx.beginPath();
+     quad.forEach(([x,y],i)=>i?ctx.lineTo(x*BASE,y*BASE):ctx.moveTo(x*BASE,y*BASE));
+     ctx.closePath();ctx.clip();
+     ctx.globalAlpha=.36;
+     ctx.drawImage(frontRimOptics(),0,0);
+   }
+   ctx.restore();
+ }
+}
 function drawHardware(ctx,view){const hw=views[view].hardware,img=imgCache.get(`hardware-${view}`);if(!hw||!img)return;ctx.save();ctx.globalCompositeOperation='source-over';warp(ctx,img,hw.q);ctx.restore()}
 // The four retainers sit on the inner face of the cover paper. Extract only their shapes,
 // so putting them over the print does not put the photo's grey base over the paper.
@@ -94,7 +193,7 @@ export function clearDisc(size=1200,rimOnly=false){const key=`clear-disc-${rimOn
  for(const [a,b]of [[3.5,4.55],[.15,1.1]]){x.strokeStyle='rgba(255,255,255,.95)';x.lineWidth=5;x.beginPath();x.arc(600,600,586,a,b);x.stroke()}imgCache.set(key,c);return c}
 function drawDisc(ctx,state,view,slot){const q=getQuad(state,view,slot),size=Math.min(3000,Math.max(1200,textureResolution));warp(ctx,clearDisc(size),q);const label=state.showDesign?slotTexture(state,slot):null;if(label)warp(ctx,label,q);warp(ctx,clearDisc(size,true),q)}
 export function render(canvas,state,view=state.view,size=1254,camera=[0,0,1,1]){const [cx,cy,cw,ch]=camera,height=Math.round(size*ch/cw),scale=size/(BASE*cw);if(canvas.width!==size||canvas.height!==height){canvas.width=size;canvas.height=height}const ctx=canvas.getContext('2d');ctx.setTransform(scale,0,0,scale,-cx*BASE*scale,-cy*BASE*scale);ctx.imageSmoothingQuality='high';ctx.globalCompositeOperation='source-over';ctx.fillStyle=state.background;ctx.fillRect(0,0,BASE,BASE);textureResolution=Math.ceil(size/cw);const shell=renderShell(view,textureResolution);if(!shell)return;ctx.save();ctx.globalCompositeOperation='multiply';ctx.drawImage(shell,0,0,BASE,BASE);ctx.restore();
-if(state.showDesign){for(const slot of views[view].slots){if(slot.id==='disc')drawHardware(ctx,view);if(slot.inBox&&!state.discVisible)continue;if(slot.id==='disc'){drawDisc(ctx,state,view,slot);continue}const tx=slotTexture(state,slot);if(tx)warp(ctx,tx,getQuad(state,view,slot))}if(state.lighting){ctx.save();ctx.beginPath();ctx.rect(0,0,BASE,BASE);for(const slot of views[view].slots){if((slot.id==='disc'||slot.sourceCrop||(view===4&&slot.id==='tray')||['front','back','inside','leftSpine','rightSpine','leftSpineInner'].includes(slot.id))&&state.assets[slot.id].src){const q=getQuad(state,view,slot);q.forEach((p,i)=>i?ctx.lineTo(p[0]*BASE,p[1]*BASE):ctx.moveTo(p[0]*BASE,p[1]*BASE));ctx.closePath()}}ctx.clip('evenodd');ctx.globalCompositeOperation='multiply';ctx.drawImage(shell,0,0,BASE,BASE);ctx.restore()}drawInsideRetainers(ctx,state,view)}else{drawHardware(ctx,view);if(state.discVisible)for(const slot of views[view].slots)if(slot.id==='disc'&&slot.inBox)drawDisc(ctx,state,view,slot);}
+if(state.showDesign){for(const slot of views[view].slots){if(slot.id==='disc')drawHardware(ctx,view);if(slot.inBox&&!state.discVisible)continue;if(slot.id==='disc'){drawDisc(ctx,state,view,slot);continue}const tx=slotTexture(state,slot);if(tx)warp(ctx,tx,getQuad(state,view,slot))}if(state.lighting){ctx.save();ctx.beginPath();ctx.rect(0,0,BASE,BASE);for(const slot of views[view].slots){if((slot.id==='disc'||slot.sourceCrop||(view===4&&slot.id==='tray')||['front','back','inside','leftSpine','rightSpine','leftSpineInner'].includes(slot.id))&&state.assets[slot.id].src){const q=getQuad(state,view,slot);q.forEach((p,i)=>i?ctx.lineTo(p[0]*BASE,p[1]*BASE):ctx.moveTo(p[0]*BASE,p[1]*BASE));ctx.closePath()}}ctx.clip('evenodd');ctx.globalCompositeOperation='multiply';ctx.drawImage(shell,0,0,BASE,BASE);ctx.restore()}drawInsideRetainers(ctx,state,view);if(view===0)drawFrontRecess(ctx,state)}else{drawHardware(ctx,view);if(state.discVisible)for(const slot of views[view].slots)if(slot.id==='disc'&&slot.inBox)drawDisc(ctx,state,view,slot);}
 ctx.setTransform(1,0,0,1,0,0);}
 export function sheetLayout(size){const header=Math.round(size*.055);return{columns:4,rows:2,cell:size/4,header,width:size,height:Math.round(size/2)+header}}
 export function renderPreview(canvas,state,size=BASE){render(canvas,state,state.view,size,previewFrame(state.view))}

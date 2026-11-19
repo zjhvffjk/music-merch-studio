@@ -8,8 +8,21 @@ export function previewPixelWidth(cssWidth,pixelRatio=1){return Math.min(4096,Ma
 // Both open references use the same photo-to-canvas mapping. Parts stay on their photographed face.
 const openFrame={body:[0,0,1774,887],destination:[.05,.25,.9,.45]};
 const openQuad=([x,y,w,h])=>[[x,y],[x+w,y],[x+w,y+h],[x,y+h]].map(([a,b])=>[.05+.9*a/1774,.25+.45*b/887]);
+const frontFrame={
+ body:[170,285,910,745],spineSplit:290,spineMM:8,coverMM:45,
+ destination:[.15,.23,.70,.70*45/53],
+ leftRail:{inner:196,anchor:225,inset:.0035},
+ rightRail:{anchor:850,inner:1044,inset:.008}
+};
+// The 41 × 41 mm folded insert uses the same scale on both axes.
+const frontPaperHalf=frontFrame.destination[2]*41/(frontFrame.spineMM+frontFrame.coverMM)/2;
+const frontPaperCenter=[.5418,.52795];
+const frontPaperQuad=[[-1,-1],[1,-1],[1,1],[-1,1]].map(([x,y])=>[
+ frontPaperCenter[0]+x*frontPaperHalf,
+ frontPaperCenter[1]+y*frontPaperHalf
+]);
 export const views=[
-{name:'正视图（闭合）',shell:'online-reference-v30/assets/front-cover-hq-v3.png',frame:{body:[170,285,910,745],spineSplit:290,spineMM:8,coverMM:45,destination:[.15,.23,.70,.70*45/53]},slots:[{id:'front',q:[[.2647,.2659],[.8289,.2659],[.8289,.79],[.2647,.79]]},{id:'tray',sourceCrop:[0,0,.08,1],label:'内盘底左端露出',q:[[.175,.273],[.223,.273],[.223,.787],[.175,.787]]}]},
+{name:'正视图（闭合）',shell:'online-reference-v30/assets/front-cover-hq-v3.png',frame:frontFrame,slots:[{id:'front',q:frontPaperQuad},{id:'tray',sourceCrop:[0,0,.08,1],label:'内盘底左端露出',q:[[.1735,.2705],[.224,.2705],[.224,.792],[.1735,.792]]}]},
 {name:'后视图（封底）',shell:'online-reference-v30/assets/open-outer-reference.png',frame:{source:[65,0,870,870],body:[105,165,830,675],closeRightFromLeft:true,destination:[.15,.23,.70,.70*45/53]},slots:[{id:'back',q:[[.15+.70*2/53,.23+.70*3.5/53],[.85-.70*2/53,.23+.70*3.5/53],[.85-.70*2/53,.23+.70*41.5/53],[.15+.70*2/53,.23+.70*41.5/53]]}]},
 {name:'左视图',shell:'online-reference-v30/assets/edge-views-atlas.png',frame:{source:[180,0,270,760],body:[267,128,93,517],destination:[.5-.60*8/45/2,.24,.60*8/45,.60]},slots:[{id:'leftSpine',q:[[.4707,.2867],[.5293,.2867],[.5293,.7933],[.4707,.7933]]}]},
 {name:'右视图',shell:'online-reference-v30/assets/edge-views-atlas.png',frame:{source:[807,0,270,760],body:[894,128,93,517],destination:[.5-.60*8/45/2,.24,.60*8/45,.60]},slots:[{id:'rightSpine',q:[[.4707,.2867],[.5293,.2867],[.5293,.7933],[.4707,.7933]]}]},

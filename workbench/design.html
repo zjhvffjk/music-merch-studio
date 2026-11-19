@@ -337,7 +337,7 @@ body.mockup-mode .studio,body.embed.mockup-mode .studio{display:block;max-width:
   <nav class="mods" id="mods">
     <button data-mod="design" class="on">设计</button>
     <button data-mod="print">打印制作</button>
-    <button id="btnMini3d" data-mod="mockup" type="button" title="查看八视图商品图样机">八视图样机</button>
+    <button id="btnMini3d" data-mod="mockup" type="button" title="查看九视图商品图样机">九视图样机</button>
     <button data-mod="export">导出</button>
   </nav>
   <div class="editorRibbon" id="editorRibbon" aria-label="设计工具栏">
@@ -553,17 +553,17 @@ body.mockup-mode .studio,body.embed.mockup-mode .studio{display:block;max-width:
         <div class="body">
           <div id="exportEmpty" class="empty">还没有生成物 —— 先去「设计」模块生成三件套。</div>
           <div id="exportBody" hidden>
-            <div class="mockupExport"><h3>八视图商品图</h3><p class="muted">包含一张三视图总预览、一张八视图总预览和八张独立商品图；全部下载还包含原有素材及打印文件。</p><div class="dlRow"><a id="downloadMockupZip" class="btn" hidden>下载全部文件 ZIP</a><button id="refreshMockupImages" class="plain" type="button">重新生成商品图</button><span id="mockupZipStatus" class="muted" role="status"></span></div><div id="mockupGallery" style="margin:16px 0 24px"></div></div>
+            <div class="mockupExport"><h3>九视图商品图</h3><p class="muted">包含一张三视图总预览、一张九视图总预览、一张内外展开组合图和九张独立商品图；全部下载还包含原有素材及打印文件。</p><div class="dlRow"><a id="downloadMockupZip" class="btn" hidden>下载全部文件 ZIP</a><button id="refreshMockupImages" class="plain" type="button">重新生成商品图</button><span id="mockupZipStatus" class="muted" role="status"></span></div><div id="mockupGallery" style="margin:16px 0 24px"></div></div>
             <div id="dlList"></div>
             <div class="dlRow" style="margin-top:12px">
               <a id="lnkZip" href="#" hidden>原素材包</a>
               <button id="btnSpec" class="plain">下载生产规格 JSON</button>
             </div>
-            <p class="cap">全部文件 ZIP 包含原有素材、打印文件、项目资料、三视图总预览、八视图总预览及八张独立商品图。</p>
+            <p class="cap">全部文件 ZIP 包含原有素材、打印文件、项目资料、三视图总预览、九视图总预览、内外展开组合图及九张独立商品图。</p>
           </div>
         </div>
       </section>
-      <section class="card" id="batchProductCard" hidden><div class="head"><h2>批量商品图</h2></div><div class="body"><p class="muted">每张专辑各有一张八视图总览和八张单图，全部下载包含批量原有素材。</p><div class="dlRow"><a id="batchProductDownload" class="btn" hidden>下载全部专辑文件 ZIP</a><button id="batchProductRefresh" class="plain" type="button">重新生成全部商品图</button><span id="batchProductStatus" class="muted" role="status"></span></div><div id="batchProducts"></div></div></section>
+      <section class="card" id="batchProductCard" hidden><div class="head"><h2>批量商品图</h2></div><div class="body"><p class="muted">每张专辑各有一张九视图总览、一张内外展开组合图和九张单图，全部下载包含批量原有素材。</p><div class="dlRow"><a id="batchProductDownload" class="btn" hidden>下载全部专辑文件 ZIP</a><button id="batchProductRefresh" class="plain" type="button">重新生成全部商品图</button><span id="batchProductStatus" class="muted" role="status"></span></div><div id="batchProducts"></div></div></section>
       <section class="card" id="batchRes" hidden>
         <div class="head"><h2>导出 · 批量</h2></div>
         <div class="body">
@@ -577,7 +577,7 @@ body.mockup-mode .studio,body.embed.mockup-mode .studio{display:block;max-width:
         </div>
       </section>
     </section>
-    <section class="mod" id="mod-mockup" hidden><div id="batchMockupPick" hidden style="padding:10px 16px;background:white">样机专辑：<select class="batchMockupSelect" aria-label="选择样机专辑"></select></div><iframe id="mockupFrame" title="八视图样机" style="display:block;width:100%;height:max(720px,calc(100vh - 110px));border:0;background:#fff"></iframe></section>
+    <section class="mod" id="mod-mockup" hidden><div id="batchMockupPick" hidden style="padding:10px 16px;background:white">样机专辑：<select class="batchMockupSelect" aria-label="选择样机专辑"></select></div><iframe id="mockupFrame" title="九视图样机" style="display:block;width:100%;height:max(720px,calc(100vh - 110px));border:0;background:#fff"></iframe></section>
   </main>
 
   <!-- ==================== 右栏 ==================== -->
@@ -783,7 +783,11 @@ async function loadFontLibrary(){
   try{
     const data=await jparse('/api/design/fonts');
     const installed=(data.fonts||[]).filter(x=>x&&x.id&&x.name).map(x=>({...x,face:x.face||'sans-serif',meta:x.meta||'已安装'}));
-    await Promise.all(installed.filter(x=>x.private&&x.assetUrl).map(async x=>{try{const family='Minuet Private '+x.id.replace(/[^a-z0-9]+/gi,'_');const face=new FontFace(family,'url('+JSON.stringify(x.assetUrl)+')');await face.load();document.fonts.add(face);x.face='"'+family+'", sans-serif';}catch(e){console.warn('private font preview unavailable',x.name,e)}}));
+    for(const font of installed.filter(x=>x.private&&x.assetUrl)){
+      const family='Minuet Private '+font.id.replace(/[^a-z0-9]+/gi,'_');
+      document.fonts.add(new FontFace(family,'url('+JSON.stringify(font.assetUrl)+')'));
+      font.face='"'+family+'", sans-serif';
+    }
     const known=new Set(FONT_LIBRARY.map(x=>x.id));
     FONT_LIBRARY=FONT_LIBRARY.concat(installed.filter(x=>!known.has(x.id)));
     document.querySelectorAll('[data-font-for]').forEach(b=>setFontButton(b.dataset.fontFor));
@@ -830,6 +834,7 @@ function mountRailUtilityPopovers(){
       popover.style.left=Math.max(12,Math.min(innerWidth-width-12,r.right-width))+'px';
       popover.style.top=Math.max(12,Math.min(innerHeight-320,r.bottom+8))+'px';
       popover.hidden=!popover.hidden;
+      if(!popover.hidden&&buttonId==='btnRecentTab')loadRailProjects();
     };
   });
   document.addEventListener('click',e=>{if(!e.target.closest('.railUtilityPopover')&&!e.target.closest('#btnStructureTab,#btnRecentTab'))document.querySelectorAll('.railUtilityPopover').forEach(x=>x.hidden=true);});
@@ -947,7 +952,7 @@ function showMod(name){
   ['design','print','export','mockup'].forEach(m=>{ $('#mod-'+m).hidden = (m!==name); });
   document.body.classList.toggle('mockup-mode',name==='mockup');document.body.classList.toggle('batch-design',name==='design'&&q.get('batch')==='1');
   const ribbon=$('#editorRibbon');if(ribbon)ribbon.hidden=(name!=='design');
-  if(name!=='mockup'&&LAST&&LAST.jid&&!LAST.batchKey&&mockupDirty)queueMockupPreparation(name==='export'?0:300);
+  if(name==='export')queueMockupPreparation(0);
   if(name==='export'&&LAST?.batchKey&&batchProductsDirty){batchProductsDirty=false;setTimeout(generateAllBatchProducts,600)}
 }
 function prepareHighresPrint(jid){if(jid)fetch('/api/design/highres-print-ready?jid='+encodeURIComponent(jid)).catch(()=>{});}
@@ -955,32 +960,32 @@ let mockupReady=false,mockupPending=false,mockupTimer,mockupPrepareTimer,mockupD
 function currentMockupKey(){return LAST?String(LAST.jid)+':'+(LAST.batchNo||'')+':'+(LAST.syncRevision||''):''}
 function queueMockupPreparation(delay=1000){
   clearTimeout(mockupPrepareTimer);
-  if(!LAST?.jid||LAST.batchKey||!mockupDirty)return;
-  mockupPrepareTimer=setTimeout(()=>{if(!mockupPending&&LAST?.jid&&!LAST.batchKey&&mockupDirty&&$('#mod-mockup').hidden)startMockupExport()},delay);
+  if(!LAST?.jid||LAST.batchKey||!mockupDirty||$('#mod-export').hidden)return;
+  mockupPrepareTimer=setTimeout(()=>{if(!mockupPending&&LAST?.jid&&!LAST.batchKey&&mockupDirty&&!$('#mod-export').hidden)startMockupExport()},delay);
 }
 function makeProductRow(data,url){
  const row=document.createElement('div'),icon=document.createElement('div'),text=document.createElement('div'),title=document.createElement('b'),detail=document.createElement('small'),open=document.createElement('a');
- row.className='dlItem';icon.className='ic';icon.textContent='PNG';text.className='t';title.textContent=data.label;detail.textContent=data.name.includes('三视图总预览')?'三视图总预览 · 8192 × 8192':data.name.includes('八视图总预览')?'八视图总预览 · 8192 × 4096':'独立商品图 · 8192 × 8192';text.append(title,detail);open.className='plain sm';open.href=url;open.target='_blank';open.rel='noopener';open.textContent='打开';row.append(icon,text,open);return row;
+ row.className='dlItem';icon.className='ic';icon.textContent='PNG';text.className='t';title.textContent=data.label;detail.textContent=data.name.includes('三视图总预览')?'三视图总预览 · 8192 × 8192':data.name.includes('九视图总预览')?'九视图总预览 · 8192 × 8192':'独立商品图 · 8192 × 8192';text.append(title,detail);open.className='plain sm';open.href=url;open.target='_blank';open.rel='noopener';open.textContent='打开';row.append(icon,text,open);return row;
 }
 function clearMockupImages(){for(const url of mockupUrls)URL.revokeObjectURL(url);mockupUrls=[];$('#mockupGallery').replaceChildren();$('#downloadMockupZip').hidden=true}
 function ensureMockup(){
-  if(!LAST||!LAST.jid){err('请先生成三件套，再打开八视图样机');return false}
+  if(!LAST||!LAST.jid){err('请先生成三件套，再打开九视图样机');return false}
   const frame=$('#mockupFrame'),jid=String(LAST.jid),no=LAST.batchNo||'',rev=LAST.syncRevision||'',key=jid+':'+no+':'+rev;
   if(frame.dataset.key!==key){mockupReady=false;mockupDirty=true;clearMockupImages();frame.dataset.key=key;frame.src='/mini-mockup/?embed=1&jid='+encodeURIComponent(jid)+(no?'&batchNo='+encodeURIComponent(no):'')+(rev?'&syncRevision='+encodeURIComponent(rev):'')}
   return true;
 }
 $('#mods').onclick=e=>{const b=e.target.closest('button[data-mod]');if(!b)return;if(b.dataset.mod==='mockup'&&!ensureMockup())return;showMod(b.dataset.mod)};
 function sendMockupExport(){if(!mockupPending||!mockupReady)return;$('#mockupFrame').contentWindow.postMessage({type:'minicd-export-eight',jid:String(LAST.jid)},location.origin)}
-function startMockupExport(){if(mockupPending||!ensureMockup())return;mockupPending=true;mockupExportKey=currentMockupKey();mockupChangedDuringExport=false;clearMockupImages();$('#refreshMockupImages').disabled=true;$('#mockupZipStatus').textContent='正在准备八张商品图…';clearTimeout(mockupTimer);mockupTimer=setTimeout(()=>{mockupPending=false;$('#refreshMockupImages').disabled=false;$('#mockupZipStatus').textContent='生成超时，请点击重新生成。'},360000);sendMockupExport()}
+function startMockupExport(){if(mockupPending||!ensureMockup())return;mockupPending=true;mockupExportKey=currentMockupKey();mockupChangedDuringExport=false;clearMockupImages();$('#refreshMockupImages').disabled=true;$('#mockupZipStatus').textContent='正在准备商品图…';clearTimeout(mockupTimer);mockupTimer=setTimeout(()=>{mockupPending=false;$('#refreshMockupImages').disabled=false;$('#mockupZipStatus').textContent='生成超时，请点击重新生成。'},360000);sendMockupExport()}
 $('#refreshMockupImages').onclick=startMockupExport;
 window.addEventListener('message',e=>{
   if(e.origin!==location.origin||e.source!==$('#mockupFrame').contentWindow||!e.data)return;
   const d=e.data;
   if(d.type==='minicd-mockup-ready'){mockupReady=true;sendMockupExport()}
-  if(d.type==='minicd-mockup-changed'){if(LAST?.batchKey){if(allProductRunning)allProductRerun=true;else if(!$('#batchProductDownload').hidden){batchProductsDirty=true;$('#batchProductDownload').hidden=true;$('#batchProductStatus').textContent='样机已调整，返回导出页时将更新商品图。'}}mockupDirty=true;if(mockupPending)mockupChangedDuringExport=true;else if(mockupUrls.length){$('#downloadMockupZip').hidden=true;$('#mockupZipStatus').textContent='样机已调整，商品图将在后台更新。'}if($('#mod-mockup').hidden)queueMockupPreparation()}
+  if(d.type==='minicd-mockup-changed'){if(LAST?.batchKey){if(allProductRunning)allProductRerun=true;else if(!$('#batchProductDownload').hidden){batchProductsDirty=true;$('#batchProductDownload').hidden=true;$('#batchProductStatus').textContent='样机已调整，返回导出页时将更新商品图。'}}mockupDirty=true;if(mockupPending)mockupChangedDuringExport=true;else if(mockupUrls.length){$('#downloadMockupZip').hidden=true;$('#mockupZipStatus').textContent='样机已调整，返回导出页时将更新商品图。'}if(!$('#mod-export').hidden)queueMockupPreparation()}
   if(d.type==='minicd-export-progress'&&mockupPending)$('#mockupZipStatus').textContent=d.message;
   if(d.type==='minicd-export-image'&&mockupPending&&d.blob instanceof Blob){const url=URL.createObjectURL(d.blob);mockupUrls.push(url);$('#mockupGallery').append(makeProductRow(d,url))}
-  if(d.type==='minicd-export-done'&&mockupPending&&d.blob instanceof Blob){clearTimeout(mockupTimer);mockupPending=false;$('#refreshMockupImages').disabled=false;mockupDirty=mockupChangedDuringExport||mockupExportKey!==currentMockupKey();if(mockupExportKey!==currentMockupKey())clearMockupImages();else{const url=URL.createObjectURL(d.blob);mockupUrls.push(url);const link=$('#downloadMockupZip');link.href=url;link.download=d.name;link.hidden=mockupDirty}$('#mockupZipStatus').textContent=mockupDirty?'样机已调整，商品图将在后台更新。':'两张总预览和八张商品图已生成，可打开查看，或与原有素材一起下载。';if(mockupDirty&&$('#mod-mockup').hidden)queueMockupPreparation()}
+  if(d.type==='minicd-export-done'&&mockupPending&&d.blob instanceof Blob){clearTimeout(mockupTimer);mockupPending=false;$('#refreshMockupImages').disabled=false;mockupDirty=mockupChangedDuringExport||mockupExportKey!==currentMockupKey();if(mockupExportKey!==currentMockupKey())clearMockupImages();else{const url=URL.createObjectURL(d.blob);mockupUrls.push(url);const link=$('#downloadMockupZip');link.href=url;link.download=d.name;link.hidden=mockupDirty}$('#mockupZipStatus').textContent=mockupDirty?'样机已调整，返回导出页时将更新商品图。':'总预览、内外展开组合图和九张商品图已生成，可打开查看，或与原有素材一起下载。';if(mockupDirty&&!$('#mod-export').hidden)queueMockupPreparation()}
   if(d.type==='minicd-export-error'&&mockupPending){clearTimeout(mockupTimer);mockupPending=false;mockupDirty=true;$('#refreshMockupImages').disabled=false;$('#mockupZipStatus').textContent=d.message}
 });
 
@@ -1056,7 +1061,8 @@ function stageHTML(){
   $('#stage').innerHTML=stageHTML();
   $('#stageNote').textContent='编辑页为完整查看而自动缩放；打印制作页仍按 1:1 实际尺寸输出。'
     +'出血 '+bl+'mm、安全区 '+(SPEC.print&&SPEC.print.safeMm||3)+'mm；灰色虚线圆为 Ø'+SPEC.parts.disc.hole+'mm 打穿孔。';
-  queuePreview();
+  clearTimeout(previewTimer);
+  refreshPreview();
 })();
 
 $('#cbGuides').onchange=e=>{document.body.classList.toggle('guides', e.target.checked);const ribbonGuide=$('#cbRibbonGuides');if(ribbonGuide)ribbonGuide.checked=e.target.checked;};
@@ -1115,7 +1121,7 @@ $('#stage').onclick=e=>{const row=e.target.closest('.stageRow');if(row)openPrevi
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('#previewModal').hidden)closePreviewZoom()});
 
 /* ---------------- 预览：先套入当前封面，正式生成才落盘 ----------------
-   实时画布与最终出件调用相同的 300DPI build_parts，避免构图、清晰度和正式件不一致。 */
+   实时画布与最终出件复用同一套排版，单部件放大预览使用 300 DPI。 */
 let previewTimer=0, previewSeq=0, LAST_PREVIEW_BODY=null;
 function queuePreview(){
   clearTimeout(previewTimer);
@@ -1131,7 +1137,7 @@ async function refreshPreview(){
   const body={artist,album,pic:PIC,company:$('#company').value.trim(),
       tracks:normTracks().join(';'),trackData:currentTrackData(),backLayout:BACK_LAYOUT,innerCopy:$('#innerCopy').value.trim(),
       barcode:$('#barcode').value.replace(/\D/g,'').slice(0,12),
-      copyright:$('#copyright').value.trim(),safeBands:$('#safeBands').value.trim(),previewDpi:300,
+      copyright:$('#copyright').value.trim(),safeBands:$('#safeBands').value.trim(),previewDpi:150,
        id:q.get('id')||'',date:q.get('date')||'',...currentCopySettings(),...ai,aiElements:collectElements()};
     LAST_PREVIEW_BODY=body;
     const r=await fetch('/api/design/preview',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
@@ -1250,7 +1256,13 @@ $('#tracks').addEventListener('input',()=>{ if(BACK_LAYOUT==='auto')setBackLayou
 $('#barcode').addEventListener('input',syncBarcodeHint);
 $('#barcode').addEventListener('change',syncBarcodeHint);
 syncBarcodeHint();
-if(q.get('album')&&PIC){ ensureHotTracks().then(()=>{queuePreview();readDesign();}); }
+if(q.get('album')&&PIC){
+  if(currentTrackData().length&&SEARCH_TRACKS_ARTIST===$('#artist').value.trim()){
+    readDesign();
+  }else{
+    ensureHotTracks().then(()=>{queuePreview();readDesign();});
+  }
+}
 
 /* ---------------- ② 视觉 DNA ---------------- */
 async function readDesign(){
@@ -1478,7 +1490,7 @@ async function generateAllBatchProducts(){
     const receive=e=>{if(e.origin!==location.origin||e.source!==frame.contentWindow||!e.data)return;const d=e.data;
      if(d.type==='minicd-mockup-ready')frame.contentWindow.postMessage({type:'minicd-export-eight',jid:item.jid,imagesOnly:true},location.origin);
      else if(d.type==='minicd-export-progress')status.textContent=`第 ${i+1}/${albums.length} 张：${d.message}`;
-     else if(d.type==='minicd-export-image'&&d.blob instanceof Blob){files.push({name:'八视图商品图/'+folder+'/'+d.name,blob:d.blob});const url=URL.createObjectURL(d.blob);allProductUrls.push(url);grid.append(makeProductRow(d,url))}
+     else if(d.type==='minicd-export-image'&&d.blob instanceof Blob){files.push({name:'九视图商品图/'+folder+'/'+d.name,blob:d.blob});const url=URL.createObjectURL(d.blob);allProductUrls.push(url);grid.append(makeProductRow(d,url))}
      else if(d.type==='minicd-export-done')finish();else if(d.type==='minicd-export-error')finish(Error(d.message));};
     window.addEventListener('message',receive);timer=setTimeout(()=>finish(Error('商品图生成超时')),360000);frame.src='/mini-mockup/?embed=1&jid='+encodeURIComponent(item.jid)+(item.batchNo?'&batchNo='+encodeURIComponent(item.batchNo):'')+(item.syncRevision?'&syncRevision='+encodeURIComponent(item.syncRevision):'');document.body.append(frame);
    });
@@ -1753,9 +1765,5 @@ async function loadProject(jid){
   /* 有封面就把「视觉 DNA」也一并读出来 —— 那才是完整回到那次设计 */
   if(PIC) readDesign();
 }
-/* 启动：先读项目列表（左栏 + 供 ?jid= 用），再回看历史项目 */
-(async()=>{
-  await loadRailProjects();
-  if(JID) loadProject(JID);
-})();
+if(JID) loadProject(JID);
 </script></body></html>

@@ -19,6 +19,7 @@ import os
 
 import numpy as np
 from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
+from player_style import draw_player_theme
 
 from fonts import find_bold, find_regular
 
@@ -331,6 +332,38 @@ def draw_bar_icon(d, cx, cy, s, color, lw):
     d.polygon([(cx-s/2,cy-s*.51),(cx-s/2,cy-s*.21),(cx-s*.25,cy-s*.36)],fill=color)
 
 
+def draw_default_controls(d, width, y, front, secondary, playback_mode):
+    """Draw the five playback controls at consistent visual sizes."""
+    stroke = max(2, round(width * .0038))
+    draw_play_mode(d, width * .105, y, width * .025, secondary, stroke, playback_mode)
+    for position, direction in ((.302, -1), (.698, 1)):
+        x = width * position
+        draw_tri(d, x, y, width * .049, front, direction)
+        stem = x + direction * width * .019
+        d.rounded_rectangle((stem-width*.0038, y-width*.020, stem+width*.0038, y+width*.020),
+                            radius=width*.003, fill=front)
+    draw_pause(d, width * .5, y, width * .020, width * .075, width * .044, front)
+    draw_bar_icon(d, width * .895, y, width * .048, secondary, stroke)
+
+
+def draw_default_footer(d, width, y, color):
+    """Device, information, and more icons."""
+    size = width * .041
+    stroke = max(1, round(width * .0027))
+    x = width * .25
+    d.rounded_rectangle((x-size*.39,y-size*.5,x+size*.12,y+size*.5), radius=size*.11, outline=color,width=stroke)
+    d.arc((x-size*.07,y-size*.39,x+size*.42,y+size*.39), -89,89, fill=color,width=stroke)
+    d.ellipse((x-size*.18,y+size*.28,x-size*.11,y+size*.35), fill=color)
+    x = width * .5
+    d.ellipse((x-size*.41,y-size*.41,x+size*.41,y+size*.41), outline=color,width=stroke)
+    d.line((x,y-size*.03,x,y+size*.22), fill=color,width=stroke)
+    d.ellipse((x-size*.045,y-size*.23,x+size*.045,y-size*.14), fill=color)
+    for offset in (-.30,0,.30):
+        x = width*.75 + size*offset
+        radius = size*.066
+        d.ellipse((x-radius,y-radius,x+radius,y+radius), fill=color)
+
+
 def draw_bubble(d, cx, cy, s, color, lw):
     # Open top-right rim and the flat lower tail follow the supplied screenshot.
     curves = [((.14,-.43),(-.25,-.57),(-.50,-.27),(-.48,.02)),
@@ -366,10 +399,9 @@ def tw_of(d, text, font):
     return bb[2] - bb[0]
 
 
-def draw_statusbar(d, W, H, clock="12:01"):
+def draw_statusbar(d, W, H, clock="12:01", col=(240, 240, 245, 255)):
     """状态栏 (可选): 时间 + 信号 + 5G + 电量"""
     y = H * 0.0340
-    col = (240, 240, 245, 255)
     d.text((W * 0.0655, y), clock, font=_font(int(W * 0.0300), bold=True),
            fill=col, anchor="lm")
 
@@ -401,7 +433,8 @@ def make(cover_path, out_path, title, artist, duration, width=1200,
          played_ratio=0.047, playlist="我喜欢的音乐",
          likes="999w+", comments="100w+", listeners="999+人", quality="极高音质",
          statusbar=False, clock="12:01", ratio=RATIO,
-         vip=False, follow=False, video_tag=False, fav_loop=True, playback_mode="loop"):
+         vip=False, follow=False, video_tag=False, fav_loop=True, playback_mode="loop",
+         player_style=None):
     W = width
     H = int(W * ratio)
     is_3x5 = abs(ratio - RATIO_3X5) < 0.06
@@ -417,8 +450,17 @@ def make(cover_path, out_path, title, artist, duration, width=1200,
 
     # 封面先读: 背景渐变要从封面提主色 (网易云的做法, 灰底是错的)
     src = Image.open(cover_path).convert("RGB")
-    bg_top, bg_bot = cover_palette(src)
+    bg_top, bg_bot = (player_style.top, player_style.bottom) if player_style else cover_palette(src)
     img = vgrad(W, H, bg_top, bg_bot).convert("RGBA")
+    controls = player_style.controls if player_style else None
+    text_main = controls.text if controls else TEXT_MAIN
+    text_sub = controls.muted if controls else TEXT_SUB
+    accent = controls.accent if controls else ACCENT_RED
+    tag_bg = controls.chip + (255,) if controls else TAG_BG
+    bar_rest = controls.track if controls else BAR_REST
+    bar_done = controls.text if controls else BAR_DONE
+    icon = controls.text if controls else ICON
+    icon_dim = controls.muted if controls else ICON_DIM
     d = ImageDraw.Draw(img, "RGBA")
 
     mxt = W * MX_T              # 文字左边距
@@ -426,16 +468,16 @@ def make(cover_path, out_path, title, artist, duration, width=1200,
     lw = max(2, int(W * 0.0030))
 
     if statusbar:
-        draw_statusbar(d, W, H, clock)
+        draw_statusbar(d, W, H, clock, text_main + (255,) if controls else (240, 240, 245, 255))
 
     # ---------- 1. 顶部导航栏 (3:5 卡片模式下没有) ----------
     if NAV_Y is not None:
         nav_y = H * NAV_Y
         draw_chevron_down(d, W * 0.0840, nav_y, W * 0.0205, W * 0.0195,
-                          TEXT_MAIN + (255,), max(3, int(W * 0.0038)))
+                          text_main + (255,), max(3, int(W * 0.0038)))
         d.text((W * 0.5, nav_y), playlist, font=_font(int(W * 0.0320)),
-               fill=TEXT_MAIN, anchor="mm")
-        draw_loop(d, W * 0.9203, nav_y, W * 0.0240, TEXT_MAIN + (255,),
+               fill=text_main, anchor="mm")
+        draw_loop(d, W * 0.9203, nav_y, W * 0.0240, text_main + (255,),
                   max(2, int(W * 0.0034)))
 
     # ---------- 2. 方形封面 ----------
@@ -450,7 +492,10 @@ def make(cover_path, out_path, title, artist, duration, width=1200,
     mask = Image.new("L", (side, side), 0)
     ImageDraw.Draw(mask).rounded_rectangle([0, 0, side - 1, side - 1],
                                            radius=int(W * 0.011), fill=255)
-    img.paste(cover, (cx0, cy0), mask)
+    if player_style:
+        draw_player_theme(img, cover, cx0, cy0, side, player_style)
+    else:
+        img.paste(cover, (cx0, cy0), mask)
     d = ImageDraw.Draw(img, "RGBA")
 
     # ---------- 3. 标签行 ----------
@@ -458,14 +503,14 @@ def make(cover_path, out_path, title, artist, duration, width=1200,
     th = W * 0.0520
     f_tag = _font(int(W * 0.0295))
     ty0, ty1 = tag_y - th / 2, tag_y + th / 2
-    tag_col = (228, 228, 232, 255)
+    tag_col = (controls.muted if controls else (228, 228, 232)) + (255,)
 
     # 「999+人」
     x1 = W * TAG_X0
     w1 = tw_of(d, listeners, f_tag)
     pad_l, dot_d, gap_i, pad_r = th * 0.28, th * 0.30, th * 0.14, th * 0.24
     tw1 = pad_l + dot_d + gap_i + w1 + pad_r
-    blend_rrect(img, [x1, ty0, x1 + tw1, ty1], th / 2, TAG_BG)
+    blend_rrect(img, [x1, ty0, x1 + tw1, ty1], th / 2, tag_bg)
     dcx = x1 + pad_l + dot_d / 2
     d.ellipse([dcx - dot_d / 2, tag_y - dot_d / 2, dcx + dot_d / 2, tag_y + dot_d / 2],
               fill=GREEN + (255,))
@@ -478,7 +523,7 @@ def make(cover_path, out_path, title, artist, duration, width=1200,
         w2 = tw_of(d, "视频", f_tag)
         ico_w = th * 0.52
         tw2 = pad_l + ico_w + gap_i + w2 + pad_r
-        blend_rrect(img, [x2, ty0, x2 + tw2, ty1], th / 2, TAG_BG)
+        blend_rrect(img, [x2, ty0, x2 + tw2, ty1], th / 2, tag_bg)
         draw_tri(d, x2 + pad_l + ico_w / 2, tag_y, ico_w * 0.80, tag_col, 1,
                  outline=True, lw=max(2, int(W * 0.0026)))
         d.text((x2 + pad_l + ico_w + gap_i, tag_y), "视频", font=f_tag,
@@ -487,7 +532,7 @@ def make(cover_path, out_path, title, artist, duration, width=1200,
     # ---------- 4. 歌名 + VIP + 互动数 ----------
     title_y = H * TITLE_Y
     f_title = _font(int(W * 0.0420), bold=True)
-    d.text((mxt, title_y), title, font=f_title, fill=TEXT_MAIN, anchor="lm")
+    d.text((mxt, title_y), title, font=f_title, fill=text_main, anchor="lm")
 
     # 「VIP」小标签 (付费歌曲才有; 实测宽 0.0467W / 高 0.0365W)
     if vip:
@@ -497,24 +542,25 @@ def make(cover_path, out_path, title, artist, duration, width=1200,
         vh = W * 0.0365
         vx = mxt + tw_of(d, title, f_title) + W * 0.0210
         blend_rrect(img, [vx, title_y - vh / 2, vx + vw, title_y + vh / 2],
-                    W * 0.0092, (255, 255, 255, 30))
+                    W * 0.0092, tag_bg if controls else (255, 255, 255, 30))
         d.text((vx + vw / 2, title_y), "VIP", font=f_vip,
-               fill=(234, 236, 244, 255), anchor="mm")
+               fill=text_main if controls else (234, 236, 244, 255), anchor="mm")
 
     f_num = _font(int(W * 0.0205), bold=True)
     icon_y = title_y + W*.012
     icon_size = W*.047
     for cx, count, kind in [(W*.70, likes, "heart"),(W*.88, comments, "comment")]:
         if kind == "heart":
-            draw_open_heart(d,cx,icon_y,icon_size,ACCENT_RED+(255,),max(2,int(W*.0028)),filled=True)
+            heart_ink = accent if controls else icon
+            draw_open_heart(d,cx,icon_y,icon_size,heart_ink+(255,),max(2,int(W*.0028)),filled=bool(controls))
         else:
-            draw_bubble(d,cx,icon_y,icon_size,TEXT_SUB+(255,),max(2,int(W*.0028)))
-        d.text((cx+W*.012,icon_y-icon_size*.42),count,font=f_num,fill=ACCENT_RED if kind == "heart" else TEXT_SUB,anchor="lm")
+            draw_bubble(d,cx,icon_y,icon_size,text_sub+(255,),max(2,int(W*.0028)))
+        d.text((cx+W*.012,icon_y-icon_size*.42),count,font=f_num,fill=heart_ink if kind == "heart" else text_sub,anchor="lm")
 
     # ---------- 5. 歌手 (+ 「关注」按钮 或 > 箭头) ----------
     art_y = H * ART_Y
     f_art = _font(int(W * 0.0325))
-    d.text((mxt, art_y), artist, font=f_art, fill=TEXT_SUB, anchor="lm")
+    d.text((mxt, art_y), artist, font=f_art, fill=text_sub, anchor="lm")
     aw = tw_of(d, artist, f_art)
 
     if follow:
@@ -525,63 +571,71 @@ def make(cover_path, out_path, title, artist, duration, width=1200,
         fh = W * 0.0382
         bx = mxt + aw + W * 0.0212
         blend_rrect(img, [bx, art_y - fh / 2, bx + fw, art_y + fh / 2],
-                    fh / 2, None, (255, 255, 255, 62), max(2, int(W * 0.0022)))
+                    fh / 2, None, (icon_dim + (130,) if controls else (255, 255, 255, 62)), max(2, int(W * 0.0022)))
         d.text((bx + fw / 2, art_y), "关注", font=f_fl,
-               fill=(204, 209, 220, 255), anchor="mm")
+               fill=text_sub if controls else (204, 209, 220, 255), anchor="mm")
     else:
         draw_chevron_right(d, mxt + aw + W * 0.0220, art_y, W * 0.0075, W * 0.0100,
-                           TEXT_SUB + (255,), max(2, int(W * 0.0026)))
+                           text_sub + (255,), max(2, int(W * 0.0026)))
 
     # ---------- 6. 进度条 ----------
     bar_y = H * BAR_Y
     bh = max(3, int(W * 0.0042))
     d.rounded_rectangle([mxt, bar_y - bh / 2, mtr, bar_y + bh / 2],
-                        radius=bh / 2, fill=BAR_REST + (255,))
+                        radius=bh / 2, fill=bar_rest + (255,))
     kx = mxt + (mtr - mxt) * max(0.0, min(1.0, played_ratio))
     d.rounded_rectangle([mxt, bar_y - bh / 2, kx, bar_y + bh / 2],
-                        radius=bh / 2, fill=BAR_DONE + (255,))
+                        radius=bh / 2, fill=bar_done + (255,))
     kr = W * 0.0080
-    d.ellipse([kx - kr, bar_y - kr, kx + kr, bar_y + kr], fill=(255, 255, 255, 255))
+    d.ellipse([kx - kr, bar_y - kr, kx + kr, bar_y + kr], fill=bar_done + (255,))
 
     # ---------- 7. 时间行 ----------
     tm_y = H * TIME_Y
     f_tm = _font(int(W * 0.0240))
     d.text((mxt, tm_y), fmt_time(duration * played_ratio), font=f_tm,
-           fill=TEXT_SUB, anchor="lm")
-    d.text((W * 0.5, tm_y), quality, font=f_tm, fill=TEXT_SUB, anchor="mm")
-    d.text((mtr, tm_y), fmt_time(duration), font=f_tm, fill=TEXT_SUB, anchor="rm")
+           fill=text_sub, anchor="lm")
+    d.text((W * 0.5, tm_y), quality, font=f_tm, fill=text_sub, anchor="mm")
+    d.text((mtr, tm_y), fmt_time(duration), font=f_tm, fill=text_sub, anchor="rm")
 
     # ---------- 8. 播放控制 ----------
+    if not player_style and fav_loop:
+        control_y = H * (.915 if is_3x5 else CTL_Y)
+        footer_y = H * (.973 if is_3x5 else BOT_Y)
+        draw_default_controls(d, W, control_y, icon+(255,), text_sub+(255,), playback_mode)
+        draw_default_footer(d, W, footer_y, text_sub+(255,))
+        img.convert("RGB").save(out_path, quality=96)
+        return out_path
+
     ctl_y = H * CTL_Y
     lw_i = max(3, int(W * 0.0042))
     # 第一个图标: 新版是「循环」(参考模板), 旧版是「心形+闪光」
     if fav_loop:
-        draw_play_mode(d, W * 0.0968, ctl_y, W * 0.0272, ICON_DIM + (255,),
+        draw_play_mode(d, W * 0.0968, ctl_y, W * 0.0272, icon_dim + (255,),
                        max(3, int(W * 0.0032)), playback_mode)
     else:
-        draw_heart_outline(img, W * 0.0958, ctl_y, W * 0.0509, ICON_DIM + (255,),
+        draw_heart_outline(img, W * 0.0958, ctl_y, W * 0.0509, icon_dim + (255,),
                            max(2, int(W * 0.0032)))
         d = ImageDraw.Draw(img, "RGBA")
-        draw_sparkle(d, W * 0.0962, ctl_y + W * 0.0026, W * 0.0125, ICON_DIM + (255,))
+        draw_sparkle(d, W * 0.0962, ctl_y + W * 0.0026, W * 0.0125, icon_dim + (255,))
     # 上一首  |◀
-    draw_tri(d, W * 0.2981, ctl_y, W * 0.0424, ICON + (255,), -1)
+    draw_tri(d, W * 0.2981, ctl_y, W * 0.0424, icon + (255,), -1)
     d.rounded_rectangle([W * 0.2714, ctl_y - W * 0.0210,
                          W * 0.2777, ctl_y + W * 0.0210],
-                        radius=W * 0.0032, fill=ICON + (255,))
+                        radius=W * 0.0032, fill=icon + (255,))
     # 暂停
     draw_pause(d, W * 0.4992, ctl_y, W * 0.0237, W * 0.0763, W * 0.0458,
-               (250, 250, 252, 255))
+               (icon + (255,) if controls else (250, 250, 252, 255)))
     # 下一首  ▶|
-    draw_tri(d, W * 0.7002, ctl_y, W * 0.0424, ICON + (255,), 1)
+    draw_tri(d, W * 0.7002, ctl_y, W * 0.0424, icon + (255,), 1)
     d.rounded_rectangle([W * 0.7222, ctl_y - W * 0.0210,
                          W * 0.7285, ctl_y + W * 0.0210],
-                        radius=W * 0.0032, fill=ICON + (255,))
+                        radius=W * 0.0032, fill=icon + (255,))
     # 列表
-    draw_bar_icon(d, W * 0.9042, ctl_y, W * 0.0475, ICON_DIM + (255,), lw_i)
+    draw_bar_icon(d, W * 0.9042, ctl_y, W * 0.0475, icon_dim + (255,), lw_i)
 
     # ---------- 9. 底部图标 (3:5 卡片模式画到画面外, 等效不显示) ----------
     bot_y = H * BOT_Y if BOT_Y is not None else -H
-    icol = (128, 128, 136, 255)
+    icol = icon_dim + (255,) if controls else (128, 128, 136, 255)
     lw2 = max(2, int(W * 0.0030))
     BX0, BSTEP = 0.0891, 0.27393
 

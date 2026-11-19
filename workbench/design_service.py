@@ -36,6 +36,7 @@ workbench 工作台的「作品库」把商品图任务与迷你CD任务合并�
 ``safeBands``（build / album / batch 通用）：字符串 ``"0.30,1.0"`` = 封面顶部 30%
 被自带标题占用，补件取景只落在下方可用带内（根治「字压两遍」）。不传 = 整幅取景。
 """
+import hashlib
 import io
 import json
 import os
@@ -316,6 +317,36 @@ def _album_zip_members():
 _cover_cache = OrderedDict()
 _cover_cache_lock = threading.Lock()
 _cover_fetch_locks = [threading.Lock() for _ in range(16)]
+_cover_disk_slots = 32
+_cover_disk_max_age = 24 * 60 * 60
+_cover_disk_max_bytes = 12 * 1024 * 1024
+
+
+def _read_cached_cover(path, key):
+    try:
+        if time.time() - path.stat().st_mtime > _cover_disk_max_age:
+            return None
+        with path.open("rb") as file:
+            if file.read(len(key)) == key:
+                return Image.open(io.BytesIO(file.read())).convert("RGB")
+    except (OSError, ValueError):
+        pass
+    return None
+
+
+def _store_cached_cover(path, key, data):
+    if len(data) > _cover_disk_max_bytes:
+        return
+    temporary = path.with_suffix(f".{uuid.uuid4().hex}.tmp")
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temporary.write_bytes(key + data)
+        temporary.replace(path)
+    except OSError:
+        try:
+            temporary.unlink(missing_ok=True)
+        except OSError:
+            pass
 
 
 def _fetch_cover(pic):
@@ -334,13 +365,21 @@ def _fetch_cover(pic):
                 _cover_cache.move_to_end(pic)
                 return cached[1].copy()
         try:
-            req = Request(pic, headers={
-                "User-Agent": "Mozilla/5.0",
-                "Referer": "https://music.163.com/",
-            })
-            with urlopen(req, timeout=25) as r:
-                data = r.read()
-            image = Image.open(io.BytesIO(data)).convert("RGB")
+            key = hashlib.sha256(pic.encode("utf-8")).digest()
+            slot = int.from_bytes(key[:2], "big") % _cover_disk_slots
+            path = OUT_DIR / "_cover_source_cache" / f"{slot:02d}.cover"
+            cacheable = pic.startswith(("https://", "http://"))
+            image = _read_cached_cover(path, key) if cacheable else None
+            if image is None:
+                req = Request(pic, headers={
+                    "User-Agent": "Mozilla/5.0",
+                    "Referer": "https://music.163.com/",
+                })
+                with urlopen(req, timeout=25) as r:
+                    data = r.read()
+                image = Image.open(io.BytesIO(data)).convert("RGB")
+                if cacheable:
+                    _store_cached_cover(path, key, data)
             with _cover_cache_lock:
                 _cover_cache[pic] = (time.monotonic(), image)
                 _cover_cache.move_to_end(pic)

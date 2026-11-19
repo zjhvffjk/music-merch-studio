@@ -953,6 +953,8 @@ html:not([data-theme="dark"]) .song-maker-replace:hover{color:#fffdf6;border-bot
 .music-page__side .side-album:hover b{color:#ffffff}
 .music-page__side .side-more{color:#9cc3a6}
 </style>
+<link rel="stylesheet" href="/artist-browser.css">
+<link rel="stylesheet" href="/mini-mockup/studio-menu.css">
 </head>
 <body data-page-node-id="Na2JkVOieEwQ90ny6oba1N">
 <div id="conn" class="conn" hidden></div>
@@ -1251,6 +1253,10 @@ html:not([data-theme="dark"]) .song-maker-replace:hover{color:#fffdf6;border-bot
     <div class="prog" data-page-node-id="LvwOPtNmZQKr1itiwREi4y"><i id="pbar" data-page-node-id="EfX81fLrNkXPnIBiWk3psK"></i></div>
     <div class="progwrap" data-page-node-id="Lghzpgv6uXa9UszZc9JHUt"></div>
 
+    <div id="artistSearchStatus" hidden style="padding:12px 18px">
+      <span id="artistSearchMessage" role="status"></span>
+      <button id="retryArtistSearch" type="button" hidden>重试</button>
+    </div>
     <div class="content" id="content" data-page-node-id="SwJHkFeLf7BKlOBYCjskNI">
       <section class="discover-home" aria-label="开始制作音乐周边">
         <span class="discover-home__eyebrow">MUSIC OBJECTS / DISCOVER</span>
@@ -1563,6 +1569,7 @@ function syncSel(){
    URL 不变、左栏不丢 —— 从头到尾只有一个工作台，不再「跳走」。 */
 let ARTIST_Q = '';    // 最近一次查询到的歌手名
 let DW_URL   = '';    // 当前 iframe 载入的地址（重复点同一张不重载，免得丢掉已生成的结果）
+let STUDIO_STAGE_SCROLL = 0;
 /* 「歌手」搜一次的结果缓存：两个出口都靠它，省掉第二次查询。
    albums 是**数组**（来自 /api/artist?albums=1 的 albumList），不是张数。 */
 let ARTIST_FOUND = null;
@@ -1603,7 +1610,8 @@ function openStudio(params){
   DW_URL = url;
   $('main').classList.add('studio-on');
   w.classList.add('on');
-  const s = $('#albStage'); if(s) s.hidden = true;
+  const s = $('#albStage');
+  if(s && !s.hidden){ STUDIO_STAGE_SCROLL = s.scrollTop; s.hidden = true; }
 }
 /* 返回（设计页里点「← 返回」触发） */
 function closeStudio(){
@@ -1613,6 +1621,13 @@ function closeStudio(){
   const f = $('#dwFrame'); if(f) f.src = 'about:blank';
   /* 从作品库点进去的 → 回作品库（重读一次磁盘，刚生成的会立刻出现） */
   if(MODE === 'proj'){ libOpen('minicd'); return; }
+  const stage = $('#albStage');
+  if(stage && $('main').classList.contains('music-search-active') &&
+     (stage.querySelector('.catalog-shell') || STAGE_ALBUM_CTX)){
+    stage.hidden = false;
+    stage.scrollTop = STUDIO_STAGE_SCROLL;
+    return;
+  }
   if(ALBUM_LIST.length) showAlbumStage();
   else { const a = $('#albStage'); if(a) { renderAlbumStage(); showAlbumStage(); } }
 }
@@ -1693,6 +1708,22 @@ function albumParams(a, songList){
   return u;
 }
 /* ===== 歌手搜索结果：音乐详情页（热门曲目 + 关联专辑） ===== */
+function trackCoverThumbnail(track, album){
+  const picture = track.pic || album?.pic;
+  if(!picture) return '';
+  try{
+    const url = new URL(asset(picture), location.href);
+    if(url.protocol !== 'http:' && url.protocol !== 'https:') return '';
+    if(/(^|\.)music\.126\.net$/i.test(url.hostname)) url.searchParams.set('param','96y96');
+    return url.href;
+  }catch(_){ return ''; }
+}
+
+function trackTitleCell(track, album, showArtist){
+  const thumbnail = trackCoverThumbnail(track, album);
+  return `<div class="track-title-cell"><span class="track-cover" aria-hidden="true">♪${thumbnail ? `<img src="${esc(thumbnail)}" alt="" loading="lazy" decoding="async" onerror="this.hidden=true">` : ''}</span><div class="track-title-copy"><span class="track-song-title">${esc(track.name||'—')}</span>${showArtist && track.artist ? `<div class="catalog-track-artist">${esc(track.artist)}</div>` : ''}</div></div>`;
+}
+
 function renderArtistResultStage(data){
   LAST_ARTIST_DATA=data;
   hideAppBack();
@@ -1704,7 +1735,7 @@ function renderArtistResultStage(data){
   const songs=(data.songs||[]).slice(0, (data._noCap||albCtx)?100000:(isSongSearch?40:18));
   const albums=(data.albumList||ALBUM_LIST||[]);
   const fallbackPic=(albums[0]&&albums[0].pic)||''; const pic=artist.pic ? asset(artist.pic) : (fallbackPic ? asset(fallbackPic) : '');
-  const rows=songs.map((track,i)=>`<tr class="artist-track" data-track="${i}">${albCtx?`<td class="chk"><input type="checkbox" class="track-check" data-track="${i}" checked></td>`:''}<td class="no">${i+1}</td><td>${esc(track.name||'—')}</td>${isSongSearch?`<td>${esc(track.artist||'—')}</td>`:''}<td>${esc(track.album||track.artist||'—')}</td><td class="duration">${esc(track.dur||'')}</td><td class="make"><button type="button" data-track="${i}">制作</button></td></tr>`).join('');
+  const rows=songs.map((track,i)=>`<tr class="artist-track" data-track="${i}">${albCtx?`<td class="chk"><input type="checkbox" class="track-check" data-track="${i}" checked></td>`:''}<td class="no">${i+1}</td><td>${trackTitleCell(track, albCtx, !isSongSearch)}</td>${isSongSearch?`<td>${esc(track.artist||'—')}</td>`:''}<td>${esc(track.album||track.artist||'—')}</td><td class="duration">${esc(track.dur||'')}</td><td class="make"><button type="button" data-track="${i}">制作</button></td></tr>`).join('');
   const albumRows=albums.map((album,i)=>`<div class="side-album" data-album="${i}"><img src="${esc(asset(album.pic||''))}" alt=""><span><b>${esc(album.name||'未命名专辑')}</b><small>${esc([album.date,album.type].filter(Boolean).join(' · ')||'专辑')}</small>${album.tracks?`<span class="cnt">${album.tracks} 首</span>`:''}</span></div>`).join('');
   box.className='albStage music-search-stage';
   box.innerHTML=`<div class="music-page${albCtx?' no-side':''}"><section class="music-page__main"><div class="artist-info">${pic?`<img class="artist-info__cover" src="${esc(pic)}" alt="${esc(albCtx?albCtx.name:(artist.name||''))}">`:'<div class="artist-info__cover"></div>'}<div class="artist-info__copy">${albCtx?`<span class="artist-info__tag">专辑</span><h2>${esc(albCtx.name||'未命名专辑')}</h2><div class="artist-info__meta">${esc(artist.name||ARTIST_Q||'')}${albCtx.date?'　·　'+esc(albCtx.date):''}${albCtx.type?'　·　'+esc(albCtx.type):''}${albCtx.company?'　·　'+esc(albCtx.company):''}　·　共 ${songs.length} 首</div><div class="artist-info__actions"><button type="button" class="primary" id="albumMakeDesign">生成整张专辑设计</button><button type="button" id="albumBatchMake">批量制作已选曲目</button></div>`:`<span class="artist-info__tag">歌手</span><h2>${esc(artist.name||ARTIST_Q||'搜索结果')}</h2><div class="artist-info__meta">热门单曲 ${songs.length} 首　·　专辑 ${ALBUM_LIST.length||data.albumCount||0} 张　·　来源 ${data.source==='qq'?'QQ音乐':data.source==='kugou'?'酷狗音乐':'网易云音乐'}</div><div class="artist-info__actions"><button type="button" class="primary" id="artistMakeHot">按热门生成</button><button type="button" id="artistBrowseAlbums">查看全部专辑</button></div>`}</div></div><div class="artist-summary"><b>音乐资料</b>从这里挑选一首单曲或一张专辑，再交给右侧的商品制作队列。封面、曲名和歌手信息会继续传入现有生成流程。</div><div class="track-head"><h3>${albCtx?'专辑曲目':(ARTIST_SONGS_FULL?'全部歌曲':'热门歌曲')}</h3><span>${songs.length} 首</span>${albCtx?`<span class="track-sel-info" id="trackSelInfo"></span>`:''}${albCtx?'':`<button type="button" id="artistSongMode">${ARTIST_SONGS_FULL?'← 返回热门歌曲':'载入该歌手全部歌曲 →'}</button>`}</div><table class="track-table"><thead><tr>${albCtx?'<th class="chk"><input type="checkbox" id="trackSelAll" checked title="全选 / 全不选"></th>':''}<th class="no">#</th><th>歌曲标题</th><th>专辑</th><th class="duration">时长</th><th></th></tr></thead><tbody>${rows||`<tr><td colspan="${albCtx?6:5}">暂无歌曲数据</td></tr>`}</tbody></table></section>${albCtx?'':`<aside class="music-page__side"><div class="side-head"><div class="side-title">相关专辑<span class="side-total">共 ${albums.length||ALBUM_LIST.length||0} 张专辑</span></div><button class="side-sort" id="sideSortBtn" type="button" title="排序方式"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 6h8M3.5 12h6M3.5 18h4.5M17 4.5v15M14.7 6.8 17 4.5l2.3 2.3M14.7 17.2 17 19.5l2.3-2.3"/></svg></button></div><div class="side-sort-pop" id="sideSortPop" hidden><button type="button" data-sort="date" class="${SIDE_SORT_MODE==='date'?'on':''}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>按发行时间排序<i>✓</i></button><button type="button" data-sort="hot" class="${SIDE_SORT_MODE==='hot'?'on':''}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5c1.2 2.6 4.5 4.6 4.5 8.3a4.5 4.5 0 0 1-9 0c0-1.7.8-2.9 1.7-4.1.5.9 1.1 1.4 1.8 1.6-.4-2 .1-4.1 1-5.8z"/></svg>按热度排序<i>✓</i></button><button type="button" data-sort="type" class="${SIDE_SORT_MODE==='type'?'on':''}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18.5V6.5l9-2v11"/><circle cx="6.8" cy="18.5" r="2.2"/><circle cx="15.8" cy="15.5" r="2.2"/></svg>按类型排序<i>✓</i></button></div><div class="side-scroll" id="sideScroll">${albumRows||'<p class="search-popover__empty">暂无专辑数据</p>'}</div>${ALBUM_LIST.length?'<button class="side-more" id="artistSideMore" type="button">网格视图查看全部 →</button>':''}</aside>`}</div>`;
@@ -1717,10 +1748,10 @@ function renderArtistResultStage(data){
     LAST_SONG_INDEX=i;
     hideAppBack();
     pushAppRoute('song',{data,index:i});
-    box.innerHTML=`<section class="song-maker-page"><button type="button" class="song-maker-back">← 返回歌曲列表</button><div class="song-maker-hero"><div class="song-maker-cover"><span>♪</span><img src="${esc(asset(track.pic||''))}" alt="" onerror="this.style.display='none'"></div><div><span>SONG / PRODUCT MAKER</span><h2>制作《${esc(track.name||'未命名歌曲')}》</h2><p>${esc(artist.name||track.artist||'')}　·　${esc(track.album||'单曲')}　·　${esc(track.dur||'')}</p><button type="button" class="song-maker-replace">更换封面</button></div></div><div class="song-maker-choice-head"><div><i>选择商品</i><h3>先决定，要把这首歌做成什么</h3></div><p>当前歌曲封面会自动带入已选商品；以后新增 NFC 小卡等品类也会在这里出现。</p></div><div class="song-maker-products"><button type="button" class="song-maker-product" data-output="keychain"><i>01 / OUTPUT</i><b>钥匙扣商品图</b><small>主图 · 实物合成</small></button><button type="button" class="song-maker-product" data-output="shop"><i>02 / OUTPUT</i><b>电商白底图</b><small>白底 · 透明底 · 拼版</small></button><button type="button" class="song-maker-product" data-output="vinyl"><i>03 / OUTPUT</i><b>黑胶播放界面</b><small>竖图 · 唱片 · 控制区</small></button><button type="button" class="song-maker-product song-maker-product--soon" disabled><i>04 / NEXT</i><b>NFC 音乐小卡</b><small>封面 · 链接 · 收藏卡</small></button></div><details class="song-maker-details"><summary>制作细节参数</summary><div class="song-maker-detail-grid"><label><span>播放模式</span><select data-detail="playbackMode">${[['loop','列表循环'],['single','单曲循环'],['random','随机播放']].map(([v,t])=>`<option value="${v}" ${$('#p_playbackMode').value===v?'selected':''}>${t}</option>`).join('')}</select></label><label><span>播放列表标题</span><input data-detail="playlist" value="${esc($('#p_playlist').value)}"></label><label><span>热度 / 评论文案</span><div style="display:flex;gap:6px"><input data-detail="likes" value="${esc($('#p_likes').value)}"><input data-detail="comments" value="${esc($('#p_comments').value)}"></div></label><label><span>在线人数文案</span><input data-detail="listeners" value="${esc($('#p_listeners').value)}"></label><label><span>主图尺寸 / DPI</span><div style="display:flex;gap:6px"><input type="number" data-detail="width" value="${esc($('#p_width').value)}"><input type="number" data-detail="dpi" value="${esc($('#p_dpi').value)}"></div></label><label><span>白底商品图画布</span><div class="detail-chips">${SHOP_PRESETS.map(p=>`<button type="button" data-detail-canvas="${esc(p.key)}">${esc(p.tag||p.label||p.key)}</button>`).join('')}</div></label><label><span>白底商品图底色</span><div class="detail-chips"><button type="button" data-detail-bg="white">白底</button><button type="button" data-detail-bg="transparent">透明</button><button type="button" data-detail-bg="both">两种</button></div></label><label><span>黑胶播放图宽度</span><div class="detail-chips"><button type="button" data-detail-vinyl="900">900</button><button type="button" data-detail-vinyl="1200">1200</button><button type="button" data-detail-vinyl="1500">1500</button></div></label><label><span>显示与封面规则</span><div class="detail-switch">VIP 标签<input type="checkbox" data-detail-check="vip" ${$('#p_vip').checked?'checked':''}></div><div class="detail-switch">歌手关注按钮<input type="checkbox" data-detail-check="follow" ${$('#p_follow').checked?'checked':''}></div><div class="detail-switch">无封面自动补位<input type="checkbox" data-detail-check="ph" ${$('#p_ph').checked?'checked':''}></div></label><label><span>印刷与商品图附加输出</span><div class="detail-switch">额外输出商品拼版总览<input type="checkbox" data-detail-check="shopGrid" ${$('#p_shopGrid').checked?'checked':''}></div><div class="detail-switch">播放界面 A4 印刷拼版<input type="checkbox" data-detail-check="playerPrint" ${$('#p_playerPrint').checked?'checked':''}></div><select data-detail="playerPrintLayout"><option value="landscape32" ${$('#p_playerPrintLayout').value==='landscape32'?'selected':''}>横向高密 · 32 张</option><option value="portrait30" ${$('#p_playerPrintLayout').value==='portrait30'?'selected':''}>竖向直排 · 30 张</option><option value="landscape21" ${$('#p_playerPrintLayout').value==='landscape21'?'selected':''}>横向留缝 · 21 张</option></select></label></div></details><div class="song-maker-footer"><span class="song-maker-status">正在匹配当前歌曲封面…</span><button type="button" class="song-maker-cancel">取消</button><button type="button" class="song-maker-start primary" disabled>开始制作 →</button></div></section>`;
+    box.innerHTML=`<section class="song-maker-page"><button type="button" class="song-maker-back">← 返回歌曲列表</button><div class="song-maker-hero"><div class="song-maker-cover"><span>♪</span><img src="${esc(asset(track.pic||''))}" alt="" onerror="this.style.display='none'"></div><div><span>SONG / PRODUCT MAKER</span><h2>制作《${esc(track.name||'未命名歌曲')}》</h2><p>${esc(track.artist||artist.name||'')}　·　${esc(track.album||'单曲')}　·　${esc(track.dur||'')}</p><button type="button" class="song-maker-replace">更换封面</button></div></div><div class="song-maker-choice-head"><div><i>选择商品</i><h3>先决定，要把这首歌做成什么</h3></div><p>当前歌曲封面会自动带入已选商品；以后新增 NFC 小卡等品类也会在这里出现。</p></div><div class="song-maker-products"><button type="button" class="song-maker-product" data-output="keychain"><i>01 / OUTPUT</i><b>钥匙扣商品图</b><small>主图 · 实物合成</small></button><button type="button" class="song-maker-product" data-output="shop"><i>02 / OUTPUT</i><b>电商白底图</b><small>白底 · 透明底 · 拼版</small></button><button type="button" class="song-maker-product" data-output="vinyl"><i>03 / OUTPUT</i><b>黑胶播放界面</b><small>竖图 · 唱片 · 控制区</small></button><button type="button" class="song-maker-product song-maker-product--soon" disabled><i>04 / NEXT</i><b>NFC 音乐小卡</b><small>封面 · 链接 · 收藏卡</small></button></div><details class="song-maker-details"><summary>制作细节参数</summary><div class="song-maker-detail-grid"><label><span>播放模式</span><select data-detail="playbackMode">${[['loop','列表循环'],['single','单曲循环'],['random','随机播放']].map(([v,t])=>`<option value="${v}" ${$('#p_playbackMode').value===v?'selected':''}>${t}</option>`).join('')}</select></label><label><span>播放列表标题</span><input data-detail="playlist" value="${esc($('#p_playlist').value)}"></label><label><span>热度 / 评论文案</span><div style="display:flex;gap:6px"><input data-detail="likes" value="${esc($('#p_likes').value)}"><input data-detail="comments" value="${esc($('#p_comments').value)}"></div></label><label><span>在线人数文案</span><input data-detail="listeners" value="${esc($('#p_listeners').value)}"></label><label><span>主图尺寸 / DPI</span><div style="display:flex;gap:6px"><input type="number" data-detail="width" value="${esc($('#p_width').value)}"><input type="number" data-detail="dpi" value="${esc($('#p_dpi').value)}"></div></label><label><span>白底商品图画布</span><div class="detail-chips">${SHOP_PRESETS.map(p=>`<button type="button" data-detail-canvas="${esc(p.key)}">${esc(p.tag||p.label||p.key)}</button>`).join('')}</div></label><label><span>白底商品图底色</span><div class="detail-chips"><button type="button" data-detail-bg="white">白底</button><button type="button" data-detail-bg="transparent">透明</button><button type="button" data-detail-bg="both">两种</button></div></label><label><span>黑胶播放图宽度</span><div class="detail-chips"><button type="button" data-detail-vinyl="900">900</button><button type="button" data-detail-vinyl="1200">1200</button><button type="button" data-detail-vinyl="1500">1500</button></div></label><label><span>显示与封面规则</span><div class="detail-switch">VIP 标签<input type="checkbox" data-detail-check="vip" ${$('#p_vip').checked?'checked':''}></div><div class="detail-switch">歌手关注按钮<input type="checkbox" data-detail-check="follow" ${$('#p_follow').checked?'checked':''}></div><div class="detail-switch">无封面自动补位<input type="checkbox" data-detail-check="ph" ${$('#p_ph').checked?'checked':''}></div></label><label><span>印刷与商品图附加输出</span><div class="detail-switch">额外输出商品拼版总览<input type="checkbox" data-detail-check="shopGrid" ${$('#p_shopGrid').checked?'checked':''}></div><div class="detail-switch">播放界面 A4 印刷拼版<input type="checkbox" data-detail-check="playerPrint" ${$('#p_playerPrint').checked?'checked':''}></div><select data-detail="playerPrintLayout"><option value="landscape32" ${$('#p_playerPrintLayout').value==='landscape32'?'selected':''}>横向高密 · 32 张</option><option value="portrait30" ${$('#p_playerPrintLayout').value==='portrait30'?'selected':''}>竖向直排 · 30 张</option><option value="landscape21" ${$('#p_playerPrintLayout').value==='landscape21'?'selected':''}>横向留缝 · 21 张</option></select></label></div></details><div class="song-maker-footer"><span class="song-maker-status">正在匹配当前歌曲封面…</span><button type="button" class="song-maker-cancel">取消</button><button type="button" class="song-maker-start primary" disabled>开始制作 →</button></div></section>`;
     const page=box.querySelector('.song-maker-page'), status=page.querySelector('.song-maker-status'), start=page.querySelector('.song-maker-start');
     mountShopStyleDetail(page);
-    const coverKey=(artist.name||track.artist||'')+'::'+(track.name||'');
+    const coverKey=(track.artist||artist.name||'')+'::'+(track.name||'');
     let customCover=CUSTOM_COVERS.get(coverKey)||null;
     if(customCover) page.querySelector('.song-maker-hero img').src=customCover.url;
     const replaceCover=page.querySelector('.song-maker-replace');
@@ -1755,7 +1786,7 @@ function renderArtistResultStage(data){
       el.onclick=()=>{VINYL_W=Number(el.dataset.detailVinyl);page.querySelectorAll('[data-detail-vinyl]').forEach(x=>x.classList.toggle('on',x===el));bindVinylChips();};
     });
     try{
-      const found={...track,source:data.source||track.source||'163'};
+      const found={...track,source:track.source||data.source||'163'};
       if(!found)throw new Error('没有找到可用封面');
       const cover=page.querySelector('.song-maker-hero img'); if(found.pic && !customCover)cover.src=asset(found.pic);
       status.textContent='已匹配封面 · 默认完整商品包已选，可按需取消'; start.disabled=false;
@@ -1867,6 +1898,9 @@ async function openAlbumDetail(album){
   if(!album) return;
   if(!ARTIST_BASE_DATA && LAST_ARTIST_DATA) ARTIST_BASE_DATA=LAST_ARTIST_DATA;
   const box=$('#albStage'); if(!box) return;
+  const origin = LAST_ARTIST_DATA?._catalog ? {
+    ...LAST_ARTIST_DATA, _catalog:{...LAST_ARTIST_DATA._catalog, scrollTop:box.scrollTop}
+  } : null;
   toast('正在载入《'+(album.name||'')+'》曲目…');
   try{
     const d=await jget('/api/album_songs?id='+encodeURIComponent(album.id||''),20000);
@@ -1883,7 +1917,11 @@ async function openAlbumDetail(album){
     };
     $('main').classList.add('music-search-active');
     renderArtistResultStage(LAST_ARTIST_DATA);
-    setAppBack('← 返回歌手页',backToArtistBase);
+    setAppBack(origin?._catalog.tab==='albums'?'← 返回专辑列表':'← 返回歌手页', () => {
+      if(!origin) return backToArtistBase();
+      LAST_ARTIST_DATA = origin;
+      returnArtistList();
+    });
     const stage=$('#albStage'),content=$('#content'); if(stage)stage.hidden=false; if(content)content.hidden=true;
     pushAppRoute('albumDetail',{});
   }catch(e){
@@ -1898,6 +1936,12 @@ function backToArtistBase(){
 /* 从歌曲资料页进入专辑全集：应用内返回回歌曲列表，首页由顶栏独立负责。 */
 function showArtistAlbums(){
   if(!LAST_ARTIST_DATA) return;
+  if(LAST_ARTIST_DATA._catalog){
+    const data = {...LAST_ARTIST_DATA, _catalog:{...LAST_ARTIST_DATA._catalog, tab:'albums', scrollTop:0}};
+    renderArtistResultStage(data);
+    pushAppRoute('artist',{data});
+    return;
+  }
   STAGE_ALBUM_CTX = null;   // 专辑墙不是某张专辑的详情页：别让它的复选框被误认为曲目勾选
   uiMode('album'); renderAlbumStage(); showAlbumStage();
   setAppBack('← 返回歌曲列表',returnArtistList);
@@ -2028,24 +2072,21 @@ function renderAlbumStage(){
   const sa = $('#selAll'), sn = $('#selNone'), bd = $('#btnDesignSel');
   if(sa) sa.onclick = ()=>{ ALBUM_LIST.forEach((_,i)=>ALBUM_SEL.add(i)); syncSel(); };
   if(sn) sn.onclick = ()=>{ ALBUM_SEL.clear(); syncSel(); };
-  if(bd) bd.onclick = ()=>{
-    const picked=[],skipped=[];
-    [...ALBUM_SEL].sort((x,y)=>x-y).forEach(i=>{
-      const a = ALBUM_LIST[i] || {};
-      if(a.name && a.pic)
-        picked.push({album:a.name, artist:ARTIST_Q||'', id:a.id||'',
-                     pic:a.pic, company:a.company||'', date:a.date||''});
-      else skipped.push(a.name || ('第'+(i+1)+'张'));
-    });
-    if(!picked.length) return toast('选中的专辑缺封面，换几张再试');
-    if(skipped.length) toast('已跳过 '+skipped.length+' 张没有封面的：'+skipped.slice(0,3).join('、'));
-    // 每张约 5~8 秒（实测 3 张用时 16 秒）；量太大先让用户确认，避免点下去干等几分钟。
-    if(picked.length>24 && !confirm('选了 '+picked.length+' 张，预计要 '+
-        Math.ceil(picked.length*8/60)+' 分钟以上。确定现在就开始吗？')) return;
-    try{ sessionStorage.setItem('minuet_design_batch', JSON.stringify(picked)); }catch(e){}
-    openStudio({batch:'1'});
-  };
+  if(bd) bd.onclick = () => openAlbumBatch(ALBUM_LIST.filter((_, i) => ALBUM_SEL.has(i)), ARTIST_Q);
   syncSel();
+}
+
+function openAlbumBatch(albums, artist){
+  const available = albums.filter(album => album.name && album.pic);
+  if(!available.length) return toast('请勾选有封面的专辑');
+  if(available.length > 24 && !confirm('选了 '+available.length+' 张，预计要 '+
+      Math.ceil(available.length*8/60)+' 分钟以上。确定现在就开始吗？')) return;
+  const picked = available.map(a => ({album:a.name, artist:artist||'', id:a.id||'',
+    pic:a.pic, company:a.company||'', date:a.date||''}));
+  try{ sessionStorage.setItem('minuet_design_batch', JSON.stringify(picked)); }
+  catch(e){ return toast('无法保存批量选择，请重试'); }
+  if(available.length < albums.length) toast('已跳过 '+(albums.length-available.length)+' 张没有封面的专辑');
+  openStudio({batch:'1'});
 }
 /* 设计页里的「← 返回专辑列表」：iframe 内拿不到外层函数，走 postMessage 回来 */
 window.addEventListener('message', e=>{
@@ -2371,12 +2412,18 @@ $('#btnQueryArtist').onclick = async ()=>{
   const name = $('#artistName').value.trim();
   if(!name) return toast('先填歌手名');
   const btn = $('#btnQueryArtist');
+  const status = $('#artistSearchStatus');
+  const message = $('#artistSearchMessage');
+  const retry = $('#retryArtistSearch');
+  message.textContent = '正在搜索「'+name+'」的歌曲和专辑…';
+  retry.hidden = true;
+  status.hidden = false;
   btn.disabled = true; btn.textContent = '查询中';
   ARTIST_FOUND = null;
   $('#exitBox').classList.remove('on');
   try{
     const d = await jget('/api/artist?name='+encodeURIComponent(name)
-                         +'&source='+encodeURIComponent(SRC)+'&albums=1');
+                         +'&source='+encodeURIComponent(SRC)+'&albums=1', 45000);
     const a = d.artist, n = d.songs.length;
     const srcName = d.source === 'qq' ? 'QQ音乐' : d.source === 'kugou' ? '酷狗音乐' : '网易云';
     const warn = (d.notes||[]).filter(t=>t.startsWith('⚠'));
@@ -2433,9 +2480,15 @@ $('#btnQueryArtist').onclick = async ()=>{
     document.body.classList.add('has-music-result');
     $('main').classList.add('music-search-active'); setWorkspaceCompact(true);
     setTitle(a.name+' · 音乐搜索', '热门歌曲 '+n+' 首 · 选择歌曲或专辑后制作商品');
+    status.hidden = true;
     if(!warn.length) toast(`找到 ${a.name}，热门 ${n} 首 · 专辑 ${acnt} 张 · 数据源 ${srcName}`);
   }catch(e){
-    toast(e.message);
+    message.textContent = '暂时无法加载「'+name+'」的歌曲和专辑。'+e.message;
+    retry.onclick = ()=>{
+      $('#artistName').value = name;
+      btn.click();
+    };
+    retry.hidden = false;
     $('#artistBox').innerHTML=''; $('#exitBox').classList.remove('on');
   }
   finally{ btn.disabled = false; btn.textContent = '查询'; }
@@ -2526,7 +2579,7 @@ $('#albBack').onclick = ()=>{
 };
 
 /* ---------------- 查询单曲 ---------------- */
-function showSongSearchStage(kw,songs,searchError=''){
+function showSongSearchStage(kw,songs,searchError='',artistCandidates){
   const result={searchKind:'song',query:kw,artist:{name:''},songs,searchError};
   renderArtistResultStage(result);
   pushAppRoute('artist',{data:result});
@@ -2537,7 +2590,10 @@ function showSongSearchStage(kw,songs,searchError=''){
   /* 单曲页兜底入口：若关键词其实是一位歌手（如"颜人中"），给一个跳转歌手主页的按钮。
      这样无论用户是回车、点了"搜索单曲"还是点了联想里的歌，都能一键回到歌手页（热门歌曲+全部专辑）。 */
   if(!searchError){
-    jget('/api/search?name='+encodeURIComponent(kw),15000).then(d=>{
+    const lookup = artistCandidates === undefined
+      ? jget('/api/search?name='+encodeURIComponent(kw),15000)
+      : Promise.resolve({artists:artistCandidates});
+    lookup.then(d=>{
       const artists=d.artists||[];
       const hit=artists.find(a=>a.source==='qq'&&a.name===kw)
               || (artists.find(a=>a.name===kw) && (d.songs||[]).length<5 ? artists.find(a=>a.name===kw) : null);
@@ -2624,6 +2680,7 @@ function collect(){
     vip:        $('#p_vip').checked,
     follow:     $('#p_follow').checked,
     playbackMode: $('#p_playbackMode').value,
+    playerSkinId: MODE === 'album' ? '' : (window.StudioMenu?.getSelectionId() || ''),
     allow_placeholder: $('#p_ph').checked,
     keychain:   $('#p_keychain').checked && !$('#p_keychain').disabled,
     keychainStyle: SHOP_STYLE_KEYS[0],
@@ -2668,6 +2725,18 @@ $('#btnGo').onclick = async ()=>{
   if(MODE === 'artist' && !o.artist) return toast('先填歌手名');
   if(MODE === 'album'  && !o.artist) return toast('先填歌手名');
   if(MODE === 'song'   && !o.song)   return toast('先填歌名');
+
+  if(o.playerSkinId){
+    $('#btnGo').disabled = true;
+    try{
+      const backend = await jget('/api/ping', 3000);
+      if(!backend.playerSkinRendering) return toast('请重启工作台服务，加载新的播放器样式出图功能');
+    }catch(e){
+      return toast('未能连接工作台服务，请稍后再试');
+    }finally{
+      $('#btnGo').disabled = false;
+    }
+  }
 
   if(!ROUTE_RESTORING) pushAppRoute('output',{});
   if(MODE==='song' && LAST_ARTIST_DATA) setAppBack('← 返回制作设置',returnSongMaker);
@@ -3569,7 +3638,7 @@ document.addEventListener('keydown', e=>{
 /* 首页快捷入口沿用顶部搜索与上传流程，不另起一套功能。 */
 document.addEventListener('click', e=>{
   const artist=e.target.closest('[data-discover-artist]');
-  if(artist){ const input=$('#globalSearch'); input.value=artist.dataset.discoverArtist; input.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true})); return; }
+  if(artist) window.goArtistPage(artist.dataset.discoverArtist);
 });
 
 /* ===== 全局搜索：历史、热搜、输入联想与两种结果入口 ===== */
@@ -3578,12 +3647,26 @@ document.addEventListener('click', e=>{
   if(!input || !pop) return;
   const hot=['周杰伦','陈奕迅','林俊杰','薛之谦','邓紫棋','告五人','毛不易','张杰','孙燕姿','王菲'];
   let timer=0, token=0, ALBUMS=[];
+  let recentSearch;
+  function lookupSearch(query){
+    if(recentSearch?.query===query && Date.now()<recentSearch.expires) return recentSearch.promise;
+    const entry={query,expires:Infinity};
+    entry.promise=jget('/api/search?name='+encodeURIComponent(query),15000).then(result=>{
+      entry.expires=Date.now()+30000;
+      return result;
+    },error=>{
+      if(recentSearch===entry)recentSearch=undefined;
+      throw error;
+    });
+    recentSearch=entry;
+    return entry.promise;
+  }
   const escape=esc;
   function history(){try{return JSON.parse(localStorage.getItem('fold-search-history')||'[]').slice(0,8).map(x=>typeof x==='string'?{q:x,mode:hot.includes(x)?'artist':'song'}:x).filter(x=>x&&x.q)}catch(e){return []}}
   function save(q,mode){const list=history().filter(x=>x.q!==q); list.unshift({q,mode}); try{localStorage.setItem('fold-search-history',JSON.stringify(list.slice(0,8)))}catch(e){}}
   function open(){pop.hidden=false; clear.hidden=!input.value; if(!input.value.trim()) renderStart();}
   function close(){pop.hidden=true;}
-  function artist(q){q=(q||'').trim(); if(!q)return; save(q,'artist'); input.value=q; clear.hidden=false; document.body.classList.remove('has-active-production','production-controls-open'); uiMode('artist'); $('#artistName').value=q; $('#btnQueryArtist').click(); close();}
+  function artist(q){q=(q||'').trim(); if(!q || $('#btnQueryArtist').disabled)return; save(q,'artist'); input.value=q; clear.hidden=false; document.body.classList.remove('has-active-production','production-controls-open'); uiMode('artist'); $('#artistName').value=q; $('#btnQueryArtist').click(); close();}
   /* 暴露给模块外（如单曲搜索页的「进入歌手主页」按钮）复用 */
   window.goArtistPage = artist;
   function song(q){q=(q||'').trim(); if(!q)return; save(q,'song'); input.value=q; clear.hidden=false; document.body.classList.remove('has-active-production','production-controls-open'); uiMode('song'); $('#songKw').value=q; $('#btnQuerySong').click(); close();}
@@ -3597,7 +3680,8 @@ document.addEventListener('click', e=>{
     q=(q||'').trim(); if(!q)return;
     save(q); input.value=q; clear.hidden=false;
     let d=null;
-    try{ d=await jget('/api/search?name='+encodeURIComponent(q),15000); }
+    clearTimeout(timer);
+    try{ d=await lookupSearch(q); }
     catch(e){ return artist(q); }
     const artists=d.artists||[], songs=d.songs||[], albums=d.albums||[];
     const exactQQ=artists.find(a=>a.source==='qq'&&a.name===q);
@@ -3606,7 +3690,7 @@ document.addEventListener('click', e=>{
     if(songs.length){
       save(q,'song'); uiMode('song'); $('#songKw').value=q;
       PICK=null; SEL=null; close();
-      return showSongSearchStage(q,songs);
+      return showSongSearchStage(q,songs,'',artists);
     }
     const albExact=albums.find(a=>a.name===q);
     if(albExact){ ALBUMS=albums; return openAlbumFromSearch(albums.indexOf(albExact)); }
@@ -3616,9 +3700,11 @@ document.addEventListener('click', e=>{
   }
   function renderStart(){
     const h=history();
-    pop.innerHTML=`${h.length?`<div class="search-popover__history"><span>搜索历史</span><button type="button" data-search-clear-history>清空</button></div><div class="search-popover__chips">${h.map(x=>`<button type="button" data-search-${x.mode==='artist'?'artist':'song'}="${escape(x.q)}">${escape(x.q)}</button>`).join('')}</div>`:''}<div class="search-popover__label">猜你想搜</div><div class="search-popover__chips">${hot.map(x=>`<button type="button" data-search-artist="${escape(x)}">${escape(x)}</button>`).join('')}</div><div class="search-popover__label">快速进入</div><div class="search-popover__actions"><button class="search-popover__action" type="button" data-search-mode="artist"><b>按歌手搜索</b><small>热门歌曲和全部专辑</small></button><button class="search-popover__action" type="button" data-search-mode="song"><b>按单曲搜索</b><small>从候选里选一首制作</small></button></div>`;
+    const artistRows = window.ArtistDiscovery ? window.ArtistDiscovery.rows(hot.map(name=>({name}))) : '';
+    pop.innerHTML=`${h.length?`<div class="search-popover__history"><span>搜索历史</span><button type="button" data-search-clear-history>清空</button></div><div class="search-popover__chips">${h.map(x=>`<button type="button" data-search-${x.mode==='artist'?'artist':'song'}="${escape(x.q)}">${escape(x.q)}</button>`).join('')}</div>`:''}${artistRows?`<div class="search-popover__label">热门歌手</div>${artistRows}`:`<div class="search-popover__label">猜你想搜</div><div class="search-popover__chips">${hot.map(x=>`<button type="button" data-search-artist="${escape(x)}">${escape(x)}</button>`).join('')}</div>`}<div class="search-popover__label">快速进入</div><div class="search-popover__actions"><button class="search-popover__action" type="button" data-search-mode="artist"><b>按歌手搜索</b><small>热门歌曲和全部专辑</small></button><button class="search-popover__action" type="button" data-search-mode="song"><b>按单曲搜索</b><small>从候选里选一首制作</small></button></div>`;
+    window.ArtistDiscovery?.hydrate(pop);
   }
-  function renderResults(q,songs,albums){
+  function renderResults(q,songs,albums,artists=[]){
     /* 专辑联想：点一条直接进设计页（design.html 只认 artist/album/id/pic/date）。
        QQ/酷狗/网易云的专辑搜索接口都给直链封面，联想框可放心展示缩略图。 */
     ALBUMS=albums||[];
@@ -3627,8 +3713,11 @@ document.addEventListener('click', e=>{
     const albRows=ALBUMS.slice(0,3).map((a,i)=>`<button class="search-popover__row" type="button" data-search-album="${i}">${a.pic?`<img class="search-popover__cover" src="${escape(a.pic)}" alt="">`:'<i class="search-popover__cover"></i>'}<span><b>${escape(a.name)}</b><small>专辑 · ${escape(a.singer||'')}${a.count?' · '+a.count+' 首':''}</small></span><i>${escape(srcName[a.source]||a.source||'')}</i></button>`).join('');
     const songMarkup = rows ? '<div class="search-popover__label">单曲联想</div>' + rows : '';
     const albMarkup = albRows ? '<div class="search-popover__label">专辑联想</div>' + albRows : '';
-    const listMarkup = (songMarkup || albMarkup) ? songMarkup + albMarkup : '<div class="search-popover__empty">没有匹配的单曲或专辑，可直接按歌手或关键词搜索。</div>';
+    const artistRows = window.ArtistDiscovery ? window.ArtistDiscovery.rows(artists,q) : '';
+    const artistMarkup = artistRows ? '<div class="search-popover__label">歌手</div>' + artistRows : '';
+    const listMarkup = (artistMarkup || songMarkup || albMarkup) ? artistMarkup + songMarkup + albMarkup : '<div class="search-popover__empty">没有匹配的单曲或专辑，可直接按歌手或关键词搜索。</div>';
     pop.innerHTML=`<div class="search-popover__actions"><button class="search-popover__action" type="button" data-search-artist="${escape(q)}"><b>搜索歌手「${escape(q)}」</b><small>热门歌曲和专辑</small></button><button class="search-popover__action" type="button" data-search-song="${escape(q)}"><b>搜索单曲「${escape(q)}」</b><small>显示可选版本</small></button></div>${listMarkup}`;
+    window.ArtistDiscovery?.hydrate(pop);
   }
   /* 从搜索联想直接打开一张专辑的设计页（不经歌手资料页）。
      曲目清单由 design.html 侧按现有契约自行处理，热歌继承留空不影响。 */
@@ -3644,9 +3733,9 @@ document.addEventListener('click', e=>{
     openStudio(p);
   }
   input.addEventListener('focus',open);
-  input.addEventListener('input',()=>{const q=input.value.trim(); clear.hidden=!q; clearTimeout(timer); if(!q){renderStart();return;} const mine=++token; timer=setTimeout(async()=>{try{const d=await jget('/api/search?name='+encodeURIComponent(q),9000);if(mine===token && !pop.hidden)renderResults(q,d.songs||[],d.albums||[])}catch(e){if(mine===token)renderResults(q,[],[])}},260);});
+  input.addEventListener('input',()=>{const q=input.value.trim(); clear.hidden=!q; clearTimeout(timer); const mine=++token; if(!q){renderStart();return;} timer=setTimeout(async()=>{try{const d=await lookupSearch(q);if(mine===token && !pop.hidden)renderResults(q,d.songs||[],d.albums||[],d.artists||[])}catch(e){if(mine===token)renderResults(q,[],[])}},260);});
   input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();const q=input.value.trim();if(hot.includes(q))artist(q);else smartSearch(q)}else if(e.key==='Escape')close();});
-  clear.addEventListener('click',()=>{input.value='';clear.hidden=true;input.focus();renderStart();});
+  clear.addEventListener('click',()=>{token++; clearTimeout(timer);input.value='';clear.hidden=true;input.focus();renderStart();});
   pop.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;if(b.hasAttribute('data-search-clear-history')){try{localStorage.removeItem('fold-search-history')}catch(err){}renderStart();return;}if(b.dataset.searchAlbum!==undefined){openAlbumFromSearch(Number(b.dataset.searchAlbum));return;}if(b.dataset.searchArtist!==undefined){artist(b.dataset.searchArtist);return;}if(b.dataset.searchSong!==undefined){song(b.dataset.searchSong);return;}if(b.dataset.searchMode==='artist')artist(input.value);if(b.dataset.searchMode==='song')song(input.value);});
   document.addEventListener('pointerdown',e=>{if(!$('#globalSearchBox').contains(e.target))close();});
 })();
@@ -3752,6 +3841,8 @@ $('.brand h1').ondblclick = ()=> showConn(true);
   }
 })();
 </script>
+<script src="/artist-browser.js"></script>
+<script src="/mini-mockup/studio-menu.js"></script>
 <script type="module" src="/mini-mockup/keychain-watermark.js"></script>
 </body>
 </html>

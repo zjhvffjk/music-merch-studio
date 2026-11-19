@@ -1,9 +1,10 @@
 import {shellThumbnail as onlineThumbnail} from './online-reference-v30/renderer.js';
-import{surfaces,views,viewScale,widestViewScale,initialState,defaultTransform,sanitizeState,validQuad,persist,restore,readUpload}from'./model.js';
-import{preloadShells,prepareAsset,prepareProjectAssets,invalidate,render,getQuad,exportPNG,exportThreeViewPreview,frontX,shellThumbnail,BASE}from'./renderer.js';
+import{surfaces,views,viewScale,widestViewScale,initialState,defaultTransform,sanitizeState,validQuad,persist,restore,readUpload,REMOVED_DISC_VIEW,visibleViewIndices}from'./model.js';
+import{preloadShells,prepareAsset,prepareProjectAssets,invalidate,render,getQuad,exportPNG,exportThreeViewPreview,exportAccessoryOverview,frontX,shellThumbnail,BASE}from'./renderer.js';
 import{createZip}from'./zip-store.js';
 import{mountWatermarkControls}from'./watermark-controls.js';
 let watermarkControls;
+const accessoryOverviewLabel='内外展开组合图';
 const embedded=new URLSearchParams(location.search).get('embed')==='1';
 if(embedded)document.body.classList.add('embedded');
 const $=s=>document.querySelector(s);let state=initialState(),calibrating=false,zoom=100,ready=false,initializing=true,saveTimer,toastTimer,drag=null,saveRevision=0;const imageIcon='<svg viewBox="0 0 28 28" aria-hidden="true"><rect x="3" y="3" width="22" height="22" rx="2"/><circle cx="10" cy="9" r="2"/><path d="m4 22 7-8 5 5 4-4 5 7"/></svg>';
@@ -11,7 +12,7 @@ function toast(message){$('#toast').textContent=message;$('#toast').classList.ad
 function scheduleSave(){if(ready&&!initializing)tellParent({type:'minicd-mockup-changed'});clearTimeout(saveTimer);const revision=++saveRevision;$('#saveStatus').textContent='正在保存到此浏览器…';saveTimer=setTimeout(async()=>{try{await persist(structuredClone(state));if(revision===saveRevision)$('#saveStatus').textContent='已自动保存 · 仅在此浏览器'}catch{if(revision===saveRevision)$('#saveStatus').textContent='浏览器保存不可用，请保存项目文件'}},450)}
 function draw(){if(!ready)return;const width=$('#canvasWrap').getBoundingClientRect().width;const resolution=Math.min(4096,Math.max(1254,Math.ceil(width*Math.max(1,window.devicePixelRatio||1))));render($('#preview'),state,state.view,resolution);drawAlignment();const overlay=$('#watermarkPreview'),stage=$('#stage'),ratio=Math.max(1,window.devicePixelRatio||1);if(overlay){overlay.width=Math.round(stage.clientWidth*ratio);overlay.height=Math.round(stage.clientHeight*ratio);watermarkControls?.draw(overlay)}}
 function refreshAssets(){for(const s of surfaces){const row=$(`[data-surface="${s.id}"]`),a=state.assets[s.id];row.classList.toggle('active',state.selected===s.id);row.setAttribute('aria-pressed',state.selected===s.id);const thumb=row.querySelector('.asset-preview');thumb.replaceChildren();if(a.src){const img=document.createElement('img');img.src=a.src;img.alt=s.name;thumb.append(img)}else thumb.innerHTML=imageIcon;row.querySelector('.asset-action').textContent=a.src?'已上传':'＋ 上传'}$('#selectedName').textContent=surfaces.find(s=>s.id===state.selected).name;$('#assetHint').textContent=surfaces.find(s=>s.id===state.selected).hint;$('#uploadLabel').textContent=state.assets[state.selected].src?'替换当前图片':'点击上传图片';refreshControls()}
-function refreshControls(){const a=state.assets[state.selected];for(const key of ['scale','x','y','rotation']){$(`#${key}`).value=a[key];$(`#${key}Value`).textContent=a[key]+(key==='rotation'?'°':'%')}document.querySelectorAll('[data-fit]').forEach(b=>{b.classList.toggle('active',b.dataset.fit===a.fit);b.setAttribute('aria-pressed',b.dataset.fit===a.fit)});$('#removeSelected').disabled=!a.src;$('#showDesign').checked=state.showDesign;$('#lighting').checked=state.lighting;$('#discVisible').checked=state.discVisible;$('#background').value=state.background;$('#emptyToggle').classList.toggle('active',!state.showDesign);$('#emptyToggle').textContent=state.showDesign?'查看空壳':'返回设计';$('#calibrate').classList.toggle('active',calibrating);$('#calibrate').textContent=calibrating?'完成四角校准':'贴图四角校准';$('#resetQuad').hidden=!calibrating}
+function refreshControls(){const a=state.assets[state.selected];for(const key of ['scale','x','y','rotation']){$(`#${key}`).value=a[key];$(`#${key}Value`).textContent=a[key]+(key==='rotation'?'°':'%')}document.querySelectorAll('[data-fit]').forEach(b=>{b.classList.toggle('active',b.dataset.fit===a.fit);b.setAttribute('aria-pressed',b.dataset.fit===a.fit)});$('#removeSelected').disabled=!a.src;$('#showDesign').checked=state.showDesign;$('#lighting').checked=state.lighting;$('#discVisible').disabled=state.view===REMOVED_DISC_VIEW;$('#discVisible').checked=state.discVisible&&state.view!==REMOVED_DISC_VIEW;$('#background').value=state.background;$('#emptyToggle').classList.toggle('active',!state.showDesign);$('#emptyToggle').textContent=state.showDesign?'查看空壳':'返回设计';$('#calibrate').classList.toggle('active',calibrating);$('#calibrate').textContent=calibrating?'完成四角校准':'贴图四角校准';$('#resetQuad').hidden=!calibrating}
 function selectSurface(id,changeView=true){state.selected=id;calibrating=false;if(changeView){const visible=views[state.view].slots.some(s=>s.id===id);if(!visible)state.view=surfaces.find(s=>s.id===id).view}refreshAssets();refreshView();scheduleSave()}
 function refreshView(){document.querySelectorAll('[data-view]').forEach(b=>{b.classList.toggle('active',+b.dataset.view===state.view);b.setAttribute('aria-current',+b.dataset.view===state.view?'true':'false')});$('#viewTitle').textContent=views[state.view].name;$('#stageNote').textContent=calibrating?'拖动四角校准':'原壳结构';updatePreviewScale();draw()}
 function drawAlignment(){const svg=$('#alignment');svg.replaceChildren();if(!calibrating)return;const slot=views[state.view].slots.find(s=>s.id===state.selected);if(!slot)return;const q=getQuad(state,state.view,slot).map(([x,y])=>[state.view===0?frontX(x*BASE):x*BASE,y*BASE]);const poly=document.createElementNS(svg.namespaceURI,'polygon');poly.setAttribute('points',q.map(p=>p.join(',')).join(' '));svg.append(poly);q.forEach((p,i)=>{const circle=document.createElementNS(svg.namespaceURI,'circle');circle.setAttribute('cx',p[0]);circle.setAttribute('cy',p[1]);circle.setAttribute('r',11);circle.dataset.corner=i;svg.append(circle)})}
@@ -20,7 +21,7 @@ function updatePreviewScale(){
   const scale=viewScale(state.view);
   // Apply one common fit factor to every angle, so a narrow viewport does not
   // silently give the open and closed views different scales.
-  const widest=widestViewScale();
+  const widest=widestViewScale(state.view);
   const common=Math.min(1,stage.clientWidth*.96/(size*widest));
   wrap.style.transform=`scale(${common*scale*zoom/100})`;
 }
@@ -56,22 +57,27 @@ window.addEventListener('message',async e=>{
   if(!ready){tellParent({type:'minicd-export-error',message:'样机还未加载完成，请重试。'});return}
   batchExporting=true;
   try{
-    const snapshot=await highresExportState(structuredClone(state)),indices=views.map((v,i)=>v.hidden?-1:i).filter(i=>i>=0),files=[];
+    const snapshot=await highresExportState(structuredClone(state)),indices=visibleViewIndices,files=[];
     tellParent({type:'minicd-export-progress',message:'正在生成三视图总预览图…'});
     await new Promise(resolve=>setTimeout(resolve,0));
     const three=await exportThreeViewPreview(snapshot),threeName='00-三视图总预览.png';
-    files.push({name:'八视图商品图/'+threeName,blob:three});
+    files.push({name:'九视图商品图/'+threeName,blob:three});
     tellParent({type:'minicd-export-image',name:threeName,label:'三视图总预览',blob:three});
-    tellParent({type:'minicd-export-progress',message:'正在生成八视图总预览图…'});
+    tellParent({type:'minicd-export-progress',message:'正在生成九视图总预览图…'});
     await new Promise(resolve=>setTimeout(resolve,0));
-    const overview=await exportPNG(snapshot,8192,'sheet'),overviewName='01-八视图总预览.png';
-    files.push({name:'八视图商品图/'+overviewName,blob:overview});
-    tellParent({type:'minicd-export-image',name:overviewName,label:'八视图总预览',blob:overview});
+    const overview=await exportPNG(snapshot,8192,'sheet'),overviewName='01-九视图总预览.png';
+    files.push({name:'九视图商品图/'+overviewName,blob:overview});
+    tellParent({type:'minicd-export-image',name:overviewName,label:'九视图总预览',blob:overview});
+    tellParent({type:'minicd-export-progress',message:'正在生成内外展开组合图…'});
+    await new Promise(resolve=>setTimeout(resolve,0));
+    const accessory=await exportAccessoryOverview(snapshot),accessoryName='11-'+accessoryOverviewLabel+'.png';
+    files.push({name:'九视图商品图/'+accessoryName,blob:accessory});
+    tellParent({type:'minicd-export-image',name:accessoryName,label:accessoryOverviewLabel,blob:accessory});
     for(let n=0;n<indices.length;n++){
       const i=indices[n];tellParent({type:'minicd-export-progress',message:`正在生成 ${n+1}/${indices.length}：${views[i].name}`});
       await new Promise(resolve=>setTimeout(resolve,0));
       const blob=await exportPNG({...snapshot,view:i},8192,'individual');
-      const name=`${String(n+2).padStart(2,'0')}-${views[i].name}.png`;files.push({name:'八视图商品图/'+name,blob});tellParent({type:'minicd-export-image',name,label:views[i].name,blob});
+      const name=`${String(n+2).padStart(2,'0')}-${views[i].name}.png`;files.push({name:'九视图商品图/'+name,blob});tellParent({type:'minicd-export-image',name,label:views[i].name,blob});
     }
     if(e.data.imagesOnly){tellParent({type:'minicd-export-done'});return}
     tellParent({type:'minicd-export-progress',message:batchNo?'正在合并批量素材和当前专辑商品图…':'正在合并原有素材和商品图…'});
@@ -107,7 +113,18 @@ async function importWorkbenchAssets(missingAssemblyOnly=false){
 }
 function buildUI(){
 for(const s of surfaces){const b=document.createElement('button');b.className='asset-row';b.dataset.surface=s.id;b.innerHTML=`<span class="asset-preview">${imageIcon}</span><span class="asset-name">${s.name}</span><span class="asset-action">＋ 上传</span>`;b.onclick=()=>{if(state.selected===s.id){$('#imageInput').click()}else selectSurface(s.id)};$('#assetList').append(b)}
-views.forEach((v,i)=>{if(v.hidden)return;const b=document.createElement('button');b.className='view-button';b.dataset.view=i;const shell=v.onlineIndex!==undefined?v.shell:(i===0?'assets/online-front-cover-hq-v3.png':`assets/shell-${i}.webp`);b.innerHTML=`<span class="view-image"><img src="${shell}" alt="${v.name}透明空壳" loading="eager"></span><span>${v.name}</span>`;b.onclick=()=>{state.view=i;calibrating=false;if(!v.slots.some(s=>s.id===state.selected))state.selected=v.slots[0].id;setZoom(100);refreshAssets();refreshView();scheduleSave()};$('#viewList').append(b)});
+const viewOrder=[...visibleViewIndices];
+viewOrder.splice(viewOrder.indexOf(REMOVED_DISC_VIEW),1);
+viewOrder.splice(viewOrder.indexOf(1)+1,0,REMOVED_DISC_VIEW);
+for(const i of viewOrder){
+  const v=views[i],b=document.createElement('button');
+  b.className='view-button';b.dataset.view=i;
+  const shell=v.onlineIndex??(i===REMOVED_DISC_VIEW?1:i);
+  const src=v.onlineIndex!==undefined?v.shell:i===0?'assets/online-front-cover-hq-v3.png':`assets/shell-${shell}.webp`;
+  b.innerHTML=`<span class="view-image"><img src="${src}" alt="" loading="eager"></span><span>${v.name}</span>`;
+  b.onclick=()=>{state.view=i;calibrating=false;if(!v.slots.some(s=>s.id===state.selected))state.selected=v.slots[0].id;setZoom(100);refreshAssets();refreshView();scheduleSave()};
+  $('#viewList').append(b);
+}
 for(const[key,name,min,max,unit]of[['scale','缩放',25,250,'%'],['x','水平位置',-100,100,'%'],['y','垂直位置',-100,100,'%'],['rotation','旋转',-180,180,'°']]){const el=document.createElement('div');el.className='slider-control';el.innerHTML=`<div class="slider-label"><label for="${key}">${name}</label><output id="${key}Value" for="${key}">0${unit}</output></div><input id="${key}" type="range" min="${min}" max="${max}" step="1">`;$('#sliders').append(el);el.querySelector('input').oninput=e=>{state.assets[state.selected][key]=+e.target.value;invalidate(state.selected);refreshControls();draw();scheduleSave()}}
 $('#uploadSelected').onclick=()=>$('#imageInput').click();$('#imageInput').onchange=e=>{if(e.target.files[0])upload(e.target.files[0]);e.target.value=''};
 $('#uploadSelected').ondragover=e=>{e.preventDefault();$('#uploadSelected').style.borderColor='var(--accent)'};$('#uploadSelected').ondragleave=()=>$('#uploadSelected').style.borderColor='';$('#uploadSelected').ondrop=e=>{e.preventDefault();$('#uploadSelected').style.borderColor='';if(e.dataTransfer.files[0])upload(e.dataTransfer.files[0])};
@@ -124,7 +141,7 @@ $('#clearAll').onclick=async()=>{if(!surfaces.some(s=>state.assets[s.id].src)){t
 $('#calibrate').onclick=()=>{const a=state.assets[state.selected];if(!a.src){toast('请先上传当前部位的设计图片');return}if(!views[state.view].slots.some(s=>s.id===state.selected))state.view=surfaces.find(s=>s.id===state.selected).view;state.showDesign=true;calibrating=!calibrating;refreshControls();refreshView()};
 $('#resetQuad').onclick=()=>{delete state.quads[`${state.view}:${state.selected}`];draw();scheduleSave()};
 $('#alignment').onpointerdown=e=>{if(e.target.dataset.corner===undefined)return;e.preventDefault();drag={index:+e.target.dataset.corner,id:e.pointerId};$('#alignment').setPointerCapture(e.pointerId)};$('#alignment').onpointermove=e=>{if(!drag)return;const svg=$('#alignment'),p=svg.createSVGPoint();p.x=e.clientX;p.y=e.clientY;const point=p.matrixTransform(svg.getScreenCTM().inverse());const slot=views[state.view].slots.find(s=>s.id===state.selected);const q=getQuad(state,state.view,slot).map(p=>[...p]);q[drag.index]=[Math.max(0,Math.min(1,(state.view===0?frontX(point.x,true):point.x)/BASE)),Math.max(0,Math.min(1,point.y/BASE))];if(validQuad(q)){state.quads[`${state.view}:${state.selected}`]=q;draw()}};for(const key of ['onpointerup','onpointercancel'])$('#alignment')[key]=()=>{if(drag){drag=null;scheduleSave()}};
-$('#exportOpen').onclick=()=>$('#exportDialog').showModal();$('#exportConfirm').onclick=async()=>{const b=$('#exportConfirm');b.disabled=true;b.textContent='正在生成高清图片…';try{await new Promise(r=>setTimeout(r,30));const size=+$('#exportSize').value,mode=$('#exportMode').value,snapshot=await highresExportState(structuredClone(state)),blob=await exportPNG(snapshot,size,mode);download(blob,`${fileName()}-${mode==='sheet'?'八视角总览':views[state.view].name}-${size}.png`);$('#exportStatus').textContent=`PNG · ${size} × ${mode==='sheet'?Math.round(size/2):size}`;$('#exportDialog').close();toast('效果图已导出')}catch(e){toast('导出失败：'+e.message)}finally{await prepareProjectAssets(state.assets);b.disabled=false;b.textContent='下载 PNG'}};
+$('#exportOpen').onclick=()=>$('#exportDialog').showModal();$('#exportConfirm').onclick=async()=>{const b=$('#exportConfirm');b.disabled=true;b.textContent='正在生成高清图片…';try{await new Promise(r=>setTimeout(r,30));const size=+$('#exportSize').value,mode=$('#exportMode').value,snapshot=await highresExportState(structuredClone(state)),blob=await (mode==='accessories'?exportAccessoryOverview(snapshot,size):exportPNG(snapshot,size,mode));download(blob,`${fileName()}-${mode==='accessories'?accessoryOverviewLabel:mode==='sheet'?'九视图总览':views[state.view].name}-${size}.png`);$('#exportStatus').textContent=`PNG · ${size} × ${size}`;$('#exportDialog').close();toast('效果图已导出')}catch(e){toast('导出失败：'+e.message)}finally{await prepareProjectAssets(state.assets);b.disabled=false;b.textContent='下载 PNG'}};
 document.querySelectorAll('[data-panel]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-panel]').forEach(x=>x.classList.toggle('active',x===b));document.querySelectorAll('.assets-panel,.inspector-panel').forEach(x=>x.classList.toggle('mobile-visible',x.classList.contains(b.dataset.panel+'-panel')))});document.querySelector('[data-panel="assets"]').click();
 $('#demo').onclick=loadDemo;
 }
@@ -135,5 +152,10 @@ watermarkControls=await mountWatermarkControls($('.inspector-panel'),{onChange:(
 const stage=$('#stage');
 const fitStage=()=>{stage.style.setProperty('--stage-size',Math.max(200,Math.min(stage.clientWidth,stage.clientHeight))+'px');updatePreviewScale();draw()};
 new ResizeObserver(fitStage).observe(stage);fitStage();
-try{await preloadShells();for(const [i,v] of views.entries()){if(v.onlineIndex!==undefined){const image=document.querySelector(`[data-view="${i}"] img`),src=i===8?shellThumbnail(i):onlineThumbnail(v.onlineIndex);if(image&&src)image.src=src}}ready=true;$('#exportOpen').disabled=false;$('#loading').hidden=true;const saved=await restore().catch(()=>null);if(saved){state=saved;await prepareProjectAssets(state.assets);$('#projectName').value=state.title;$('#stage').style.background=state.background;$('#saveStatus').textContent='已恢复上次项目 · 仅在此浏览器'}refreshAssets();refreshView();if(workbenchJid&&syncRevision&&state.syncRevision!==syncRevision){await importWorkbenchAssets(false);state.syncRevision=syncRevision;scheduleSave()}else if(workbenchJid&&(!saved||state.assemblyVersion!==1))await importWorkbenchAssets(!!saved).catch(e=>toast('自动带入失败：'+e.message));initializing=false;tellParent({type:'minicd-mockup-ready'})}catch(e){$('#loading').textContent='外壳加载失败，请刷新页面重试';toast(e.message);tellParent({type:'minicd-export-error',message:'样机加载失败：'+e.message})}
+function updateRemovedDiscThumbnail(){
+  const thumbnail=document.createElement('canvas');
+  render(thumbnail,initialState(),REMOVED_DISC_VIEW,256);
+  document.querySelector(`[data-view="${REMOVED_DISC_VIEW}"] img`).src=thumbnail.toDataURL('image/png');
+}
+try{await preloadShells();updateRemovedDiscThumbnail();for(const [i,v] of views.entries()){if(v.onlineIndex!==undefined){const image=document.querySelector(`[data-view="${i}"] img`),src=i===8?shellThumbnail(i):onlineThumbnail(v.onlineIndex);if(image&&src)image.src=src}}ready=true;$('#exportOpen').disabled=false;$('#loading').hidden=true;const saved=await restore().catch(()=>null);if(saved){state=saved;await prepareProjectAssets(state.assets);$('#projectName').value=state.title;$('#stage').style.background=state.background;$('#saveStatus').textContent='已恢复上次项目 · 仅在此浏览器'}refreshAssets();refreshView();if(workbenchJid&&syncRevision&&state.syncRevision!==syncRevision){await importWorkbenchAssets(false);state.syncRevision=syncRevision;scheduleSave()}else if(workbenchJid&&(!saved||state.assemblyVersion!==1))await importWorkbenchAssets(!!saved).catch(e=>toast('自动带入失败：'+e.message));initializing=false;tellParent({type:'minicd-mockup-ready'})}catch(e){$('#loading').textContent='外壳加载失败，请刷新页面重试';toast(e.message);tellParent({type:'minicd-export-error',message:'样机加载失败：'+e.message})}
 window.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='s'){e.preventDefault();$('#saveProject').click()}});

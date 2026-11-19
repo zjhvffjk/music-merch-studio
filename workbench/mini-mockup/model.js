@@ -1,7 +1,7 @@
 import {views as onlineViews} from './online-reference-v30/model.js';
 export const surfaces=[{id:'front',name:'封面',hint:'封面显示在正面、展开外侧及闭合斜视图',view:0},{id:'back',name:'封底',hint:'封底显示在后视图及展开外侧',view:5},{id:'inside',name:'内页',hint:'内页显示在展开内侧的左侧盒盖',view:8},{id:'tray',name:'内盘底',hint:'内盘底显示在展开内侧右边',view:8},{id:'disc',name:'盘面',hint:'盘面显示在平展开视图',view:1}];
 export const views=[
-{name:'正视图（封面）',slots:[{id:'front',q:[[.2647,.2659],[.8289,.2659],[.8289,.79],[.2647,.79]]}]},
+{name:'正视图（封面）',slots:onlineViews[0].slots},
 {name:'展开内侧（装盘）',slots:[{id:'inside',q:[[.082,.351],[.456,.351],[.456,.711],[.082,.711]]},{id:'tray',q:[[.482,.357],[.924,.357],[.924,.708],[.482,.708]]},{id:'disc',q:[[.547,.352],[.907,.352],[.907,.712],[.547,.712]],inBox:true}]},
 {name:'取盘展示',slots:[{id:'inside',q:[[.102,.337],[.417,.268],[.483,.546],[.173,.614]]},{id:'tray',q:[[.523,.247],[.824,.173],[.880,.448],[.569,.525]]},{id:'disc',q:[[.614,.571],[.932,.571],[.932,.885],[.614,.885]]}]},
 {name:'立体内侧',slots:[{id:'inside',q:[[.083,.435],[.443,.284],[.445,.561],[.117,.722]]},{id:'tray',q:[[.525,.30],[.910,.376],[.882,.638],[.526,.555]]},{id:'disc',q:[[.546,.29],[.909,.365],[.884,.622],[.54,.545]],inBox:true}]},
@@ -16,7 +16,6 @@ surfaces.push(
 // connect the large printed faces instead of leaving a bare plastic spine.
 // Align the printed fold with the inside of the replacement front shell's
 // narrow channel. Dimensions here are photographic placement, not print mm.
-views[0].slots.push({id:'tray',sourceCrop:[0,0,.08,1],q:[[.175,.273],[.223,.273],[.223,.787],[.175,.787]]});
 views[2].slots.push({id:'sideLB',q:[[.452,.270],[.485,.259],[.549,.531],[.516,.542]]});
 views[3].slots.push({id:'sideLB',q:[[.496,.282],[.520,.292],[.521,.555],[.498,.548]]});
 views[4].slots.push(
@@ -29,15 +28,29 @@ for(let i=1;i<=6;i++){const v=onlineViews[i];views.push({...v,onlineIndex:i,slot
 // The flat interior is the same open case as the installed-disc view, with
 // only the clear disc carrier and disc removed.
 views[8].slots=views[1].slots.filter(slot=>slot.id!=='disc').map(slot=>({...slot,q:slot.q.map(p=>[...p])}));
+export const REMOVED_DISC_VIEW=views.length;
+export const removedDiscCase={scale:.69,x:.023,y:.155};
+export function mapRemovedDiscCase(quad,inverse=false){
+ const {scale,x,y}=removedDiscCase;
+ return quad.map(([u,v])=>inverse?[(u-x)/scale,(v-y)/scale]:[x+u*scale,y+v*scale]);
+}
+const [installedDiscTopLeft,installedDiscTopRight]=views[1].slots.find(slot=>slot.id==='disc').q;
+const discDiameter=(installedDiscTopRight[0]-installedDiscTopLeft[0])*removedDiscCase.scale;
+const discLeft=.695,discTop=mapRemovedDiscCase([installedDiscTopLeft])[0][1];
+views.push({name:'展开内侧（盘片取出）',slots:[
+ ...views[8].slots.map(slot=>({...slot,q:mapRemovedDiscCase(slot.q)})),
+ {id:'disc',q:[[discLeft,discTop],[discLeft+discDiameter,discTop],[discLeft+discDiameter,discTop+discDiameter],[discLeft,discTop+discDiameter]]}
+]});
+export const visibleViewIndices=views.flatMap((view,i)=>!view.hidden?[i]:[]);
 // Shared visual scale for previews and multi-view exports.
 export function viewScale(view){
  const bodyHeight=.70*45/53,paperHeight=bodyHeight*38/45;
  const installed=paperHeight/.351;
  const outsideFlat=paperHeight/(.45*565/887)*(651/629)*(722/815);
  const index=views[view]?.onlineIndex;
- return view===1||view===8?installed:index===5?outsideFlat:[2,3].includes(index)?bodyHeight/.60:1;
+ return [1,8,REMOVED_DISC_VIEW].includes(view)?installed:index===5?outsideFlat:[2,3].includes(index)?bodyHeight/.60:1;
 }
-export function widestViewScale(){return Math.max(viewScale(1)*.90,viewScale(8)*.78,viewScale(9)*.78)}
+export function widestViewScale(view){return Math.max(viewScale(1)*.90,viewScale(8)*.78,viewScale(9)*.78,view===REMOVED_DISC_VIEW?viewScale(view)*.94:0)}
 export const defaultTransform=()=>({fit:'cover',scale:100,x:0,y:0,rotation:0});
 export function initialState(){return {version:1,frontLayoutRevision:1,trayLayoutRevision:1,title:'未命名专辑',view:0,selected:'front',showDesign:true,lighting:true,discVisible:false,background:'#ffffff',assets:Object.fromEntries(surfaces.map(s=>[s.id,{src:null,...defaultTransform()}])),quads:{}}}
 export function validQuad(q){if(!Array.isArray(q)||q.length!==4||!q.every(p=>Array.isArray(p)&&p.length===2&&p.every(n=>Number.isFinite(n)&&n>=0&&n<=1)))return false;const cross=q.map((p,i)=>{const b=q[(i+1)%4],c=q[(i+2)%4];return(b[0]-p[0])*(c[1]-b[1])-(b[1]-p[1])*(c[0]-b[0])});return cross.every(n=>n>.0002)||cross.every(n=>n<-.0002)}

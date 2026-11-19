@@ -62,6 +62,7 @@ import traceback
 import urllib.request
 import uuid
 import zipfile
+from concurrent.futures import ThreadPoolExecutor
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, quote, unquote, urlparse
 
@@ -95,6 +96,7 @@ from design_service import SERVICE as DESIGN  # noqa: E402
 # 作品库合并：迷你CD 的任务落在另一个目录（outputs/迷你CD设计/），
 # 必须拿到它的 OUT_DIR / list_projects / trash_project 才能并进同一份列表。
 import design_service as DSDESIGN  # noqa: E402
+import artist_catalog  # noqa: E402
 
 from fetch163 import (  # noqa: E402
     API, artist_top_songs, album_songs, cover_url, download, get_json,
@@ -113,6 +115,7 @@ from fetch_kugou import (  # noqa: E402
     singer_hot_songs as hot_songs_kg,
 )
 from make_player import make as make_player  # noqa: E402
+from player_style import renderable_style_count, resolve_player_style  # noqa: E402
 from make_set import (  # noqa: E402
     LEAD_MIN, comment_total, contact_sheet, fmt_dur, hot_songs, hot_songs_ex,
     human, is_placeholder, lead_rate, norm, normalize_cover, save_retry, FONT_BD,
@@ -203,6 +206,7 @@ DEFAULTS = {
     "vip": True,
     "follow": True,
     "playbackMode": "loop",
+    "playerSkinId": "",
     "allow_placeholder": False,
     "source": "auto",          # auto=网易云优先,版权缺失自动切 QQ
     "dedupe": True,            # 同名歌曲只留热度最高的一版
@@ -1044,7 +1048,7 @@ def vinyl_width(opt):
     return w if w in VINYL_WIDTHS else VINYL_DEFAULT_WIDTH
 
 
-def render_vinyl(job, base, cpath, title, artist, dur_s, opt):
+def render_vinyl(job, base, cpath, title, artist, dur_s, opt, comments=""):
     """给一首歌追加一张黑胶播放界面图。返回 (相对路径, 失败原因)"""
     if VINYL is None:
         return None, f"黑胶模块不可用（{_VINYL_IMPORT_ERR}）"
@@ -1055,7 +1059,11 @@ def render_vinyl(job, base, cpath, title, artist, dur_s, opt):
     try:
         VINYL.make(cpath, vpath, title, artist, dur_s,
                    width=vinyl_width(opt),
-                   played_ratio=(0.10 if played is None else played))
+                   played_ratio=(0.10 if played is None else played),
+                   player_style=resolve_player_style(opt.get("playerSkinId")),
+                   playback_mode=opt.get("playbackMode", "loop"),
+                   likes=opt.get("likes", "999w+"), comments=comments,
+                   quality=opt.get("quality", "极高音质"))
     except Exception as e:
         return None, f"{type(e).__name__}: {e}"
     return os.path.relpath(vpath, job["dir"]), None
@@ -1122,6 +1130,9 @@ def uploaded_cover_path(uid):
     return None
 
 
+_comment_fetchers = ThreadPoolExecutor(max_workers=4, thread_name_prefix="song-comments")
+
+
 def render_song(job, s, rank, opt):
     """下载封面 + 合成播放界面。返回 (item, 失败原因)"""
     cdir = os.path.join(job["dir"], "covers")
@@ -1130,11 +1141,10 @@ def render_song(job, s, rank, opt):
     src = opt.get("_src", "163")
 
     # --- 评论数 ---
-    if opt["comments"] == "auto":
-        n = comment_total_q(s["id"]) if src == "qq" else comment_total(s["id"])
-        cmt = human(n) if n else "0+"
-    else:
-        cmt = str(opt["comments"])
+    comment_request = None
+    if opt["comments"] == "auto" and src != "kugou":
+        fetch_comments = comment_total_q if src == "qq" else comment_total
+        comment_request = _comment_fetchers.submit(fetch_comments, s["id"])
 
     # --- 1) 正方形封面母版（统一裁成 coverSize 正方形）---
     tmp = os.path.join(cdir, safe_name(f"_probe {s['name']} - {s['artists']}.jpg"))
@@ -1159,9 +1169,13 @@ def render_song(job, s, rank, opt):
         c_url = cover_url(s["pic"], 2000)
         got = download(c_url, tmp)
     if not got:
+        if comment_request:
+            comment_request.cancel()
         log(job, f"下载失败 pic={s['pic'][:100]!r} url={c_url[:150]!r}", "err")
         return None, "封面下载失败"
     if not opt["allow_placeholder"] and is_placeholder(tmp):
+        if comment_request:
+            comment_request.cancel()
         try:
             os.remove(tmp)
         except OSError:
@@ -1172,6 +1186,11 @@ def render_song(job, s, rank, opt):
     cpath = os.path.join(cdir, base + ".jpg")
     os.replace(tmp, cpath)
     normalize_cover(cpath, int(opt.get("coverSize") or 1492))
+    if opt["comments"] == "auto":
+        count = comment_request.result() if comment_request else 0
+        cmt = human(count) if count else "0+"
+    else:
+        cmt = str(opt["comments"])
 
     # --- 2) 30x50mm 播放界面 ---
     ppath = os.path.join(pdir, base + ".png")
@@ -1181,6 +1200,7 @@ def render_song(job, s, rank, opt):
         likes=opt["likes"], comments=cmt, listeners=opt["listeners"],
         quality=opt["quality"], statusbar=False, ratio=opt["ratio"],
         vip=opt["vip"], follow=opt["follow"], video_tag=False, fav_loop=True, playback_mode=opt.get("playbackMode", "loop"),
+        player_style=resolve_player_style(opt.get("playerSkinId")),
     )
     with Image.open(ppath) as _f:
         im = _f.convert("RGB")
@@ -1219,7 +1239,7 @@ def render_song(job, s, rank, opt):
     vin_rel = None
     if opt.get("vinyl"):
         vin_rel, vin_err = render_vinyl(
-            job, base, cpath, s["name"], s["artists"], int(s["dur_ms"] / 1000), opt)
+            job, base, cpath, s["name"], s["artists"], int(s["dur_ms"] / 1000), opt, cmt)
         if vin_rel:
             log(job, f"  └ 黑胶播放界面 {vinyl_width(opt)}×{vinyl_width(opt) * 2} 已出图", "ok")
         else:
@@ -1740,7 +1760,7 @@ def pick_source(artist, mode, want):
     return src_used, ar, pool or [], notes
 
 
-def multi_search_songs(name, mode="auto"):
+def multi_search_songs(name, mode="auto", qq_request=None):
     """单曲多平台聚合搜索：QQ → 酷狗 → 网易云，同名去重，来源打标。
 
     顺序即优先级：QQ 的版权曲目最全、封面是母版；酷狗补 QQ 限流/缺曲；
@@ -1766,7 +1786,7 @@ def multi_search_songs(name, mode="auto"):
     # QQ 音乐排前面：版权曲目（周杰伦等）只有这里有，用户多半要点它
     if mode in ("auto", "qq"):
         try:
-            for s in search_song_q(name, 15):
+            for s in (qq_request.result() if qq_request else search_song_q(name, 15)):
                 push(s.get("songname"),
                      "/".join(x.get("name", "?") for x in (s.get("singer") or [])),
                      s.get("albumname") or "",
@@ -1789,10 +1809,16 @@ def multi_search_songs(name, mode="auto"):
     if mode in ("auto", "163"):
         try:
             res = search(name, "song", 20)
-            for s in (res.get("songs") or [])[:20]:
-                # 网易云搜索接口通常只给 album.picId，需补查详情才有 picUrl。
-                # 不补这一步，直接搜索单曲进入制作页仍会退回音符占位。
-                pic = resolve_picurl(s)
+            rows = [s for s in (res.get("songs") or [])[:20]
+                    if (s.get("name") or "").strip() not in seen]
+            ids = [s["id"] for s in rows if s.get("id") and not (s.get("album") or {}).get("picUrl")]
+            covers = {}
+            if ids:
+                detail = get_json(f"{API}/song/detail/", {"ids": json.dumps(ids)}, retry=1, timeout=4)
+                covers = {s.get("id"): (s.get("album") or {}).get("picUrl", "")
+                          for s in detail.get("songs", [])}
+            for s in rows:
+                pic = (s.get("album") or {}).get("picUrl") or covers.get(s.get("id"), "")
                 arts = "/".join(x.get("name", "?") for x in s.get("artists", []))
                 push(s.get("name"), arts,
                      (s.get("album") or {}).get("name", ""),
@@ -1805,7 +1831,7 @@ def multi_search_songs(name, mode="auto"):
     return out[:30]
 
 
-def multi_search_artists(name, songs=None):
+def multi_search_artists(name, qq_request=None):
     """歌手候选：QQ（从单曲结果的 singer 数组投票）→ 酷狗 → 网易云。
 
     QQ 没有可用的歌手搜索接口，只能从歌曲结果里挑；酷狗有独立歌手搜索；
@@ -1824,7 +1850,7 @@ def multi_search_artists(name, songs=None):
 
     try:
         votes = {}
-        for s in search_song_q(name, 15):
+        for s in (qq_request.result() if qq_request else search_song_q(name, 15)):
             for sg in (s.get("singer") or []):
                 nm = (sg.get("name") or "").strip()
                 mid = sg.get("mid")
@@ -1911,6 +1937,34 @@ def multi_search_albums(name):
 
     return out[:12]
 
+
+
+_artist_album_fetchers = ThreadPoolExecutor(max_workers=4, thread_name_prefix="artist-albums")
+
+def artist_album_results(name):
+    out = {"albumList": [], "albumError": ""}
+    ab_ok, ab_why = album_ready()
+    if not ab_ok:
+        out["albumError"] = ab_why
+    else:
+        try:
+            # plan_albums 自己解析歌手（网易云 search + artist_albums），
+            # 与上面 pick_source 那条**互不依赖** —— 所以热门走了 QQ
+            # 音乐也不影响这里，反过来也是。这正是「部分成功」的基础。
+            _ar2, albs = ALBUM.plan_albums(name, album_limit({}))
+            if albs:
+                out["albumList"] = [album_brief(a) for a in albs]
+                # 以**实际拿到的**张数覆盖 albumSize：专辑墙到时候真出
+                # 多少张，前端提前显示的就该是多少张（可能有同名去重）。
+                out["albumCount"] = len(albs)
+            else:
+                out["albumError"] = "这位歌手没有可用的专辑封面"
+        except Exception as e:
+            # 接口抽风 / 超时 / 字段缺失 —— 一律降级成「专辑这次没拉到」，
+            # 绝不把整个查询变成 404。用户还能照常取热门出图。
+            slog("WARN", f"artist/{name} albums: {type(e).__name__}: {e}")
+            out["albumError"] = f"{type(e).__name__}: {e}"
+    return out
 
 def _tracklist_pool(raw):
     """专辑详情页「勾选批量制作」：前端送来的曲目整包 → render_song 可用的池。
@@ -2398,6 +2452,11 @@ class Handler(BaseHTTPRequestHandler):
                                    "shop": sh_ok, "shopWhy": sh_why,
                                    "vinyl": vn_ok, "vinylWhy": vn_why,
                                    "vinylWidths": list(VINYL_WIDTHS),
+                                   "playerSkinRendering": True,
+                                   "playerThemeLayouts": True,
+                                   "playerThemeCount": renderable_style_count(),
+                                   "adaptivePlayerControls": True,
+                                   "defaultPlayerIconRefresh": True,
                                    "album": ab_ok, "albumWhy": ab_why,
                                    "albumSizes": list(getattr(ALBUM, "CARD_SIZES",
                                                               (1200, 1500, 2000)))
@@ -2406,6 +2465,8 @@ class Handler(BaseHTTPRequestHandler):
                                    "shopStyles": (shop_styles() if sh_ok else [])})
             if p in ("/", "/index.html"):
                 return self._file(os.path.join(HERE, "index.html"))
+            if p in ("/artist-browser.js", "/artist-browser.css"):
+                return self._file(os.path.join(HERE, p[1:]))
             if p == "/favicon.ico":
                 return self._json({}, 404)
 
@@ -2456,11 +2517,31 @@ class Handler(BaseHTTPRequestHandler):
                 return self._file(target,
                                   name=os.path.basename(target) if dl else None)
 
+            if p in ("/api/artist/profile", "/api/artist/works"):
+                try:
+                    if p.endswith("profile"):
+                        result = artist_catalog.profile((q.get("name") or [""])[0])
+                    else:
+                        result = artist_catalog.works(
+                            (q.get("id") or ["0"])[0],
+                            (q.get("role") or ["1"])[0],
+                            (q.get("limit") or ["50"])[0],
+                            (q.get("offset") or ["0"])[0])
+                    return self._json(result)
+                except (ValueError, TypeError):
+                    return self._json({"error": "歌手或分页参数无效"}, 400)
+                except Exception as exc:
+                    slog("WARN", f"artist catalog: {type(exc).__name__}: {exc}")
+                    return self._json({"error": "音乐资料暂时未能加载，请稍后重试"}, 502)
+
             if p == "/api/artist":
                 name = (q.get("name") or [""])[0].strip()
                 if not name:
                     return self._json({"error": "缺少歌手名"}, 400)
                 mode = (q.get("source") or ["auto"])[0]
+                album_request = None
+                if (q.get("albums") or ["0"])[0] == "1":
+                    album_request = _artist_album_fetchers.submit(artist_album_results, name)
                 src, ar, pool, notes = pick_source(name, mode, 30)
                 if not pool or not ar:
                     # 把 notes 里的真实原因带出去：是接口挂了还是真没这位歌手，
@@ -2490,31 +2571,10 @@ class Handler(BaseHTTPRequestHandler):
                 }
                 # albums=1：搜一次歌手，顺手把「全部专辑」也带回来，前端两个出口
                 # 就不用让用户再查一遍。三条硬要求见文件头注释。
-                if (q.get("albums") or ["0"])[0] == "1":
-                    out["albumList"] = []
-                    out["albumCount"] = int(ar.get("albumSize") or 0)
-                    out["albumError"] = ""
-                    ab_ok, ab_why = album_ready()
-                    if not ab_ok:
-                        out["albumError"] = ab_why
-                    else:
-                        try:
-                            # plan_albums 自己解析歌手（网易云 search + artist_albums），
-                            # 与上面 pick_source 那条**互不依赖** —— 所以热门走了 QQ
-                            # 音乐也不影响这里，反过来也是。这正是「部分成功」的基础。
-                            _ar2, albs = ALBUM.plan_albums(name, album_limit({}))
-                            if albs:
-                                out["albumList"] = [album_brief(a) for a in albs]
-                                # 以**实际拿到的**张数覆盖 albumSize：专辑墙到时候真出
-                                # 多少张，前端提前显示的就该是多少张（可能有同名去重）。
-                                out["albumCount"] = len(albs)
-                            else:
-                                out["albumError"] = "这位歌手没有可用的专辑封面"
-                        except Exception as e:
-                            # 接口抽风 / 超时 / 字段缺失 —— 一律降级成「专辑这次没拉到」，
-                            # 绝不把整个查询变成 404。用户还能照常取热门出图。
-                            slog("WARN", f"artist/{name} albums: {type(e).__name__}: {e}")
-                            out["albumError"] = f"{type(e).__name__}: {e}"
+                if album_request:
+                    albums = album_request.result()
+                    albums.setdefault("albumCount", int(ar.get("albumSize") or 0))
+                    out.update(albums)
                 return self._json(out)
 
             if p == "/api/albums":
@@ -2558,9 +2618,14 @@ class Handler(BaseHTTPRequestHandler):
                 name = (q.get("name") or [""])[0].strip()
                 if not name:
                     return self._json({"error": "缺少关键词"}, 400)
-                songs = multi_search_songs(name, "auto")
-                artists = multi_search_artists(name, songs)
-                albums = multi_search_albums(name)
+                with ThreadPoolExecutor(max_workers=4) as lookups:
+                    qq_request = lookups.submit(search_song_q, name, 15)
+                    songs_request = lookups.submit(multi_search_songs, name, "auto", qq_request)
+                    artists_request = lookups.submit(multi_search_artists, name, qq_request)
+                    albums_request = lookups.submit(multi_search_albums, name)
+                    songs = songs_request.result()
+                    artists = artists_request.result()
+                    albums = albums_request.result()
                 return self._json({"query": name, "songs": songs,
                                    "artists": artists, "albums": albums})
 
@@ -2918,6 +2983,17 @@ class Handler(BaseHTTPRequestHandler):
                     if opt.get("shopBg") in ("white", "transparent", "both") else "both"
                 opt["top"] = max(1, min(opt["top"] or 10, 50))
                 opt["width"] = max(600, min(opt["width"] or 1181, 4000))
+
+                skin_id = opt.get("playerSkinId")
+                if mode == "album":
+                    skin_id = ""
+                if not isinstance(skin_id, str):
+                    return self._json({"error": "播放器样式编号无效"}, 400)
+                try:
+                    resolve_player_style(skin_id)
+                except ValueError as exc:
+                    return self._json({"error": str(exc)}, 400)
+                opt["playerSkinId"] = skin_id
 
                 titles = {"artist": f"{opt.get('artist', '')}",
                           "album": f"{opt.get('artist', '')} · 专辑全集",
