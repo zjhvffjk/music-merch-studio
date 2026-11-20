@@ -1,7 +1,12 @@
 import os
 import sys
 import unittest
+from io import BytesIO
 from pathlib import Path
+from tempfile import TemporaryDirectory
+from zipfile import ZipFile
+
+from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'tools'))
@@ -43,6 +48,27 @@ class SquareRingKeychainTests(unittest.TestCase):
         self.assertEqual(
             server.shop_styles_selected({'shopStyles': ['classic', 'square_ring']}),
             ['classic', 'square_ring'])
+
+    def test_product_zip_preserves_print_bytes_and_does_not_upscale(self):
+        with TemporaryDirectory() as folder:
+            job = Path(folder)
+            (job / 'keychain').mkdir()
+            (job / 'print').mkdir()
+            sample = Image.new('RGBA', (24, 16), (200, 40, 60, 0))
+            sample.putpixel((4, 4), (30, 120, 80, 128))
+            sample.save(job / 'keychain' / 'product.png')
+            sample.save(job / 'print' / 'layout.png', dpi=(600, 600))
+            original = (job / 'print' / 'layout.png').read_bytes()
+            (job / 'print' / 'layout.pdf').write_bytes(b'%PDF-1.4\n')
+
+            archive = server.build_zip(job, '样张', 'product-4k')
+            with ZipFile(archive) as result:
+                self.assertEqual(result.read('打印文件/layout.png'), original)
+                self.assertEqual(result.read('打印文件/layout.pdf'), b'%PDF-1.4\n')
+                product = result.read('钥匙扣商品图/product.jpg')
+            with Image.open(BytesIO(product)) as image:
+                self.assertEqual(image.size, sample.size)
+                self.assertEqual(image.format, 'JPEG')
 
 
 if __name__ == '__main__':

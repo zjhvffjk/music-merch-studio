@@ -1,8 +1,16 @@
 import {normalizeWatermark,prepareWatermark,drawWatermark} from './watermark.js';
 import {createZip} from './zip-store.js';
+import {encodeProductJpeg,productJpegFilename} from './product-export.js';
 export function isKeychainProduct(value){
  let path;try{const raw=String(value);path=/^(https?:)?\/\//.test(raw)||raw.startsWith('/')?decodeURIComponent(new URL(raw,'http://local/').pathname):raw.replace(/\\/g,'/')}catch{return false}
  return /\.(png|jpe?g|webp)$/i.test(path)&&(/(^|\/)(keychain|shop|钥匙扣商品图|白底与透明底商品图)\//.test(path)||/(^|\/)总览-(钥匙扣|商品图)[^/]*$/.test(path));
+}
+export function isProductImage(value){
+ if(isKeychainProduct(value))return true;
+ try{
+  const path=decodeURIComponent(new URL(value,'http://local/').pathname);
+  return /\.(png|jpe?g|webp)$/i.test(path)&&(/(^|\/)(vinyl|黑胶播放图)\//.test(path)||/(^|\/)总览-黑胶[^/]*$/.test(path));
+ }catch{return false}
 }
 export async function watermarkProductImage(blob,settings,name='image.png',maxSide=Infinity){
  const w=normalizeWatermark(settings);if(!w.enabled)return blob;await prepareWatermark(w);
@@ -27,13 +35,24 @@ export async function zipEntries(blob){
  }
  return entries;
 }
-export async function watermarkProductZip(blob,settings,onProgress=()=>{},depth=0){
- const w=normalizeWatermark(settings);if(!w.enabled)return blob;if(depth>3)throw Error('ZIP 嵌套层数过多');
- const entries=await zipEntries(blob),files=[],exclude=[];
- for(const entry of entries){let replacement;
-  if(isKeychainProduct(entry.name)){onProgress(entry.name);replacement=await watermarkProductImage(await entry.blob(),w,entry.name)}
-  else if(/\.zip$/i.test(entry.name)){const original=await entry.blob();replacement=await watermarkProductZip(original,w,onProgress,depth+1);if(replacement===original)replacement=null}
-  if(replacement){files.push({name:entry.name,blob:replacement});exclude.push(entry.name)}
+export async function exportProductZip(blob, settings, depth = 0){
+ const entries=await zipEntries(blob),files=[],exclude=[],products=new Map();
+ for(const entry of entries){
+  if(isProductImage(entry.name)){
+   const target=productJpegFilename(entry.name);
+   if(!products.has(target)||/\.png$/i.test(entry.name))products.set(target,entry);
+   exclude.push(entry.name);
+  }else if(depth===0&&/\.zip$/i.test(entry.name)){
+   const original=await entry.blob();
+   const output=await exportProductZip(original,settings,depth+1);
+   if(output!==original){files.push({name:entry.name,blob:output});exclude.push(entry.name)}
+  }
+ }
+ for(const [name,entry] of products){
+  const original=await entry.blob();
+  const marked=isKeychainProduct(entry.name)
+   ? await watermarkProductImage(original,settings,'image.png') : original;
+  files.push({name,blob:await encodeProductJpeg(marked)});
  }
  return files.length?createZip(files,[{blob,prefix:'',exclude}]):blob;
 }

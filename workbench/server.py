@@ -56,6 +56,7 @@ import os
 import shutil
 import socket
 import sys
+import tempfile
 import threading
 import time
 import traceback
@@ -97,6 +98,7 @@ from design_service import SERVICE as DESIGN  # noqa: E402
 # 必须拿到它的 OUT_DIR / list_projects / trash_project 才能并进同一份列表。
 import design_service as DSDESIGN  # noqa: E402
 import artist_catalog  # noqa: E402
+from product_export import MAX_PRODUCT_BYTES, encode_product_jpeg  # noqa: E402
 
 from fetch163 import (  # noqa: E402
     API, artist_top_songs, album_songs, cover_url, download, get_json,
@@ -2261,19 +2263,40 @@ def run_album(job, opt):
 
 # ---------------------------------------------------------------- 打包
 
-def build_zip(dirpath, title, image_format="jpg"):
+PRODUCT_ZIP_FORMATS = {"product-source", "product-4k"}
+PRODUCT_ENCODE_LOCK = threading.Lock()
+
+
+def build_zip(dirpath, title, image_format="jpg", destination=None):
     """把任务目录打成 ZIP。
 
     参数是 (目录, 标题) 而不是 job 对象 —— 这样**重启后**（内存里没有 job 了）
     也能用 meta.json 里的标题重建 ZIP，作品库的"重下"才有得下载。
     """
-    image_format = image_format if image_format in ("jpg", "png", "original") else "jpg"
-    zpath = os.path.join(dirpath, f"{safe_name(title or '作品')}-{image_format}.zip")
+    if image_format not in PRODUCT_ZIP_FORMATS and image_format not in ("jpg", "png", "original"):
+        image_format = "jpg"
+    product_only = image_format in PRODUCT_ZIP_FORMATS
+    zpath = destination or os.path.join(dirpath, f"{safe_name(title or '作品')}-{image_format}.zip")
     with zipfile.ZipFile(zpath, "w", zipfile.ZIP_DEFLATED) as z:
         written = set()
-        def add_file(path, name, format_override=None):
-            fmt = format_override or image_format
+        def add_file(path, name, format_override=None, product=False):
             ext = os.path.splitext(name)[1].lower()
+            if product_only:
+                if not product or image_format == "product-source" or ext not in (".jpg", ".jpeg", ".png", ".webp"):
+                    z.write(path, name)
+                    return
+                target = os.path.splitext(name)[0] + ".jpg"
+                if target in written:
+                    return
+                png = os.path.splitext(path)[0] + ".png"
+                if os.path.isfile(png):
+                    path = png
+                with PRODUCT_ENCODE_LOCK:
+                    rendered = encode_product_jpeg(path)
+                z.writestr(target, rendered)
+                written.add(target)
+                return
+            fmt = format_override or image_format
             if fmt != "original" and ext in (".jpg", ".jpeg", ".png"):
                 target = os.path.splitext(name)[0] + "." + fmt
                 if target in written:
@@ -2307,11 +2330,12 @@ def build_zip(dirpath, title, image_format="jpg"):
             for f in sorted(os.listdir(d)):
                 if f.startswith("_probe"):
                     continue
-                add_file(os.path.join(d, f), f"{label}/{f}", "jpg" if sub == "print" else None)
+                add_file(os.path.join(d, f), f"{label}/{f}", "jpg" if sub == "print" else None,
+                         product=sub in ("keychain", "shop", "vinyl"))
         # 总览类文件都在任务根目录（总览.jpg / 总览-钥匙扣.jpg / 总览-商品图-*.jpg|png）
         for f in sorted(os.listdir(dirpath)):
             if f.startswith("总览") and f.lower().endswith((".jpg", ".png")):
-                add_file(os.path.join(dirpath, f), f)
+                add_file(os.path.join(dirpath, f), f, product=f.startswith(("总览-钥匙扣", "总览-商品图", "总览-黑胶")))
         # 专辑模式：albums.json 是专辑清单（含日期/曲目数/类别），
         # 带上它才能离线用 `make_album.py --batch` 重出，别漏。
         aj = os.path.join(dirpath, "albums.json")
@@ -2457,6 +2481,7 @@ class Handler(BaseHTTPRequestHandler):
                                    "playerThemeCount": renderable_style_count(),
                                    "adaptivePlayerControls": True,
                                    "defaultPlayerIconRefresh": True,
+                                   "productExportFormats": ["4k"],
                                    "album": ab_ok, "albumWhy": ab_why,
                                    "albumSizes": list(getattr(ALBUM, "CARD_SIZES",
                                                               (1200, 1500, 2000)))
@@ -2740,16 +2765,14 @@ class Handler(BaseHTTPRequestHandler):
             if p == "/api/zip":
                 jid = (q.get("id") or [""])[0]
                 job = JOBS.get(jid)
-                if job:
-                    z = build_zip(job["dir"], job["title"], (q.get("format") or ["jpg"])[0])
-                    return self._file(z, name=f"{job['title']}.zip")
-                # 历史任务（重启后内存里没有）：用 meta.json 里的标题重建 ZIP
-                d = jobs_dir_of(jid)
-                m = load_meta(jid) if d else None
+                d = job["dir"] if job else jobs_dir_of(jid)
+                m = job if job else load_meta(jid) if d else None
                 if not d or not m:
                     return self._json({"error": "job not found"}, 404)
-                z = build_zip(d, m.get("title"), (q.get("format") or ["jpg"])[0])
-                return self._file(z, name=f"{m.get('title') or '作品'}.zip")
+                fmt = (q.get("format") or ["jpg"])[0]
+                with tempfile.TemporaryDirectory() as scratch:
+                    z = build_zip(d, m.get("title"), fmt, os.path.join(scratch, "work.zip"))
+                    return self._file(z, name=f"{m.get('title') or '作品'}.zip")
 
             if p == "/api/jobs/zip":
                 # 作品库批量下载：把勾选的多条作品合并成一个大 ZIP 一次下走。
@@ -2787,18 +2810,19 @@ class Handler(BaseHTTPRequestHandler):
                     if not d or not m:
                         missing.append(jid)
                         continue
-                    zp = build_zip(d, m.get("title"), fmt)
-                    items.append((zp, safe_name(f"{m.get('title') or '作品'}-{jid}")))
+                    items.append(((d, m.get("title")), safe_name(f"{m.get('title') or '作品'}-{jid}")))
                 if not items:
                     return self._json(
                         {"error": "勾选的作品都没有可下载的产出："
                                   + "、".join(missing[:5]) + ("…" if len(missing) > 5 else "")},
                         404)
-                combined = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                        "_batch_%s.zip" % uuid.uuid4().hex[:10])
-                try:
+                with tempfile.TemporaryDirectory() as scratch:
+                    combined = os.path.join(scratch, "batch.zip")
+                    work_zip = os.path.join(scratch, "work.zip")
                     with zipfile.ZipFile(combined, "w", zipfile.ZIP_DEFLATED) as z:
                         for i, (zp, label) in enumerate(items, 1):
+                            if isinstance(zp, tuple):
+                                zp = build_zip(*zp, fmt, work_zip)
                             z.write(zp, "%02d %s.zip" % (i, label))
                         if missing:
                             # 部分失败必须让用户看见：下载完的人不会去看服务端日志，
@@ -2810,11 +2834,6 @@ class Handler(BaseHTTPRequestHandler):
                     return self._file(
                         combined, name="作品库勾选%d条-%s.zip"
                         % (len(items), time.strftime("%Y%m%d-%H%M%S")))
-                finally:
-                    try:
-                        os.remove(combined)
-                    except OSError:
-                        pass
 
             return self._json({"error": "bad path"}, 404)
         except BrokenPipeError:
@@ -2836,6 +2855,31 @@ class Handler(BaseHTTPRequestHandler):
                 (self.headers.get("Referer") or "")[:90]))
         try:
             if DESIGN.handle(self, p, q, "POST"):
+                return
+            if p == "/api/product-export":
+                origin = self.headers.get("Origin")
+                if origin and origin != "http://" + self.headers.get("Host", ""):
+                    self.close_connection = True
+                    return self._json({"error": "请在工作台页面内导出商品图"}, 403)
+                if (q.get("format") or ["4k"])[0] != "4k":
+                    self.close_connection = True
+                    return self._json({"error": "商品图导出格式无效"}, 400)
+                size = int(self.headers.get("Content-Length") or 0)
+                if not 0 < size <= MAX_PRODUCT_BYTES:
+                    self.close_connection = True
+                    return self._json({"error": "商品图文件大小超出范围"}, 413)
+                try:
+                    with PRODUCT_ENCODE_LOCK:
+                        body = encode_product_jpeg(io.BytesIO(self._body()))
+                except ValueError as exc:
+                    return self._json({"error": str(exc)}, 400)
+                self.send_response(200)
+                self.send_header("Content-Type", "image/jpeg")
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                self._sent = True
+                self.wfile.write(body)
                 return
             if p == "/api/upload":
                 raw = self._body()

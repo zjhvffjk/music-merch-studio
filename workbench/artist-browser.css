@@ -34,6 +34,11 @@
 .catalog-album-toolbar button:disabled{opacity:.45;cursor:default}
 .catalog-album-card{display:flex;flex-direction:column;position:relative;min-width:0;gap:8px;padding:3px;border-radius:8px;border:1px solid transparent}
 .catalog-album-card.is-picked{border-color:#b42132;background:var(--card)}
-.catalog-album-select{position:absolute;inset:9px auto auto 9px;display:grid;place-items:center;width:26px;height:26px;background:var(--card);border-radius:5px;cursor:pointer;box-shadow:0 1px 6px #0003}
-.catalog-album-select input{margin:0;width:15px;height:15px;accent-color:#b42132;cursor:pointer}
+.catalog-album-select{position:absolute;inset:9px 9px auto auto;display:grid;place-items:center;width:26px;height:26px;cursor:pointer}
+@media (hover:hover) and (pointer:fine){
+  .catalog-album-card:not(:hover):not(.is-picked) .catalog-album-select:not(:focus-within){opacity:0;pointer-events:none}
+}
+.catalog-album-select input{appearance:none;display:grid;place-items:center;margin:0;width:17px;height:17px;border:1px solid #fff;border-radius:3px;background:transparent;box-shadow:0 0 0 1px #0008;cursor:pointer}
+.catalog-album-select input:checked::after{content:"";width:4px;height:8px;border:solid #fff;border-width:0 2px 2px 0;transform:translateY(-1px) rotate(45deg);filter:drop-shadow(0 1px 1px #000)}
+.catalog-album-select input:focus-visible{outline:2px solid var(--red);outline-offset:2px}
 .catalog-album-design{align-self:stretch;margin-top:auto;font-size:11px;color:var(--red)}

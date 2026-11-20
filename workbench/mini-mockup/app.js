@@ -3,6 +3,7 @@ import{surfaces,views,viewScale,widestViewScale,initialState,defaultTransform,sa
 import{preloadShells,prepareAsset,prepareProjectAssets,invalidate,render,getQuad,exportPNG,exportThreeViewPreview,exportAccessoryOverview,frontX,shellThumbnail,BASE}from'./renderer.js';
 import{createZip}from'./zip-store.js';
 import{mountWatermarkControls}from'./watermark-controls.js';
+import{encodeProductJpeg,PRODUCT_JPEG_SIZE,productJpegFilename}from'./product-export.js';
 let watermarkControls;
 const accessoryOverviewLabel='内外展开组合图';
 const embedded=new URLSearchParams(location.search).get('embed')==='1';
@@ -58,26 +59,27 @@ window.addEventListener('message',async e=>{
   batchExporting=true;
   try{
     const snapshot=await highresExportState(structuredClone(state)),indices=visibleViewIndices,files=[];
+    const size=PRODUCT_JPEG_SIZE;
+    const addImage=async (name,label,png)=>{
+      const blob=await encodeProductJpeg(await png);
+      name=productJpegFilename(name);
+      files.push({name:'九视图商品图/'+name,blob});
+      tellParent({type:'minicd-export-image',name,label,blob});
+    };
     tellParent({type:'minicd-export-progress',message:'正在生成三视图总预览图…'});
     await new Promise(resolve=>setTimeout(resolve,0));
-    const three=await exportThreeViewPreview(snapshot),threeName='00-三视图总预览.png';
-    files.push({name:'九视图商品图/'+threeName,blob:three});
-    tellParent({type:'minicd-export-image',name:threeName,label:'三视图总预览',blob:three});
+    await addImage('00-三视图总预览','三视图总预览',exportThreeViewPreview(snapshot,size));
     tellParent({type:'minicd-export-progress',message:'正在生成九视图总预览图…'});
     await new Promise(resolve=>setTimeout(resolve,0));
-    const overview=await exportPNG(snapshot,8192,'sheet'),overviewName='01-九视图总预览.png';
-    files.push({name:'九视图商品图/'+overviewName,blob:overview});
-    tellParent({type:'minicd-export-image',name:overviewName,label:'九视图总预览',blob:overview});
+    await addImage('01-九视图总预览','九视图总预览',exportPNG(snapshot,size,'sheet'));
     tellParent({type:'minicd-export-progress',message:'正在生成内外展开组合图…'});
     await new Promise(resolve=>setTimeout(resolve,0));
-    const accessory=await exportAccessoryOverview(snapshot),accessoryName='11-'+accessoryOverviewLabel+'.png';
-    files.push({name:'九视图商品图/'+accessoryName,blob:accessory});
-    tellParent({type:'minicd-export-image',name:accessoryName,label:accessoryOverviewLabel,blob:accessory});
+    await addImage('11-'+accessoryOverviewLabel,accessoryOverviewLabel,exportAccessoryOverview(snapshot,size));
     for(let n=0;n<indices.length;n++){
       const i=indices[n];tellParent({type:'minicd-export-progress',message:`正在生成 ${n+1}/${indices.length}：${views[i].name}`});
       await new Promise(resolve=>setTimeout(resolve,0));
-      const blob=await exportPNG({...snapshot,view:i},8192,'individual');
-      const name=`${String(n+2).padStart(2,'0')}-${views[i].name}.png`;files.push({name:'九视图商品图/'+name,blob});tellParent({type:'minicd-export-image',name,label:views[i].name,blob});
+      const name=`${String(n+2).padStart(2,'0')}-${views[i].name}`;
+      await addImage(name,views[i].name,exportPNG({...snapshot,view:i},size,'individual'));
     }
     if(e.data.imagesOnly){tellParent({type:'minicd-export-done'});return}
     tellParent({type:'minicd-export-progress',message:batchNo?'正在合并批量素材和当前专辑商品图…':'正在合并原有素材和商品图…'});
@@ -141,7 +143,22 @@ $('#clearAll').onclick=async()=>{if(!surfaces.some(s=>state.assets[s.id].src)){t
 $('#calibrate').onclick=()=>{const a=state.assets[state.selected];if(!a.src){toast('请先上传当前部位的设计图片');return}if(!views[state.view].slots.some(s=>s.id===state.selected))state.view=surfaces.find(s=>s.id===state.selected).view;state.showDesign=true;calibrating=!calibrating;refreshControls();refreshView()};
 $('#resetQuad').onclick=()=>{delete state.quads[`${state.view}:${state.selected}`];draw();scheduleSave()};
 $('#alignment').onpointerdown=e=>{if(e.target.dataset.corner===undefined)return;e.preventDefault();drag={index:+e.target.dataset.corner,id:e.pointerId};$('#alignment').setPointerCapture(e.pointerId)};$('#alignment').onpointermove=e=>{if(!drag)return;const svg=$('#alignment'),p=svg.createSVGPoint();p.x=e.clientX;p.y=e.clientY;const point=p.matrixTransform(svg.getScreenCTM().inverse());const slot=views[state.view].slots.find(s=>s.id===state.selected);const q=getQuad(state,state.view,slot).map(p=>[...p]);q[drag.index]=[Math.max(0,Math.min(1,(state.view===0?frontX(point.x,true):point.x)/BASE)),Math.max(0,Math.min(1,point.y/BASE))];if(validQuad(q)){state.quads[`${state.view}:${state.selected}`]=q;draw()}};for(const key of ['onpointerup','onpointercancel'])$('#alignment')[key]=()=>{if(drag){drag=null;scheduleSave()}};
-$('#exportOpen').onclick=()=>$('#exportDialog').showModal();$('#exportConfirm').onclick=async()=>{const b=$('#exportConfirm');b.disabled=true;b.textContent='正在生成高清图片…';try{await new Promise(r=>setTimeout(r,30));const size=+$('#exportSize').value,mode=$('#exportMode').value,snapshot=await highresExportState(structuredClone(state)),blob=await (mode==='accessories'?exportAccessoryOverview(snapshot,size):exportPNG(snapshot,size,mode));download(blob,`${fileName()}-${mode==='accessories'?accessoryOverviewLabel:mode==='sheet'?'九视图总览':views[state.view].name}-${size}.png`);$('#exportStatus').textContent=`PNG · ${size} × ${size}`;$('#exportDialog').close();toast('效果图已导出')}catch(e){toast('导出失败：'+e.message)}finally{await prepareProjectAssets(state.assets);b.disabled=false;b.textContent='下载 PNG'}};
+$('#exportOpen').onclick=()=>$('#exportDialog').showModal();
+$('#exportConfirm').onclick=async()=>{
+  const button=$('#exportConfirm');
+  const size=PRODUCT_JPEG_SIZE;
+  const mode=$('#exportMode').value;
+  button.disabled=true;button.textContent='正在生成高清图片…';
+  try{
+    await new Promise(resolve=>setTimeout(resolve,30));
+    const snapshot=await highresExportState(structuredClone(state));
+    const png=await (mode==='accessories'?exportAccessoryOverview(snapshot,size):exportPNG(snapshot,size,mode));
+    const label=mode==='accessories'?accessoryOverviewLabel:mode==='sheet'?'九视图总览':views[snapshot.view].name;
+    download(await encodeProductJpeg(png),productJpegFilename(`${fileName()}-${label}-${size}`));
+    $('#exportDialog').close();toast('效果图已导出');
+  }catch(error){toast('导出失败：'+error.message)}
+  finally{await prepareProjectAssets(state.assets);button.disabled=false;button.textContent='下载图片'}
+};
 document.querySelectorAll('[data-panel]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-panel]').forEach(x=>x.classList.toggle('active',x===b));document.querySelectorAll('.assets-panel,.inspector-panel').forEach(x=>x.classList.toggle('mobile-visible',x.classList.contains(b.dataset.panel+'-panel')))});document.querySelector('[data-panel="assets"]').click();
 $('#demo').onclick=loadDemo;
 }

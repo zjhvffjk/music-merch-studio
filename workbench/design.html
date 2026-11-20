@@ -965,7 +965,7 @@ function queueMockupPreparation(delay=1000){
 }
 function makeProductRow(data,url){
  const row=document.createElement('div'),icon=document.createElement('div'),text=document.createElement('div'),title=document.createElement('b'),detail=document.createElement('small'),open=document.createElement('a');
- row.className='dlItem';icon.className='ic';icon.textContent='PNG';text.className='t';title.textContent=data.label;detail.textContent=data.name.includes('三视图总预览')?'三视图总预览 · 8192 × 8192':data.name.includes('九视图总预览')?'九视图总预览 · 8192 × 8192':'独立商品图 · 8192 × 8192';text.append(title,detail);open.className='plain sm';open.href=url;open.target='_blank';open.rel='noopener';open.textContent='打开';row.append(icon,text,open);return row;
+ row.className='dlItem';icon.className='ic';icon.textContent='JPEG';text.className='t';title.textContent=data.label;detail.textContent=data.name.includes('三视图总预览')?'三视图总预览 · 4096 × 4096':data.name.includes('九视图总预览')?'九视图总预览 · 4096 × 4096':'独立商品图 · 4096 × 4096';text.append(title,detail);open.className='plain sm';open.href=url;open.target='_blank';open.rel='noopener';open.textContent='打开';row.append(icon,text,open);return row;
 }
 function clearMockupImages(){for(const url of mockupUrls)URL.revokeObjectURL(url);mockupUrls=[];$('#mockupGallery').replaceChildren();$('#downloadMockupZip').hidden=true}
 function ensureMockup(){

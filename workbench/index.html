@@ -2958,7 +2958,7 @@ function singleDeliveryView(d){
   const active=tabs.find(t=>t.key===SINGLE_DELIVERY_TAB)||tabs[0];
   const log=(d.log||[]).map(x=>`<div>${esc(x.t||'')}　${esc(x.m||'')}</div>`).join('');
   const media = active.images
-    ? `<div class="single-delivery__gallery">${active.images.map(image=>`<article><img src="${esc(asset(image.url))}" alt="" onclick="zoom('${jsq(asset(image.url))}','${jsq(image.title)}')"><div><b>${esc(image.label)}</b><a class="mini" href="${esc(asset(image.url))}?dl=1">下载原图</a></div></article>`).join('')}</div>`
+    ? `<div class="single-delivery__gallery">${active.images.map(image=>`<article><img src="${esc(asset(image.url))}" alt="" onclick="zoom('${jsq(asset(image.url))}','${jsq(image.title)}')"><div><b>${esc(image.label)}</b><a class="mini" href="${esc(asset(image.url))}?dl=1">下载图片</a></div></article>`).join('')}</div>`
     : `<div class="single-delivery__canvas-frame ${active.print?'print-canvas':''}"><img src="${esc(asset(active.url))}" alt="" onclick="zoom('${jsq(asset(active.url))}','${jsq(active.title)}')"></div>`;
   return `<section class="single-delivery"><div class="single-delivery__head"><div><span>SONG OBJECT / DELIVERY</span><h3>《${esc(item.name||d.title||'当前歌曲')}》制作完成</h3></div><p>先浏览成品；需要打印时进入“打印制作”，在这里查看适配画布并下载原尺寸文件。</p></div><div class="single-delivery__shell"><nav class="single-delivery__nav"><b>本次交付</b>${tabs.map(t=>`<button type="button" class="${t.key===active.key?'on':''} ${t.print?'print':''}" data-delivery-tab="${t.key}"><i>${t.no}</i><span>${esc(t.label)}<small>${esc(t.sub)}</small></span></button>`).join('')}</nav><div class="single-delivery__canvas"><div class="single-delivery__canvas-head"><span>${esc(active.label)} · ${esc(active.sub)}</span>${active.pdf?`<a class="mini" href="${esc(asset(active.pdf))}?dl=1">下载印刷 PDF</a>`:''}${active.images?'':`<a class="mini" href="${esc(asset(active.url))}?dl=1">下载原图</a>`}</div>${media}${active.print?`<div class="single-delivery__print-note"><b>打印制作</b><span>这是适配网页窗口的预览。下载 PDF 或原图后，请以 100% 原尺寸输出。</span></div>`:''}${log?`<details class="single-delivery__logs"><summary>查看制作记录</summary><div>${log}</div></details>`:''}</div></div></section>`;
 }
@@ -3147,24 +3147,14 @@ document.addEventListener('keydown', e=>{
 });
 
 /* ---------------- 下载 / 打开目录 ---------------- */
-/* 图片格式选择弹窗（单曲 ZIP 与作品库批量 ZIP 共用）：
-   选完把格式交给 onPick，由调用方决定怎么下载。 */
-function zipFormatDialog(onPick){
-  const dialog=document.createElement('dialog');
-  dialog.style.cssText='margin:auto;padding:24px;border:1px solid #ddd;border-radius:14px;max-width:420px;width:90%';
-  dialog.innerHTML=`<form method="dialog"><h3>下载图片格式</h3><p style="margin:12px 0">打印文件默认 JPG，PDF 也会保留。</p><select id="zipFormat" style="width:100%;padding:10px"><option value="jpg">JPG · 透明区域转为白底</option><option value="png">PNG · 保留透明背景</option><option value="original">原始格式 · 保留全部文件</option></select><p style="margin:12px 0;color:#667">此选项不影响打印文件：打印图片统一为 JPG，并保留 PDF。</p><div style="display:flex;gap:10px;justify-content:flex-end"><button class="btn" value="cancel">取消</button><button class="btn" value="download">下载 ZIP</button></div></form>`;
-  document.body.appendChild(dialog);dialog.showModal();
-  dialog.addEventListener('close',()=>{
-    if(dialog.returnValue==='download') onPick(dialog.querySelector('select').value);
-    dialog.remove();
-  });
+async function downloadWorkZip(path, query){
+  try{
+    const {downloadProductZip}=await import('/mini-mockup/keychain-watermark.js');
+    await downloadProductZip(API+path+'?'+new URLSearchParams(query));
+  }catch(error){toast('下载失败：'+error.message)}
 }
 function downloadZip(id){
-  zipFormatDialog(fmt=>{
-    const a=document.createElement('a');
-    a.href=API+'/api/zip?id='+encodeURIComponent(id)+'&format='+fmt;
-    document.body.appendChild(a);a.click();a.remove();toast('正在打包，稍等片刻');
-  });
+  return downloadWorkZip('/api/zip',{id});
 }
 $('#btnZip').onclick = ()=>{if(JOB) downloadZip(JOB);};
 $('#btnOpen').onclick = async ()=>{
@@ -3453,14 +3443,7 @@ function libZipSel(){
   if(!list.length){ toast('先勾选要下载的作品'); return; }
   const ids  = list.map(j => j.id);
   const cats = list.map(j => j.cat || 'work');
-  zipFormatDialog(fmt => {
-    const a = document.createElement('a');
-    a.href = API + '/api/jobs/zip?format=' + encodeURIComponent(fmt)
-      + '&ids='  + ids.map(encodeURIComponent).join(',')
-      + '&cats=' + cats.map(encodeURIComponent).join(',');
-    document.body.appendChild(a); a.click(); a.remove();
-    toast('正在打包 ' + ids.length + ' 条作品，稍等片刻');
-  });
+  downloadWorkZip('/api/jobs/zip',{ids:ids.join(','),cats:cats.join(',')});
 }
 
 function libRow(j){

@@ -1,5 +1,6 @@
 import {mountWatermarkControls} from './watermark-controls.js';
-import {isKeychainProduct,watermarkProductImage,watermarkProductZip} from './product-watermark.js';
+import {isKeychainProduct,isProductImage,watermarkProductImage,exportProductZip} from './product-watermark.js';
+import {encodeProductJpeg,hasProductJpegEncoder,productJpegFilename} from './product-export.js';
 const notify=message=>window.toast?.(message);
 let controls,revision=0,refreshTimer,cache=new Map();const tracked=new WeakMap(),objectUrls=new Set();
 const button=document.createElement('button');button.type='button';button.className='btn';button.id='productWatermarkButton';button.textContent='商品图水印';
@@ -21,12 +22,42 @@ function refreshImage(img){
 function refresh(){if(!controls)return;revision++;cache.clear();for(const url of objectUrls)URL.revokeObjectURL(url);objectUrls.clear();document.querySelectorAll('img').forEach(refreshImage);button.textContent=controls.snapshot().enabled?'商品图水印 · 已开启':'商品图水印'}
 controls=await mountWatermarkControls(dialog.querySelector('.watermark-dialog-body'),{onChange:()=>{clearTimeout(refreshTimer);refreshTimer=setTimeout(refresh,180)},onError:notify});refresh();
 new MutationObserver(records=>{for(const record of records){if(record.type==='attributes')refreshImage(record.target);else for(const node of record.addedNodes)if(node.nodeType===1){if(node.matches('img'))refreshImage(node);node.querySelectorAll('img').forEach(refreshImage)}}}).observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['src']});
+export async function downloadProductZip(url){
+ const settings=controls.snapshot(),target=new URL(url,location.href);
+ target.searchParams.set('format',settings.enabled?'product-source':'product-4k');
+ try{
+  if(!await hasProductJpegEncoder(target))throw Error('请重启工作台以启用商品图 ZIP 下载');
+  notify('正在准备 ZIP…');
+  if(!settings.enabled){
+   const a=document.createElement('a');a.href=target;document.body.append(a);a.click();a.remove();
+   return;
+  }
+  const archive=await fetch(target);
+  if(!archive.ok)throw Error('下载失败，请稍后重试');
+  const blob=await exportProductZip(await archive.blob(),settings);
+  const header=archive.headers.get('content-disposition')||'';
+  const match=header.match(/filename\*=UTF-8''([^;]+)/i);
+  download(blob,match?decodeURIComponent(match[1]):'作品文件.zip');
+  notify('ZIP 已导出');
+ }catch(error){notify(error.message)}
+}
+
 document.addEventListener('click',async e=>{
- const a=e.target.closest('a[href]');if(!a||!controls.snapshot().enabled)return;const u=new URL(a.href,location.href);
- const zip=/^\/api\/(zip|jobs\/zip)$/.test(u.pathname),product=isKeychainProduct(u.href);if(!zip&&!product)return;
- e.preventDefault();e.stopImmediatePropagation();const settings=controls.snapshot();
- try{notify(zip?'正在为商品图添加水印并打包…':'正在导出带水印商品图…');const response=await fetch(u.href);if(!response.ok)throw Error('下载失败，请稍后重试');const original=await response.blob();
-  let blob,name;if(zip){blob=await watermarkProductZip(original,settings);const header=response.headers.get('content-disposition')||'',match=header.match(/filename\*=UTF-8''([^;]+)/i);name=match?decodeURIComponent(match[1]):'商品图-作品文件.zip'}else{blob=await watermarkProductImage(original,settings,u.pathname);name=decodeURIComponent(u.pathname.split('/').pop())}
-  download(blob,name);notify('已导出，水印仅应用于商品图');
+ const a=e.target.closest('a[href]');
+ if(!a)return;
+ const url=new URL(a.href,location.href);
+ if(!url.pathname.startsWith('/assets/')||!isProductImage(url.href))return;
+ e.preventDefault();
+ const settings=controls.snapshot();
+ try{
+  notify('正在导出商品图…');
+  const response=await fetch(url);
+  if(!response.ok)throw Error('下载失败，请稍后重试');
+  const original=await response.blob();
+  const marked=isKeychainProduct(url.href)
+   ? await watermarkProductImage(original,settings,'image.png') : original;
+  const name=decodeURIComponent(url.pathname.split('/').pop());
+  download(await encodeProductJpeg(marked),productJpegFilename(name));
+  notify('商品图已导出');
  }catch(error){notify(error.message)}
 },true);
