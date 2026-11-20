@@ -1,5 +1,5 @@
 import {shellThumbnail as onlineThumbnail} from './online-reference-v30/renderer.js';
-import{surfaces,views,viewScale,widestViewScale,initialState,defaultTransform,sanitizeState,validQuad,persist,restore,readUpload,REMOVED_DISC_VIEW,visibleViewIndices}from'./model.js';
+import{surfaces,views,viewScale,widestViewScale,initialState,defaultTransform,sanitizeState,validQuad,persist,restore,readUpload,REMOVED_DISC_VIEW,removedDiscCase,visibleViewIndices}from'./model.js';
 import{preloadShells,prepareAsset,prepareProjectAssets,invalidate,render,getQuad,exportPNG,exportThreeViewPreview,exportAccessoryOverview,frontX,shellThumbnail,BASE}from'./renderer.js';
 import{createZip}from'./zip-store.js';
 import{mountWatermarkControls}from'./watermark-controls.js';
@@ -15,16 +15,26 @@ function draw(){if(!ready)return;const width=$('#canvasWrap').getBoundingClientR
 function refreshAssets(){for(const s of surfaces){const row=$(`[data-surface="${s.id}"]`),a=state.assets[s.id];row.classList.toggle('active',state.selected===s.id);row.setAttribute('aria-pressed',state.selected===s.id);const thumb=row.querySelector('.asset-preview');thumb.replaceChildren();if(a.src){const img=document.createElement('img');img.src=a.src;img.alt=s.name;thumb.append(img)}else thumb.innerHTML=imageIcon;row.querySelector('.asset-action').textContent=a.src?'已上传':'＋ 上传'}$('#selectedName').textContent=surfaces.find(s=>s.id===state.selected).name;$('#assetHint').textContent=surfaces.find(s=>s.id===state.selected).hint;$('#uploadLabel').textContent=state.assets[state.selected].src?'替换当前图片':'点击上传图片';refreshControls()}
 function refreshControls(){const a=state.assets[state.selected];for(const key of ['scale','x','y','rotation']){$(`#${key}`).value=a[key];$(`#${key}Value`).textContent=a[key]+(key==='rotation'?'°':'%')}document.querySelectorAll('[data-fit]').forEach(b=>{b.classList.toggle('active',b.dataset.fit===a.fit);b.setAttribute('aria-pressed',b.dataset.fit===a.fit)});$('#removeSelected').disabled=!a.src;$('#showDesign').checked=state.showDesign;$('#lighting').checked=state.lighting;$('#discVisible').disabled=state.view===REMOVED_DISC_VIEW;$('#discVisible').checked=state.discVisible&&state.view!==REMOVED_DISC_VIEW;$('#background').value=state.background;$('#emptyToggle').classList.toggle('active',!state.showDesign);$('#emptyToggle').textContent=state.showDesign?'查看空壳':'返回设计';$('#calibrate').classList.toggle('active',calibrating);$('#calibrate').textContent=calibrating?'完成四角校准':'贴图四角校准';$('#resetQuad').hidden=!calibrating}
 function selectSurface(id,changeView=true){state.selected=id;calibrating=false;if(changeView){const visible=views[state.view].slots.some(s=>s.id===id);if(!visible)state.view=surfaces.find(s=>s.id===id).view}refreshAssets();refreshView();scheduleSave()}
-function refreshView(){document.querySelectorAll('[data-view]').forEach(b=>{b.classList.toggle('active',+b.dataset.view===state.view);b.setAttribute('aria-current',+b.dataset.view===state.view?'true':'false')});$('#viewTitle').textContent=views[state.view].name;$('#stageNote').textContent=calibrating?'拖动四角校准':'原壳结构';updatePreviewScale();draw()}
+function refreshView(){document.querySelectorAll('[data-view]').forEach(b=>{b.classList.toggle('active',+b.dataset.view===state.view);b.setAttribute('aria-current',+b.dataset.view===state.view?'true':'false')});$('#viewTitle').textContent=views[state.view].name;updatePreviewScale();draw()}
 function drawAlignment(){const svg=$('#alignment');svg.replaceChildren();if(!calibrating)return;const slot=views[state.view].slots.find(s=>s.id===state.selected);if(!slot)return;const q=getQuad(state,state.view,slot).map(([x,y])=>[state.view===0?frontX(x*BASE):x*BASE,y*BASE]);const poly=document.createElementNS(svg.namespaceURI,'polygon');poly.setAttribute('points',q.map(p=>p.join(',')).join(' '));svg.append(poly);q.forEach((p,i)=>{const circle=document.createElementNS(svg.namespaceURI,'circle');circle.setAttribute('cx',p[0]);circle.setAttribute('cy',p[1]);circle.setAttribute('r',11);circle.dataset.corner=i;svg.append(circle)})}
 function updatePreviewScale(){
-  const stage=$('#stage'),wrap=$('#canvasWrap'),size=Math.min(stage.clientWidth,stage.clientHeight,740);if(!size)return;
-  const scale=viewScale(state.view);
-  // Apply one common fit factor to every angle, so a narrow viewport does not
-  // silently give the open and closed views different scales.
-  const widest=widestViewScale(state.view);
-  const common=Math.min(1,stage.clientWidth*.96/(size*widest));
-  wrap.style.transform=`scale(${common*scale*zoom/100})`;
+  const stage=$('#stage'),pan=$('#previewPan'),wrap=$('#canvasWrap');
+  const available=stage.clientWidth,size=Math.min(available,stage.offsetHeight,740);
+  if(!size)return;
+  const removed=state.view===REMOVED_DISC_VIEW;
+  const referenceView=removed?1:state.view;
+  const common=Math.min(1,available*.96/(size*widestViewScale(referenceView)));
+  // The square export fits both parts by shrinking the composition. Counter
+  // that shrink in the interactive preview so either view has the same scale.
+  const scale=common*viewScale(referenceView)*zoom/100/(removed?removedDiscCase.scale:1);
+  wrap.style.transform=`scale(${scale})`;
+  const pictureWidth=removed?Math.ceil(wrap.offsetWidth*scale*(calibrating?1:.90)+16):available;
+  const scrollable=pictureWidth>available;
+  pan.style.width=scrollable?pictureWidth+'px':'100%';
+  stage.classList.toggle('wide-view',scrollable);
+  if(scrollable)stage.tabIndex=0;
+  else stage.removeAttribute('tabindex');
+  $('#stageNote').textContent=calibrating?'拖动四角校准':scrollable?'横向滚动查看全图':'原壳结构';
 }
 function setZoom(value){zoom=Math.max(60,Math.min(160,value));updatePreviewScale();$('#zoomReset').textContent=zoom+'%';draw()}
 function download(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),10000)}
@@ -167,7 +177,8 @@ buildUI();refreshAssets();refreshView();
 const watermarkPreview=document.createElement('canvas');watermarkPreview.id='watermarkPreview';watermarkPreview.setAttribute('aria-hidden','true');$('#stage').append(watermarkPreview);
 watermarkControls=await mountWatermarkControls($('.inspector-panel'),{onChange:()=>{draw();scheduleSave()},onError:toast});
 const stage=$('#stage');
-const fitStage=()=>{stage.style.setProperty('--stage-size',Math.max(200,Math.min(stage.clientWidth,stage.clientHeight))+'px');updatePreviewScale();draw()};
+stage.addEventListener('scroll',()=>{watermarkPreview.style.transform=`translateX(${stage.scrollLeft}px)`});
+const fitStage=()=>{stage.style.setProperty('--stage-size',Math.max(200,Math.min(stage.clientWidth,stage.offsetHeight))+'px');updatePreviewScale();draw()};
 new ResizeObserver(fitStage).observe(stage);fitStage();
 function updateRemovedDiscThumbnail(){
   const thumbnail=document.createElement('canvas');

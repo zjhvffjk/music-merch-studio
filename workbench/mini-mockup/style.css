@@ -16,4 +16,7 @@ body.embedded .topbar .brand,body.embedded #backToDesign{display:none}body.embed
 /* 在工作台内统一从导出页下载；独立样机页保留项目文件功能。 */
 body.embedded #saveProject,body.embedded #exportOpen{display:none}
 #watermarkPreview{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.preview-pan{display:grid;place-items:center;align-self:stretch;flex:none;width:100%;overflow:hidden}
+.stage.wide-view{justify-content:flex-start;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;touch-action:pan-x}
+.stage.wide-view #alignment circle{touch-action:none}
 .watermark-controls{order:1}.watermark-fields{display:grid;gap:14px;margin-top:10px}.watermark-fields>label{display:grid;gap:7px;font-size:12px}.watermark-fields input[type=text]{width:100%;padding:8px;border:1px solid var(--line);border-radius:5px;background:#fff;font:inherit}.watermark-fields input[type=color]{width:100%;height:30px;padding:2px;border:1px solid var(--line);border-radius:5px}.watermark-fields small,.watermark-hint{font-size:10px;color:var(--muted);line-height:1.6}.watermark-hint{margin-top:14px}.watermark-upload{width:100%;padding:8px;font-size:12px}.watermark-logo-row{display:flex;align-items:center;justify-content:space-between;margin-top:8px}.watermark-logo-row img{width:50px;height:40px;object-fit:contain}.watermark-range{display:grid;gap:8px;margin-top:14px}.watermark-range>span{display:flex;justify-content:space-between;font-size:12px}.watermark-range output{color:var(--muted);font-size:11px}.watermark-fields [hidden]{display:none}

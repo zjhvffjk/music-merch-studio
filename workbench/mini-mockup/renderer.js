@@ -1,6 +1,6 @@
 import * as online from './online-reference-v30/renderer.js';
 import {drawWatermark} from './watermark.js';
-import{views,viewScale,widestViewScale,loadImage,REMOVED_DISC_VIEW,removedDiscCase,mapRemovedDiscCase,visibleViewIndices}from'./model.js';
+import{views,viewScale,widestViewScale,loadImage,REMOVED_DISC_VIEW,removedDiscCase,mapRemovedDiscCase}from'./model.js';
 export const BASE=1254;
 const imgCache=new Map();const textureCache=new Map();let localResolution=1200;
 export function shellThumbnail(view){const shell=imgCache.get(view===8?'shell-flat':`shell-${view}`);return shell?.toDataURL?.('image/png')||shell?.src||null}
@@ -254,7 +254,62 @@ export function render(canvas,state,view=state.view,size=1254){
   ctx.setTransform(1,0,0,1,0,0);
   if(view===0)calibrateFront(canvas);
 }
-export async function exportPNG(state,size,mode){const c=document.createElement('canvas');if(mode==='current')render(c,state,state.view,size);else if(mode==='individual'){const cell=document.createElement('canvas'),side=size*viewScale(state.view)*Math.min(1,.90/widestViewScale(state.view));c.width=c.height=size;const x=c.getContext('2d');x.fillStyle=state.background;x.fillRect(0,0,size,size);render(cell,state,state.view,Math.ceil(side));x.drawImage(cell,(size-side)/2,(size-side)/2,side,side);cell.width=cell.height=0}else{const cell=document.createElement('canvas'),indices=visibleViewIndices,columns=3,cellSize=size/columns;c.width=c.height=size;const x=c.getContext('2d');x.fillStyle=state.background;x.fillRect(0,0,c.width,c.height);const common=Math.min(1,.90/widestViewScale());indices.forEach((view,i)=>{render(cell,state,view,Math.ceil(cellSize*viewScale(view)*common));const px=(i%columns)*cellSize,py=Math.floor(i/columns)*cellSize,side=cellSize*viewScale(view)*common;x.save();x.beginPath();x.rect(px,py,cellSize,cellSize*.91);x.clip();x.drawImage(cell,px+(cellSize-side)/2,py+(cellSize*.91-side)/2,side,side);x.restore();x.fillStyle='#55534e';x.font=`${Math.round(cellSize*.025)}px sans-serif`;x.textAlign='center';x.fillText(views[view].name,px+cellSize/2,py+cellSize*.96)})}
+// Bounds of the photographed shell, including the hanger. The removed-disc
+// bounds include the separate disc on the right.
+const overviewBounds={
+  0:[.148,.136,.850,.850],
+  1:[.054,.269,.946,.742],
+  5:[.150,.137,.850,.844],
+  6:[.446,.154,.559,.873],
+  7:[.446,.153,.555,.876],
+  8:[.054,.269,.945,.743],
+  9:[.103,.286,.897,.688],
+  10:[.165,.086,.837,.894],
+  [REMOVED_DISC_VIEW]:[.060,.340,.944,.667],
+};
+
+function drawNineViewOverview(canvas,state,size){
+ const rows=[[0,1,5],[8,6,9],[10,7,REMOVED_DISC_VIEW]].map(row=>row.map(view=>{
+   const [left,top,right,bottom]=overviewBounds[view];
+   const height=bottom-top;
+   return {view,left,top,height,aspect:(right-left)/height};
+ }));
+ const margin=size*.038,gapX=size*.024,gapY=size*.034,bleed=.06;
+ const labelSize=Math.round(size*.016),labelGap=size*.006;
+ const labelHeight=labelSize*1.3+labelGap;
+ const widestRow=Math.max(...rows.map(row=>row.reduce((sum,item)=>sum+item.aspect+2*bleed,0)));
+ const height=Math.min(
+   (size-2*margin-2*gapX)/widestRow,
+   (size-2*margin-2*gapY-3*labelHeight)/(3*(1+2*bleed))
+ );
+ const padding=height*bleed,imageHeight=height+2*padding;
+ const rowHeight=imageHeight+labelHeight;
+ canvas.width=canvas.height=size;
+ const ctx=canvas.getContext('2d'),cell=document.createElement('canvas');
+ ctx.fillStyle=state.background;ctx.fillRect(0,0,size,size);
+ ctx.imageSmoothingQuality='high';
+ ctx.fillStyle='#55534e';ctx.font=`${labelSize}px sans-serif`;
+ ctx.textAlign='center';ctx.textBaseline='top';
+ let y=(size-3*rowHeight-2*gapY)/2;
+ for(const row of rows){
+   const widths=row.map(item=>item.aspect*height+2*padding);
+   const rowWidth=widths.reduce((sum,width)=>sum+width,0)+2*gapX;
+   let x=(size-rowWidth)/2;
+   for(const [index,item] of row.entries()){
+     const width=widths[index],factor=height/item.height,sourceSize=Math.ceil(factor);
+     render(cell,state,item.view,sourceSize);
+     const ratio=sourceSize/factor;
+     ctx.drawImage(cell,item.left*sourceSize-padding*ratio,item.top*sourceSize-padding*ratio,
+       width*ratio,imageHeight*ratio,x,y,width,imageHeight);
+     ctx.fillText(views[item.view].name,x+width/2,y+imageHeight+labelGap);
+     x+=width+gapX;
+   }
+   y+=rowHeight+gapY;
+ }
+ cell.width=cell.height=0;
+}
+
+export async function exportPNG(state,size,mode){const c=document.createElement('canvas');if(mode==='current')render(c,state,state.view,size);else if(mode==='individual'){const cell=document.createElement('canvas'),side=size*viewScale(state.view)*Math.min(1,.90/widestViewScale(state.view));c.width=c.height=size;const x=c.getContext('2d');x.fillStyle=state.background;x.fillRect(0,0,size,size);render(cell,state,state.view,Math.ceil(side));x.drawImage(cell,(size-side)/2,(size-side)/2,side,side);cell.width=cell.height=0}else drawNineViewOverview(c,state,size);
 drawWatermark(c,state.watermark);
 return new Promise((resolve,reject)=>c.toBlob(b=>{c.width=c.height=0;b?resolve(b):reject(Error('导出失败，请尝试较小分辨率'))},'image/png'))}
 export async function exportThreeViewPreview(state,size=8192){
