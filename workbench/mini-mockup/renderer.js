@@ -309,9 +309,37 @@ function drawNineViewOverview(canvas,state,size){
  cell.width=cell.height=0;
 }
 
-export async function exportPNG(state,size,mode){const c=document.createElement('canvas');if(mode==='current')render(c,state,state.view,size);else if(mode==='individual'){const cell=document.createElement('canvas'),side=size*viewScale(state.view)*Math.min(1,.90/widestViewScale(state.view));c.width=c.height=size;const x=c.getContext('2d');x.fillStyle=state.background;x.fillRect(0,0,size,size);render(cell,state,state.view,Math.ceil(side));x.drawImage(cell,(size-side)/2,(size-side)/2,side,side);cell.width=cell.height=0}else drawNineViewOverview(c,state,size);
-drawWatermark(c,state.watermark);
-return new Promise((resolve,reject)=>c.toBlob(b=>{c.width=c.height=0;b?resolve(b):reject(Error('导出失败，请尝试较小分辨率'))},'image/png'))}
+function finishPngExport(canvas,watermark,errorMessage){
+ drawWatermark(canvas,watermark);
+ return new Promise((resolve,reject)=>{
+   canvas.toBlob(blob=>{
+     canvas.width=canvas.height=0;
+     if(blob)resolve(blob);
+     else reject(Error(errorMessage));
+   },'image/png');
+ });
+}
+
+export async function exportPNG(state,size,mode){
+ const canvas=document.createElement('canvas');
+ if(mode==='current'){
+   render(canvas,state,state.view,size);
+ }else if(mode==='individual'){
+   const cell=document.createElement('canvas');
+   const side=size*viewScale(state.view)*Math.min(1,.90/widestViewScale(state.view));
+   canvas.width=canvas.height=size;
+   const ctx=canvas.getContext('2d');
+   ctx.fillStyle=state.background;
+   ctx.fillRect(0,0,size,size);
+   render(cell,state,state.view,Math.ceil(side));
+   ctx.drawImage(cell,(size-side)/2,(size-side)/2,side,side);
+   cell.width=cell.height=0;
+ }else{
+   drawNineViewOverview(canvas,state,size);
+ }
+ return finishPngExport(canvas,state.watermark,'导出失败，请尝试较小分辨率');
+}
+
 export async function exportThreeViewPreview(state,size=8192){
  const c=document.createElement('canvas');c.width=c.height=size;
  const x=c.getContext('2d');x.fillStyle=state.background;x.fillRect(0,0,size,size);
@@ -333,8 +361,7 @@ export async function exportThreeViewPreview(state,size=8192){
  x.fillText(views[1].name,layoutSize/2,top-layoutSize*.016);
  for(const [view,column] of [[0,0],[5,1]])x.fillText(views[view].name,column*half+half/2,layoutSize*1.022);
  cell.width=cell.height=0;
- drawWatermark(c,state.watermark);
- return new Promise((resolve,reject)=>c.toBlob(b=>{c.width=c.height=0;b?resolve(b):reject(Error('三视图预览导出失败'))},'image/png'));
+ return finishPngExport(c,state.watermark,'三视图预览导出失败');
 }
 
 function drawBallChain(ctx,image,cx,cy,height){
@@ -391,9 +418,5 @@ export async function exportAccessoryOverview(state,size=8192){
  ctx.fillText('银色珠链',chainX*size,vertical(.457)*size);
  ctx.fillText(views[REMOVED_DISC_VIEW].name,caseX*size,vertical(.888)*size);
  ctx.fillText('光盘',chainX*size,vertical(.888)*size);
- drawWatermark(canvas,state.watermark);
- return new Promise((resolve,reject)=>canvas.toBlob(blob=>{
-   canvas.width=canvas.height=0;
-   blob?resolve(blob):reject(Error('内外展开组合图导出失败'));
- },'image/png'));
+ return finishPngExport(canvas,state.watermark,'内外展开组合图导出失败');
 }
