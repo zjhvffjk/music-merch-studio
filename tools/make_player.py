@@ -551,11 +551,12 @@ def make(cover_path, out_path, title, artist, duration, width=1200,
     icon_size = W*.047
     for cx, count, kind in [(W*.70, likes, "heart"),(W*.88, comments, "comment")]:
         if kind == "heart":
-            heart_ink = accent if controls else icon
-            draw_open_heart(d,cx,icon_y,icon_size,heart_ink+(255,),max(2,int(W*.0028)),filled=bool(controls))
+            draw_open_heart(d,cx,icon_y,icon_size,accent+(255,),max(2,int(W*.0028)),filled=True)
+            count_ink = accent if controls else icon
         else:
             draw_bubble(d,cx,icon_y,icon_size,text_sub+(255,),max(2,int(W*.0028)))
-        d.text((cx+W*.012,icon_y-icon_size*.42),count,font=f_num,fill=heart_ink if kind == "heart" else text_sub,anchor="lm")
+            count_ink = text_sub
+        d.text((cx+W*.012,icon_y-icon_size*.42),count,font=f_num,fill=count_ink,anchor="lm")
 
     # ---------- 5. 歌手 (+ 「关注」按钮 或 > 箭头) ----------
     art_y = H * ART_Y
