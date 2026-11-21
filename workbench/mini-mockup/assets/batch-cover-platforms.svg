@@ -1,0 +1,106 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2384" height="644" viewBox="0 0 596 161" role="img" aria-labelledby="platform-title">
+  <title id="platform-title">九个音乐平台标识的矢量绘制预览</title>
+  <defs>
+    <linearGradient id="apple-tile" x2="0" y2="1">
+      <stop stop-color="#ff5c6c"/><stop offset=".53" stop-color="#f8374e"/><stop offset="1" stop-color="#ec2039"/>
+    </linearGradient>
+    <linearGradient id="blue-tile" x2="0" y2="1">
+      <stop stop-color="#1b9ef5"/><stop offset="1" stop-color="#066cda"/>
+    </linearGradient>
+    <linearGradient id="soda-tile" x2="0" y2="1">
+      <stop stop-color="#303739"/><stop offset="1" stop-color="#111519"/>
+    </linearGradient>
+    <linearGradient id="soda-note" x2="0" y2="1">
+      <stop stop-color="#d1f94c"/><stop offset=".47" stop-color="#76ea31"/><stop offset="1" stop-color="#18d976"/>
+    </linearGradient>
+    <linearGradient id="red-tile" x2="0" y2="1">
+      <stop stop-color="#fb4346"/><stop offset="1" stop-color="#df202d"/>
+    </linearGradient>
+    <linearGradient id="qq-tile" x2="0" y2="1">
+      <stop stop-color="#fff173"/><stop offset="1" stop-color="#f4d62c"/>
+    </linearGradient>
+    <linearGradient id="yt-disc" x2="0" y2="1">
+      <stop stop-color="#484948"/><stop offset="1" stop-color="#252626"/>
+    </linearGradient>
+    <linearGradient id="kkbox-tile" x2="0" y2="1">
+      <stop stop-color="#27c3df"/><stop offset="1" stop-color="#009ac2"/>
+    </linearGradient>
+    <linearGradient id="joox-green" x2="0" y2="1">
+      <stop stop-color="#58d09c"/><stop offset="1" stop-color="#40b889"/>
+    </linearGradient>
+    <linearGradient id="spotify-disc" x2="0" y2="1">
+      <stop stop-color="#32d575"/><stop offset="1" stop-color="#16b657"/>
+    </linearGradient>
+  </defs>
+
+  <g aria-label="Apple Music" transform="translate(34 4)">
+    <rect x=".7" y=".7" width="62.6" height="62.6" rx="16" fill="url(#apple-tile)" stroke="#ff8f92" stroke-width="1.4"/>
+    <path fill="#fffdf9" d="M22 15.5c0-.8.5-1.5 1.5-1.7l21.8-5c1.3-.3 2.1.4 2.1 1.8v28.8c0 3.8-2.6 6.6-6.6 7.3-3.9.7-6.6-1.3-6.6-4.2 0-3.1 2.5-5.6 6.5-6.4l2-.3V19.7l-16 3.6v22.1c0 3.8-2.6 6.6-6.6 7.3-3.9.7-6.6-1.3-6.6-4.2 0-3.1 2.6-5.6 6.5-6.4l2-.3z"/>
+  </g>
+
+  <g aria-label="酷狗音乐" transform="translate(123 4)">
+    <rect x=".7" y=".7" width="62.6" height="62.6" rx="16" fill="url(#blue-tile)" stroke="#73b6f0" stroke-width="1.4"/>
+    <circle cx="32" cy="32" r="24.4" fill="none" stroke="#fffdf9" stroke-width="2.7"/>
+    <path fill="#fffdf9" d="M23.6 19h6.6l-1.7 11.2L40.6 19H48L34.5 31.5l9 13h-7.3l-8.1-12-1.9 12h-6.6z"/>
+  </g>
+
+  <g aria-label="汽水音乐" transform="translate(213 4)">
+    <rect x=".7" y=".7" width="62.6" height="62.6" rx="16" fill="url(#soda-tile)" stroke="#808785" stroke-width="1.4"/>
+    <path fill="url(#soda-note)" d="M25.8 10.2 46 11.6l4.4 10-11.4-.8-4.6 13.7c4.8 1.4 5.8 4.8 3.2 10.3-2.9 6.2-8.2 9.9-14.8 9.9-6.6 0-10.7-3.6-10.7-8.4 0-5.5 5.3-10.3 11.7-10.7l3.7-15.5z"/>
+    <path d="M13 43.7c7.9-3.7 19-5.1 30.9-5.1l-11.1 5.7-8.7 1.5-6.8-.2-7.1.6z" fill="#40ec55"/>
+    <path d="M15.4 44.4c4.4-1.9 9.9-3 16.5-3.4" fill="none" stroke="#225332" stroke-width="1.3" stroke-linecap="round"/>
+  </g>
+
+  <g aria-label="网易云音乐" transform="translate(303 4)">
+    <rect x=".7" y=".7" width="62.6" height="62.6" rx="16" fill="url(#red-tile)" stroke="#fa7577" stroke-width="1.4"/>
+    <path d="M26.7 14.3C18 16.4 12 24.5 12 33.3c0 10.8 8.7 19.5 19.5 19.5S51 44.1 51 33.3c0-8.1-5.1-15.3-12.3-18.1-2.6-1-3.9-2.1-3.8-3.7.1-2.4 3.3-3.7 6.3-3.1" fill="none" stroke="#fffdf9" stroke-width="4.2" stroke-linecap="round"/>
+    <path d="M32.2 15c-1.5 3.9-.4 6.3 3.7 8.2 3.7 1.7 6 5.2 6 9.3 0 5.7-4.6 10.3-10.3 10.3s-10.3-4.6-10.3-10.3c0-4.6 3-8.5 7.2-9.8" fill="none" stroke="#fffdf9" stroke-width="4.1" stroke-linecap="round"/>
+    <circle cx="31.6" cy="32.6" r="3.9" fill="#fffdf9"/>
+  </g>
+
+  <g aria-label="QQ 音乐" transform="translate(393 4)">
+    <circle cx="32" cy="32" r="31.3" fill="url(#qq-tile)" stroke="#fff3a5" stroke-width="1.4"/>
+    <path d="M53 7.1c-1.7 7.7-6.5 12.6-13.7 14.6-2.5.7-5 1-7.4.7l8.9 19.4c3.3 7.3-.9 14.3-8.6 16-7.2 1.7-14.3-2-15.7-8.3-1.6-6.8 3.8-13 10.7-13.6 2.7-.3 5.3.1 7.1 1.1l-9.2-23.8C33.2 9.5 42.4 8 53 7.1z" fill="#13ae65"/>
+    <path d="M26 13.4C34.1 10.1 43.4 8.3 53 7.1c-1.2 4.2-3.2 7.3-6.4 9.8-6.7-2.6-13.5-3.9-20.6-3.5z" fill="#40cf85"/>
+  </g>
+
+  <g aria-label="YouTube Music" transform="translate(526 30)">
+    <circle r="29" fill="url(#yt-disc)" stroke="#838583" stroke-width="1.4"/>
+    <circle r="15.7" fill="#fa2832"/>
+    <path d="M-4.6-7.4 7.3 0-4.6 7.4z" fill="#fffdf9"/>
+    <text x="0" y="40.2" fill="#222025" font-family="Arial Narrow, Roboto Condensed, sans-serif" font-size="20" font-weight="700" text-anchor="middle" textLength="104" lengthAdjust="spacingAndGlyphs">YouTube Music</text>
+  </g>
+
+  <g aria-label="KKBOX" transform="translate(2 100)">
+    <rect x=".7" y=".7" width="144.6" height="52.6" rx="2" fill="url(#kkbox-tile)" stroke="#62d6ee" stroke-width="1.4"/>
+    <g fill="#fffdf9">
+      <path d="M16 16h4.8v9.7l9.9-9.7h6.1L26.3 26.5 37.5 38h-6.6l-10.1-10.3V38H16z"/>
+      <path d="M38.5 16h4.8v9.7l9.9-9.7h6.1L48.8 26.5 60 38h-6.6L43.3 27.7V38h-4.8z"/>
+      <path fill-rule="evenodd" d="M62 14h4.7v8.5a9 9 0 0 1 6.8-2.9c5.7 0 9.7 4 9.7 9.5s-4 9.5-9.7 9.5a9.1 9.1 0 0 1-6.8-2.9V38H62zm10.6 9.8c-3.3 0-5.9 2.2-5.9 5.3s2.6 5.4 5.9 5.4c3.4 0 5.9-2.3 5.9-5.4s-2.5-5.3-5.9-5.3z"/>
+      <path fill-rule="evenodd" d="M96 19.6c6.1 0 10.6 4 10.6 9.5s-4.5 9.5-10.6 9.5-10.6-4-10.6-9.5 4.5-9.5 10.6-9.5zm0 4.2c-3.5 0-6 2.2-6 5.3s2.5 5.4 6 5.4 6-2.3 6-5.4-2.5-5.3-6-5.3z"/>
+      <path d="M107.5 20.1h5.7l5.2 6.1 5.2-6.1h5.8l-8.1 9 8.2 8.9h-6l-5.1-6.1-5.3 6.1h-5.8l8.1-8.9z"/>
+    </g>
+  </g>
+
+  <g aria-label="JOOX" transform="translate(189 100)" fill="url(#joox-green)">
+    <path d="M17 1h8.7v24.1c0 8.3-4.9 13.9-13.2 13.9-5.4 0-9.5-2.7-12.5-6.9l6.1-5.2c1.7 2.1 3.5 3.4 6.1 3.4 3 0 4.8-1.9 4.8-5.3z"/>
+    <path fill-rule="evenodd" d="M52 0a19.6 19.6 0 1 0 0 39.2A19.6 19.6 0 0 0 52 0zm0 7.6a12 12 0 1 1 0 24 12 12 0 0 1 0-24z"/>
+    <circle cx="52" cy="19.6" r="3.1"/>
+    <circle cx="52" cy="19.6" r="8.7" fill="none" stroke="#54cf9c" stroke-width=".8" stroke-opacity=".46"/>
+    <path d="M70.8 32.2l-5.3 5.7-4.6-4.4 5.9-5.3z"/>
+    <path d="M74 4.5C77.2 1.7 81.5 0 86.5 0c11.4 0 20.3 8.5 20.3 19.6s-8.9 19.6-20.3 19.6c-5 0-9.3-1.7-12.5-4.5l5.3-5.9c2 1.6 4.3 2.4 7.1 2.4 6.8 0 11.7-5 11.7-11.6S93.2 8 86.4 8c-2.8 0-5.1.8-7.1 2.4z"/>
+    <path d="M106.3 1h10.2l8 11.4L132.7 1h10.1l-13.2 18.4 14 18.8h-10.5l-8.7-11.7-8.7 11.7h-10.2l13.7-18.8z"/>
+    <text x="0" y="57" font-family="Arial, sans-serif" font-size="14" font-weight="500" textLength="143" lengthAdjust="spacing">LIVE YOUR MUSIC</text>
+  </g>
+
+  <g aria-label="Spotify" transform="translate(369 93)">
+    <circle cx="32.5" cy="32.5" r="32" fill="url(#spotify-disc)" stroke="#59db91"/>
+    <g fill="none" stroke="#fffdf9" stroke-linecap="round">
+      <path d="M12.2 22.3c13.4-4 29.9-2.5 43.1 4.3" stroke-width="5.3"/>
+      <path d="M14.7 31.6c11.2-3.1 24.7-1.6 36.3 3.6" stroke-width="4.5"/>
+      <path d="M17.1 40.6c9-2.4 19.8-1.2 29.4 3.1" stroke-width="3.8"/>
+    </g>
+    <text x="77" y="45.4" fill="#38ca76" font-family="Arial, sans-serif" font-size="41" font-weight="700" textLength="137" lengthAdjust="spacingAndGlyphs">Spotify</text>
+    <text x="218" y="32.5" fill="#38ca76" font-family="Arial, sans-serif" font-size="11" font-weight="700">®</text>
+  </g>
+</svg>

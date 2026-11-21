@@ -69,12 +69,38 @@ window.addEventListener('message',async e=>{
   batchExporting=true;
   try{
     const snapshot=await highresExportState(structuredClone(state)),indices=visibleViewIndices,files=[];
+    const {includeBatchCover,coverAlbum}=e.data;
+    const publishProduct=(name,label,blob,details={})=>{
+      name=productJpegFilename(name);
+      files.push({name:'九视图商品图/'+name,blob});
+      tellParent({type:'minicd-export-image',name,label,blob,...details});
+    };
+    let coverWarning='';
+    if(includeBatchCover||coverAlbum){
+      try{
+        const {exportBatchCoverTile}=await import('./batch-cover-tile.js');
+        if(coverAlbum)tellParent({type:'minicd-export-progress',message:'正在生成专辑封面商品图…'});
+        const tile=await exportBatchCoverTile(snapshot,includeBatchCover?undefined:PRODUCT_JPEG_SIZE*.75);
+        if(includeBatchCover){
+          tellParent({type:'minicd-batch-cover',blob:tile});
+        }else{
+          const {exportSingleCoverPoster,SINGLE_COVER_LABEL}=await import('./batch-cover-overview.js');
+          const album={artist:coverAlbum.artist,album:coverAlbum.album||snapshot.title};
+          const blob=await exportSingleCoverPoster(album,tile,snapshot.watermark);
+          publishProduct('00-'+SINGLE_COVER_LABEL,SINGLE_COVER_LABEL,blob,{
+            detail:`正视图（封面） · ${PRODUCT_JPEG_SIZE} × ${PRODUCT_JPEG_SIZE}`,
+            downloadName:productJpegFilename(SINGLE_COVER_LABEL),
+          });
+        }
+      }catch(error){
+        if(includeBatchCover)tellParent({type:'minicd-batch-cover-error',message:error.message});
+        else coverWarning=`专辑封面商品图未生成（${error.message}）。其余商品图可一起下载。`;
+      }
+    }
     const size=PRODUCT_JPEG_SIZE;
     const addImage=async (name,label,png)=>{
       const blob=await encodeProductJpeg(await png);
-      name=productJpegFilename(name);
-      files.push({name:'九视图商品图/'+name,blob});
-      tellParent({type:'minicd-export-image',name,label,blob});
+      publishProduct(name,label,blob);
     };
     tellParent({type:'minicd-export-progress',message:'正在生成三视图总预览图…'});
     await new Promise(resolve=>setTimeout(resolve,0));
@@ -94,7 +120,7 @@ window.addEventListener('message',async e=>{
     if(e.data.imagesOnly){tellParent({type:'minicd-export-done'});return}
     tellParent({type:'minicd-export-progress',message:batchNo?'正在合并批量素材和当前专辑商品图…':'正在合并原有素材和商品图…'});
     const response=await fetch('/api/design/zip?jid='+encodeURIComponent(workbenchJid));if(!response.ok)throw Error('原有素材包获取失败，请稍后重试');
-    const zip=await createZip(files,await response.blob());tellParent({type:'minicd-export-done',name:`${fileName()}-素材和商品图.zip`,blob:zip});
+    const zip=await createZip(files,await response.blob());tellParent({type:'minicd-export-done',name:`${fileName()}-素材和商品图.zip`,blob:zip,warning:coverWarning});
   }catch(error){tellParent({type:'minicd-export-error',message:'生成失败：'+error.message})}finally{await prepareProjectAssets(state.assets);batchExporting=false}
 });
 const workbenchSlots={front:'封面',back:'封底',inside:'封面背面',tray:'内盘底',disc:'盘面',sideR:'右侧封',sideL:'左侧封',sideLB:'左侧封背面'};
