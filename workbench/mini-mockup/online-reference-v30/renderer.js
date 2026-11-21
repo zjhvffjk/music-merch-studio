@@ -1,43 +1,45 @@
 import{views,surfaces,MAIN_VIEW_COUNT,DISC,loadImage,previewFrame}from'./model.js?rev=materials-23-neutral-tray';
+import { composeFrontShell, frontLowerRetainerMask, frontRetainerMask, frontSlotWindow, prepareFrontEyelet } from '../front-shell.js';
 export const BASE=1254;
 const imgCache=new Map();const textureCache=new Map();
 let shellResolutionCache=null,textureResolution=1200;
-export async function preloadShells(){await prepareInsideRetainers();await prepareUnifiedHooks();return Promise.all(views.map(async(v,i)=>{
- let img=(i===1&&imgCache.get('unified-rear'))||imgCache.get('unified-'+v.shell)||(v.shell==='online-reference-v30/assets/open-inner-reference.png'?imgCache.get('sharp-inner-shell'):await loadImage(v.shell||`online-reference-v30/assets/shell-${i}.webp`));
+export async function preloadShells(){await prepareInsideRetainers();
+ const [front]=await Promise.all([loadImage(views[0].shell),prepareUnifiedHooks()]);
+ imgCache.set('measured-eyelet',prepareFrontEyelet(front));
+ return Promise.all(views.map(async(v,i)=>{
+ let img=i===0?front:imgCache.get('unified-'+v.shell)||(v.shell==='online-reference-v30/assets/open-inner-reference.png'?imgCache.get('sharp-inner-shell'):await loadImage(v.shell||`online-reference-v30/assets/shell-${i}.webp`));
  imgCache.set(`raw-shell-${i}`,img);imgCache.set(`shell-${i}`,composeShell(img,v,BASE));
  if(v.hardware){const raw=await loadImage(v.hardware.shell),[sx,sy,sw,sh]=v.hardware.source,c=document.createElement('canvas');c.width=sw;c.height=sh;c.getContext('2d').drawImage(raw,sx,sy,sw,sh,0,0,sw,sh);imgCache.set(`hardware-${i}`,transparentHardware(c))}
  }))}
 function composeShell(img,v,size){
+ if(v===views[0])return composeFrontShell(img,size);
  if(v.frame){const c=document.createElement('canvas');c.width=c.height=size;const x=c.getContext('2d');x.setTransform(size/BASE,0,0,size/BASE,0,0);x.imageSmoothingQuality='high';x.fillStyle='#ffffff';x.fillRect(0,0,BASE,BASE);
  const [bx,by,bw,bh]=v.frame.body,[dx,dy,dw,dh]=v.frame.destination.map(n=>n*BASE),sx=dw/bw,sy=dh/bh;
- if(v.frame.spineSplit){
- const cut=v.frame.spineSplit,spineWidth=dw*v.frame.spineMM/(v.frame.spineMM+v.frame.coverMM),leftScale=spineWidth/(cut-bx),rightScale=(dw-spineWidth)/(bx+bw-cut);
- const y=dy-by*sy,h=img.height*sy;
- const drawBands=(source,target)=>{
-   for(let i=0;i<source.length-1;i++){
-     x.drawImage(img,source[i],0,source[i+1]-source[i],img.height,target[i],y,target[i+1]-target[i],h);
-   }
- };
- const left=v.frame.leftRail,right=v.frame.rightRail;
- const leftSource=[0,bx,left.inner,left.anchor,cut];
- const leftTarget=leftSource.map(p=>dx+(p-bx)*leftScale);
- const rightSource=[cut,right.anchor,right.inner,bx+bw,img.width];
- const rightTarget=rightSource.map(p=>dx+spineWidth+(p-cut)*rightScale);
- // Widen the outer rails toward the artwork while the hinge stays fixed.
- leftTarget[2]+=left.inset*BASE;
- rightTarget[2]-=right.inset*BASE;
- drawBands(leftSource,leftTarget);
- drawBands(rightSource,rightTarget);
- }
- else if(v.frame.source){const [cx,cy,cw,ch]=v.frame.source;x.drawImage(img,cx,cy,cw,ch,dx+(cx-bx)*sx,dy+(cy-by)*sy,cw*sx,ch*sy)}
+ if(v.frame.source){const [cx,cy,cw,ch]=v.frame.source;x.drawImage(img,cx,cy,cw,ch,dx+(cx-bx)*sx,dy+(cy-by)*sy,cw*sx,ch*sy)}
  else x.drawImage(img,dx-bx*sx,dy-by*sy,img.width*sx,img.height*sy);
  // The open photo continues into the hinge at right. Close the isolated rear with its own outer rail.
  if(v.frame.closeRightFromLeft){const rail=dw*2/53,cap=dh*3.5/45;
  x.drawImage(img,105,165,700,55,dx,dy,dw,cap);x.drawImage(img,105,785,700,55,dx,dy+dh-cap,dw,cap);
+ // Flatten the old eyelet base in the stretched rear cap before mounting the measured one.
+ x.drawImage(img,638,165,146,20,dx+(393-105)*dw/700,dy,(624-393)*dw/700,cap*20/55);
  x.drawImage(img,bx,by,45,bh,dx,dy,rail,dh);x.save();x.translate(dx+dw,dy);x.scale(-1,1);x.drawImage(img,bx,by,45,bh,0,0,rail,dh);x.restore();
  // Remove the remnant of the neighbouring open-shell rail above the rear's
  // top-right edge; keep the photographed border itself below the body line.
- x.fillStyle='#fff';x.fillRect(dx+dw*.72,dy-12,dw*.28+2,11.5)}img=c}
+ x.fillStyle='#fff';x.fillRect(dx+dw*.72,dy-12,dw*.28+2,11.5)}
+ if(v.eyelets){
+   const eyelet=imgCache.get('measured-eyelet');
+   const railY=dy+(165-by)*sy;
+   // Both views use the same outside photograph, with a body 675 px tall.
+   const pixelsPerMM=675*sy/45;
+   x.fillStyle='#fff';
+   for(const {center,clearLeft,clearRight} of v.eyelets){
+     x.fillRect(dx+(clearLeft-bx)*sx,0,(clearRight-clearLeft)*sx,railY);
+     const centerX=dx+(center-bx)*sx;
+     x.drawImage(eyelet.canvas,centerX+eyelet.x*pixelsPerMM,railY+eyelet.y*pixelsPerMM,
+       eyelet.width*pixelsPerMM,eyelet.height*pixelsPerMM);
+   }
+ }
+ img=c}
  return img;
 }
 function renderShell(view,size){const raw=imgCache.get(`raw-shell-${view}`);if(!raw)return null;if(!views[view].frame)return raw;if(size===BASE)return imgCache.get(`shell-${view}`);if(shellResolutionCache?.view===view&&shellResolutionCache.size===size)return shellResolutionCache.canvas;const canvas=composeShell(raw,views[view],size);shellResolutionCache={view,size,canvas};return canvas}
@@ -54,9 +56,25 @@ textureCache.set(id,{key,canvas:c});while(textureCache.size>3)textureCache.delet
 function slotTexture(state,slot){const full=texture(state,slot.id);if(!full||!slot.sourceCrop)return full;const key=slot.id+'-crop-'+slot.sourceCrop.join(','),cached=textureCache.get(key);if(cached?.source===full)return cached.canvas;const[x,y,w,h]=slot.sourceCrop,c=document.createElement('canvas');c.width=Math.max(1,Math.round(full.width*w));c.height=Math.max(1,Math.round(full.height*h));c.getContext('2d').drawImage(full,x*full.width,y*full.height,w*full.width,h*full.height,0,0,c.width,c.height);textureCache.set(key,{source:full,canvas:c});return c}
 // Isolate local plastic edges and highlights from the photographed grey backdrop.
 // A flat clear area becomes transparent, so adding the carrier cannot tint the paper below.
-export function transparentHardware(c){const x=c.getContext('2d'),w=c.width,h=c.height,p=x.getImageData(0,0,w,h),stride=w+1,sum=new Float64Array(stride*(h+1)),gray=new Float32Array(w*h);
+export function transparentHardware(c, lowerHighlights){const x=c.getContext('2d'),w=c.width,h=c.height,p=x.getImageData(0,0,w,h),stride=w+1,sum=new Float64Array(stride*(h+1)),gray=new Float32Array(w*h);
  for(let y=0;y<h;y++){let row=0;for(let a=0;a<w;a++){const i=y*w+a,k=i*4;gray[i]=(p.data[k]+p.data[k+1]+p.data[k+2])/3;row+=gray[i];sum[(y+1)*stride+a+1]=sum[y*stride+a+1]+row}}
- for(let y=0;y<h;y++)for(let a=0;a<w;a++){const l=Math.max(0,a-18),r=Math.min(w,a+19),t=Math.max(0,y-18),b=Math.min(h,y+19),mean=(sum[b*stride+r]-sum[t*stride+r]-sum[b*stride+l]+sum[t*stride+l])/((r-l)*(b-t)),delta=gray[y*w+a]-mean,k=(y*w+a)*4,light=delta>0;p.data[k]=p.data[k+1]=p.data[k+2]=light?255:55;p.data[k+3]=Math.min(light?210:190,Math.max(0,Math.abs(delta)-2)*(light?5:1.35))}
+ const localMean=(a,y,radius)=>{
+   const l=Math.max(0,a-radius),r=Math.min(w,a+radius+1),t=Math.max(0,y-radius),b=Math.min(h,y+radius+1);
+   return (sum[b*stride+r]-sum[t*stride+r]-sum[b*stride+l]+sum[t*stride+l])/((r-l)*(b-t));
+ };
+ for(let y=0;y<h;y++)for(let a=0;a<w;a++){
+   const i=y*w+a,k=i*4,value=gray[i],delta=value-localMean(a,y,18),light=delta>0;
+   let alpha=Math.min(light?210:190,Math.max(0,Math.abs(delta)-2)*(light?5:1.35));
+   const coverage=light&&lowerHighlights?lowerHighlights[k+3]/255:0;
+   if(coverage){
+     // The wide filter brightens the paper beside a dark arc. Limit the
+     // lower clips to the narrow specular detail next to the plastic edge.
+     const fineAlpha=Math.min(alpha,Math.max(0,value-localMean(a,y,6)-2)*4);
+     alpha+=(fineAlpha*.6-alpha)*coverage;
+   }
+   p.data[k]=p.data[k+1]=p.data[k+2]=light?255:55;
+   p.data[k+3]=alpha;
+ }
  x.putImageData(p,0,0);return c}
 const recessCache=new Map();
 export function paperRecess(view,id,lighting){
@@ -79,9 +97,11 @@ function frontRimOptics(){
  const canvas=document.createElement('canvas');canvas.width=canvas.height=BASE;
  const ctx=canvas.getContext('2d',{willReadFrequently:true});
  ctx.drawImage(imgCache.get('shell-0'),0,0);
- transparentHardware(canvas);
  const mask=document.createElement('canvas');mask.width=mask.height=BASE;
  const m=mask.getContext('2d');
+ m.fill(frontLowerRetainerMask(BASE));
+ transparentHardware(canvas,m.getImageData(0,0,BASE,BASE).data);
+ m.clearRect(0,0,BASE,BASE);
  for(const slot of views[0].slots){
    const [a,,c]=slot.q;
    const [left,top]=a.map(n=>n*BASE),[right,bottom]=c.map(n=>n*BASE);
@@ -93,6 +113,8 @@ function frontRimOptics(){
      m.fillRect(left,top,right-left,bottom-top);
    }
  }
+ m.fillStyle='#fff';
+ m.fill(frontRetainerMask(BASE));
  ctx.globalCompositeOperation='destination-in';
  ctx.drawImage(mask,0,0);
  imgCache.set('front-rim-optics',canvas);
@@ -125,19 +147,39 @@ function drawFrontRecess(ctx,state){
    if(!state.assets[slot.id].src)continue;
    const quad=getQuad(state,0,slot);
    ctx.save();
+   ctx.clip(frontSlotWindow(slot.id,BASE));
    ctx.globalAlpha=slot.id==='tray'?.32:.48;
    warp(ctx,paperRecess(0,slot.id,false),quad);
+   ctx.globalAlpha=1;
+   if(state.lighting&&slot.id==='tray')warp(ctx,frontChannelReflection(),quad);
+   clipQuad(ctx,quad);
+   ctx.globalAlpha=state.lighting?.72:.40;
+   ctx.drawImage(frontRimOptics(),0,0);
+   ctx.restore();
+ }
+}
+function clipQuad(ctx,quad){
+ ctx.beginPath();
+ quad.forEach(([x,y],i)=>i?ctx.lineTo(x*BASE,y*BASE):ctx.moveTo(x*BASE,y*BASE));
+ ctx.closePath();ctx.clip();
+}
+function drawFrontArtwork(ctx,state,shell){
+ if(!state.showDesign)return;
+ for(const slot of views[0].slots){
+   const image=slotTexture(state,slot);
+   if(!image)continue;
+   const quad=getQuad(state,0,slot);
+   ctx.save();
+   ctx.clip(frontSlotWindow(slot.id,BASE));
+   warp(ctx,image,quad);
    if(state.lighting){
-     ctx.globalAlpha=1;
-     if(slot.id==='tray')warp(ctx,frontChannelReflection(),quad);
-     ctx.beginPath();
-     quad.forEach(([x,y],i)=>i?ctx.lineTo(x*BASE,y*BASE):ctx.moveTo(x*BASE,y*BASE));
-     ctx.closePath();ctx.clip();
-     ctx.globalAlpha=.36;
-     ctx.drawImage(frontRimOptics(),0,0);
+     clipQuad(ctx,quad);
+     ctx.globalCompositeOperation='multiply';
+     ctx.drawImage(shell,0,0,BASE,BASE);
    }
    ctx.restore();
  }
+ drawFrontRecess(ctx,state);
 }
 function drawHardware(ctx,view){const hw=views[view].hardware,img=imgCache.get(`hardware-${view}`);if(!hw||!img)return;ctx.save();ctx.globalCompositeOperation='source-over';warp(ctx,img,hw.q);ctx.restore()}
 // The four retainers sit on the inner face of the cover paper. Extract only their shapes,
@@ -158,25 +200,18 @@ async function prepareInsideRetainers(){
 }
 function drawInsideRetainers(ctx,state,view){const slot=views[view].slots.find(s=>s.id==='inside'),img=imgCache.get('inside-retainers');if(!slot||!img||!state.assets.inside.src)return;ctx.save();ctx.globalCompositeOperation='multiply';warp(ctx,img,getQuad(state,view,slot));ctx.restore()}
 export function drawInsideRetainersOnQuad(ctx,quad){const img=imgCache.get('inside-retainers');if(!img)return;ctx.save();ctx.globalCompositeOperation='multiply';warp(ctx,img,quad);ctx.restore()}
-// One photographed eyelet, shared by every view; only its projection changes.
+// Preserve the established optical layers for the other camera angles.
 async function prepareUnifiedHooks(){const front=await loadImage('online-reference-v30/assets/front-cover-hq-v3.png'),hook=document.createElement('canvas');hook.width=235;hook.height=145;hook.getContext('2d').drawImage(front,510,140,235,145,0,0,235,145);
- // Resize only the front eyelet, keeping the photographed shell and its top rail.
- const frontAdjusted=document.createElement('canvas');frontAdjusted.width=front.width;frontAdjusted.height=front.height;
- const fx=frontAdjusted.getContext('2d');fx.drawImage(front,0,0);fx.fillStyle='#fff';fx.fillRect(510,140,235,145);
- const factor=.85,w=235*factor,h=145*factor;fx.imageSmoothingQuality='high';fx.drawImage(hook,627.5-w/2,285-h,w,h);
- imgCache.set('unified-online-reference-v30/assets/front-cover-hq-v3.png',frontAdjusted);
  // Reduce the photographed oblique eyelet around its attachment point; the
  // sloping rail is excluded from the edit so its perspective stays intact.
  const angled=await loadImage('online-reference-v30/assets/closed-oblique.png'),adjusted=document.createElement('canvas');adjusted.width=angled.width;adjusted.height=angled.height;const ax=adjusted.getContext('2d');ax.drawImage(angled,0,0);ax.save();ax.beginPath();ax.moveTo(530,40);ax.lineTo(760,40);ax.lineTo(760,215);ax.lineTo(530,252);ax.closePath();ax.clip();ax.fillStyle='#fff';ax.fillRect(530,40,230,212);ax.imageSmoothingQuality='high';ax.translate(645,233);ax.scale(.82,.82);ax.translate(-645,-233);ax.drawImage(angled,0,0);ax.restore();imgCache.set('unified-online-reference-v30/assets/closed-oblique.png',adjusted);
  const specs=[
   {file:'online-reference-v30/assets/open-inner-reference.png',flat:[[425,20,205,153,525,173,215,130],[1130,20,235,153,1252,173,215,130]]},
-  {file:'online-reference-v30/assets/open-outer-reference.png',flat:[[390,10,235,155,507,165,215,130],[1130,10,260,155,1260,165,215,130]]},
   {file:'online-reference-v30/assets/shell-2.webp',projected:[{erase:[[285,242],[400,242],[400,315],[285,345]],q:[[280,264],[389,240],[395,317],[287,344]]},{erase:[[728,137],[855,137],[855,217],[728,252]],q:[[728,165],[838,138],[848,218],[738,250]]}]},
   {file:'online-reference-v30/assets/shell-3.webp',projected:[{erase:[[330,326],[448,326],[448,398],[330,453]],q:[[329,367],[421,326],[433,402],[342,447]]},{erase:[[790,260],[948,260],[948,377],[790,338]],q:[[804,265],[928,298],[928,375],[804,342]]}]},
   {file:'online-reference-v30/assets/shell-4.webp',projected:[{erase:[[295,340],[430,340],[430,480],[295,413]],q:[[300,337],[407,403],[416,483],[308,417]]},{erase:[[735,350],[863,350],[863,429],[735,485]],q:[[740,400],[840,356],[849,430],[749,482]]}]}
  ];
  await Promise.all(specs.map(async spec=>{const raw=spec.file==='online-reference-v30/assets/open-inner-reference.png'?imgCache.get('sharp-inner-shell'):await loadImage(spec.file),c=document.createElement('canvas');c.width=raw.width;c.height=raw.height;const x=c.getContext('2d');x.drawImage(raw,0,0);
-  if(spec.file.endsWith('open-outer-reference.png')){const rear=document.createElement('canvas');rear.width=raw.width;rear.height=raw.height;const rx=rear.getContext('2d');rx.drawImage(raw,0,0);for(const [ex,ey,ew,eh,cx,base,w,h]of spec.flat){rx.fillStyle='#fff';rx.fillRect(ex,ey,ew,eh);rx.drawImage(hook,cx-w*factor/2,base-h*factor,w*factor,h*factor)}imgCache.set('unified-rear',rear)}
   for(const [ex,ey,ew,eh,cx,base,w,h]of spec.flat||[]){x.fillStyle='#fff';x.fillRect(ex,ey,ew,eh);const flatFactor=.75,scaledW=w*flatFactor,scaledH=h*flatFactor;x.drawImage(hook,cx-scaledW/2,base-scaledH,scaledW,scaledH)}
   for(const p of spec.projected||[]){x.save();x.beginPath();p.erase.forEach(([a,b],i)=>i?x.lineTo(a,b):x.moveTo(a,b));x.closePath();x.fillStyle='#fff';x.fill();x.restore();warp(x,hook,p.q.map(([a,b])=>[a/BASE,b/BASE]))}
   imgCache.set('unified-'+spec.file,c);
@@ -193,7 +228,8 @@ export function clearDisc(size=1200,rimOnly=false){const key=`clear-disc-${rimOn
  for(const [a,b]of [[3.5,4.55],[.15,1.1]]){x.strokeStyle='rgba(255,255,255,.95)';x.lineWidth=5;x.beginPath();x.arc(600,600,586,a,b);x.stroke()}imgCache.set(key,c);return c}
 function drawDisc(ctx,state,view,slot){const q=getQuad(state,view,slot),size=Math.min(3000,Math.max(1200,textureResolution));warp(ctx,clearDisc(size),q);const label=state.showDesign?slotTexture(state,slot):null;if(label)warp(ctx,label,q);warp(ctx,clearDisc(size,true),q)}
 export function render(canvas,state,view=state.view,size=1254,camera=[0,0,1,1]){const [cx,cy,cw,ch]=camera,height=Math.round(size*ch/cw),scale=size/(BASE*cw);if(canvas.width!==size||canvas.height!==height){canvas.width=size;canvas.height=height}const ctx=canvas.getContext('2d');ctx.setTransform(scale,0,0,scale,-cx*BASE*scale,-cy*BASE*scale);ctx.imageSmoothingQuality='high';ctx.globalCompositeOperation='source-over';ctx.fillStyle=state.background;ctx.fillRect(0,0,BASE,BASE);textureResolution=Math.ceil(size/cw);const shell=renderShell(view,textureResolution);if(!shell)return;ctx.save();ctx.globalCompositeOperation='multiply';ctx.drawImage(shell,0,0,BASE,BASE);ctx.restore();
-if(state.showDesign){for(const slot of views[view].slots){if(slot.id==='disc')drawHardware(ctx,view);if(slot.inBox&&!state.discVisible)continue;if(slot.id==='disc'){drawDisc(ctx,state,view,slot);continue}const tx=slotTexture(state,slot);if(tx)warp(ctx,tx,getQuad(state,view,slot))}if(state.lighting){ctx.save();ctx.beginPath();ctx.rect(0,0,BASE,BASE);for(const slot of views[view].slots){if((slot.id==='disc'||slot.sourceCrop||(view===4&&slot.id==='tray')||['front','back','inside','leftSpine','rightSpine','leftSpineInner'].includes(slot.id))&&state.assets[slot.id].src){const q=getQuad(state,view,slot);q.forEach((p,i)=>i?ctx.lineTo(p[0]*BASE,p[1]*BASE):ctx.moveTo(p[0]*BASE,p[1]*BASE));ctx.closePath()}}ctx.clip('evenodd');ctx.globalCompositeOperation='multiply';ctx.drawImage(shell,0,0,BASE,BASE);ctx.restore()}drawInsideRetainers(ctx,state,view);if(view===0)drawFrontRecess(ctx,state)}else{drawHardware(ctx,view);if(state.discVisible)for(const slot of views[view].slots)if(slot.id==='disc'&&slot.inBox)drawDisc(ctx,state,view,slot);}
+if(view===0)drawFrontArtwork(ctx,state,shell);
+else if(state.showDesign){for(const slot of views[view].slots){if(slot.id==='disc')drawHardware(ctx,view);if(slot.inBox&&!state.discVisible)continue;if(slot.id==='disc'){drawDisc(ctx,state,view,slot);continue}const tx=slotTexture(state,slot);if(tx)warp(ctx,tx,getQuad(state,view,slot))}if(state.lighting){ctx.save();ctx.beginPath();ctx.rect(0,0,BASE,BASE);for(const slot of views[view].slots){if((slot.id==='disc'||slot.sourceCrop||(view===4&&slot.id==='tray')||['front','back','inside','leftSpine','rightSpine','leftSpineInner'].includes(slot.id))&&state.assets[slot.id].src){const q=getQuad(state,view,slot);q.forEach((p,i)=>i?ctx.lineTo(p[0]*BASE,p[1]*BASE):ctx.moveTo(p[0]*BASE,p[1]*BASE));ctx.closePath()}}ctx.clip('evenodd');ctx.globalCompositeOperation='multiply';ctx.drawImage(shell,0,0,BASE,BASE);ctx.restore()}drawInsideRetainers(ctx,state,view)}else{drawHardware(ctx,view);if(state.discVisible)for(const slot of views[view].slots)if(slot.id==='disc'&&slot.inBox)drawDisc(ctx,state,view,slot);}
 ctx.setTransform(1,0,0,1,0,0);}
 export function sheetLayout(size){const header=Math.round(size*.055);return{columns:4,rows:2,cell:size/4,header,width:size,height:Math.round(size/2)+header}}
 export function renderPreview(canvas,state,size=BASE){render(canvas,state,state.view,size,previewFrame(state.view))}

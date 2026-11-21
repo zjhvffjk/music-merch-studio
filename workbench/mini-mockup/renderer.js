@@ -1,28 +1,21 @@
 import * as online from './online-reference-v30/renderer.js';
 import {drawWatermark} from './watermark.js';
+import { frontShellBounds } from './front-shell.js';
 import{views,viewScale,widestViewScale,loadImage,REMOVED_DISC_VIEW,removedDiscCase,mapRemovedDiscCase}from'./model.js';
 export const BASE=1254;
 const imgCache=new Map();const textureCache=new Map();let localResolution=1200;
-export function shellThumbnail(view){const shell=imgCache.get(view===8?'shell-flat':`shell-${view}`);return shell?.toDataURL?.('image/png')||shell?.src||null}
+export function shellThumbnail(view){if(view===0)return online.shellThumbnail(0);const shell=imgCache.get(view===8?'shell-flat':`shell-${view}`);return shell?.toDataURL?.('image/png')||shell?.src||null}
 // Use a single continuous photo so case highlights do not break at seams.
 export function frontX(x,inverse=false){return x}
 function calibrateFront(canvas){const copy=document.createElement('canvas');copy.width=canvas.width;copy.height=canvas.height;copy.getContext('2d').drawImage(canvas,0,0);const s=canvas.width/BASE,x=canvas.getContext('2d');x.save();x.setTransform(s,0,0,s,0,0);const a=[0,164,277,1090,BASE],b=a.map(v=>frontX(v));for(let i=0;i<4;i++)x.drawImage(copy,a[i]*s,0,(a[i+1]-a[i])*s,canvas.height,b[i],0,b[i+1]-b[i],BASE);x.restore()}
 function repairFrontClip(c){const patch=document.createElement('canvas');patch.width=patch.height=BASE;const p=patch.getContext('2d');p.translate(423+890,0);p.scale(-1,1);p.drawImage(c,0,0);p.setTransform(1,0,0,1,0,0);p.globalCompositeOperation='destination-in';const g=p.createRadialGradient(890,320,28,890,320,72);g.addColorStop(0,'rgba(0,0,0,1)');g.addColorStop(.75,'rgba(0,0,0,1)');g.addColorStop(1,'rgba(0,0,0,0)');p.fillStyle=g;p.fillRect(818,248,144,144);c.getContext('2d').drawImage(patch,0,0)}
-export async function preloadShells(){await online.preloadShells();await Promise.all(views.filter((v,i)=>v.onlineIndex===undefined&&i!==REMOVED_DISC_VIEW).map(async(v,i)=>{
-  if(i!==0){const raw=await loadImage(`assets/shell-${i}.webp`);if(i!==1){imgCache.set(`shell-${i}`,raw);return}
-    const c=document.createElement('canvas');c.width=raw.width;c.height=raw.height;const x=c.getContext('2d');x.drawImage(raw,0,0);
-    // Match the eyelets to the front relative to case height, retaining the photographed rail.
-    for(const cx of [367,881]){const left=cx-70,top=325,width=140,height=90,base=top+height,factor=.96;x.fillStyle='#fff';x.fillRect(left,top,width,height);x.imageSmoothingQuality='high';x.drawImage(raw,left,top,width,height,cx-width*factor/2,base-height*factor,width*factor,height*factor)}
-    imgCache.set(`shell-${i}`,c);return}
-  // Keep the photographed frame, hanger and left slot from the supplied
-  // reference. The generated blank replaces only the printed central window.
-  const img=await loadImage('assets/online-front-cover-hq-v3.png');
-  const c=document.createElement('canvas');c.width=c.height=BASE;const x=c.getContext('2d');
-  x.fillStyle='#fff';x.fillRect(0,0,BASE,BASE);
-  const [bx,by,bw,bh]=[170,285,910,745], [dx,dy,dw,dh]=[.15,.23,.70,.70*45/53].map(n=>n*BASE),cut=290,sy=dh/bh,spineWidth=dw*8/53,leftScale=spineWidth/(cut-bx),rightScale=(dw-spineWidth)/(bx+bw-cut);
-  x.drawImage(img,0,0,cut,img.height,dx-bx*leftScale,dy-by*sy,cut*leftScale,img.height*sy);
-  x.drawImage(img,cut,0,img.width-cut,img.height,dx+spineWidth,dy-by*sy,(img.width-cut)*rightScale,img.height*sy);
-  imgCache.set('shell-0',c);
+export async function preloadShells(){await online.preloadShells();await Promise.all(views.map(async(v,i)=>{
+  if(i===0||i===REMOVED_DISC_VIEW||v.onlineIndex!==undefined)return;
+  const raw=await loadImage(`assets/shell-${i}.webp`);if(i!==1){imgCache.set(`shell-${i}`,raw);return}
+  const c=document.createElement('canvas');c.width=raw.width;c.height=raw.height;const x=c.getContext('2d');x.drawImage(raw,0,0);
+  // Retain the photographed rail and the established inside-view eyelet scale.
+  for(const cx of [367,881]){const left=cx-70,top=325,width=140,height=90,base=top+height,factor=.96;x.fillStyle='#fff';x.fillRect(left,top,width,height);x.imageSmoothingQuality='high';x.drawImage(raw,left,top,width,height,cx-width*factor/2,base-height*factor,width*factor,height*factor)}
+  imgCache.set(`shell-${i}`,c);
 }));
   // The flat view uses the installed view's photographed case. Replace only
   // the right carrier with the empty inner shell, keeping the lid identical.
@@ -256,10 +249,11 @@ export function render(canvas,state,view=state.view,size=1254){
 }
 // Bounds of the photographed shell, including the hanger. The removed-disc
 // bounds include the separate disc on the right.
+const frontOverviewBounds=frontShellBounds(1);
 const overviewBounds={
-  0:[.148,.136,.850,.850],
+  0:[frontOverviewBounds.left-.002,frontOverviewBounds.top-.002,frontOverviewBounds.left+frontOverviewBounds.width,frontOverviewBounds.bottom+.025],
   1:[.054,.269,.946,.742],
-  5:[.150,.137,.850,.844],
+  5:[.150,frontOverviewBounds.top-.002,.850,.844],
   6:[.446,.154,.559,.873],
   7:[.446,.153,.555,.876],
   8:[.054,.269,.945,.743],
