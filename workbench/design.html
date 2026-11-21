@@ -972,19 +972,50 @@ function queueMockupPreparation(delay=1000){
   if(!LAST?.jid||LAST.batchKey||!mockupDirty||$('#mod-export').hidden)return;
   mockupPrepareTimer=setTimeout(()=>{if(!mockupPending&&LAST?.jid&&!LAST.batchKey&&mockupDirty&&!$('#mod-export').hidden)startMockupExport()},delay);
 }
+function clearProductArchive(link){
+ link.archiveRequest?.abort();
+ link.hidden=true;
+ link.removeAttribute('href');
+ link.onclick=null;
+}
+async function prepareProductArchive(link,blob,name,status){
+ clearProductArchive(link);
+ const request=new AbortController();
+ link.archiveRequest=request;
+ status.textContent='正在准备 ZIP 下载…';
+ try{
+  const response=await fetch('/api/product-download?name='+encodeURIComponent(name),{
+   method:'POST',body:blob,signal:request.signal,
+  });
+  if(!response.ok)throw Error('无法准备 ZIP，请重新生成。');
+  const {url}=await response.json();
+  if(request.signal.aborted)return false;
+  link.href=url;
+  link.onclick=()=>{status.textContent='已请求下载，可查看浏览器下载记录。'};
+  link.hidden=false;
+  return true;
+ }catch(error){
+  if(request.signal.aborted)return false;
+  throw error;
+ }
+}
 function makeProductRow(data,url){
  const row=document.createElement('div'),icon=document.createElement('div'),text=document.createElement('div'),title=document.createElement('b'),detail=document.createElement('small'),open=document.createElement('a');
  row.className='dlItem';icon.className='ic';icon.textContent='JPEG';text.className='t';title.textContent=data.label;
  detail.textContent=data.detail||(data.name.includes('三视图总预览')?'三视图总预览 · 4096 × 4096':data.name.includes('九视图总预览')?'九视图总预览 · 4096 × 4096':'独立商品图 · 4096 × 4096');
  text.append(title,detail);open.className='plain sm';open.href=url;open.target='_blank';open.rel='noopener';open.textContent='打开';row.append(icon,text,open);
  if(data.downloadName){
-  const thumb=document.createElement('img'),download=document.createElement('a');
+  const thumb=document.createElement('img');
   thumb.className='coverProductThumb';thumb.src=url;thumb.alt='';icon.replaceWith(thumb);
-  download.className='plain sm';download.href=url;download.download=data.downloadName;download.textContent='下载';row.append(download);
  }
  return row;
 }
-function clearMockupImages(){for(const url of mockupUrls)URL.revokeObjectURL(url);mockupUrls=[];$('#mockupGallery').replaceChildren();$('#downloadMockupZip').hidden=true}
+function clearMockupImages(){
+ for(const url of mockupUrls)URL.revokeObjectURL(url);
+ mockupUrls=[];
+ $('#mockupGallery').replaceChildren();
+ clearProductArchive($('#downloadMockupZip'));
+}
 function ensureMockup(){
   if(!LAST||!LAST.jid){err('请先生成三件套，再打开九视图样机');return false}
   const frame=$('#mockupFrame'),jid=String(LAST.jid),no=LAST.batchNo||'',rev=LAST.syncRevision||'',key=jid+':'+no+':'+rev;
@@ -999,14 +1030,34 @@ function sendMockupExport(){
 }
 function startMockupExport(){if(mockupPending||!ensureMockup())return;mockupPending=true;mockupExportKey=currentMockupKey();mockupChangedDuringExport=false;clearMockupImages();$('#refreshMockupImages').disabled=true;$('#mockupZipStatus').textContent='正在准备商品图…';clearTimeout(mockupTimer);mockupTimer=setTimeout(()=>{mockupPending=false;$('#refreshMockupImages').disabled=false;$('#mockupZipStatus').textContent='生成超时，请点击重新生成。'},360000);sendMockupExport()}
 $('#refreshMockupImages').onclick=startMockupExport;
-window.addEventListener('message',e=>{
+window.addEventListener('message',async e=>{
   if(e.origin!==location.origin||e.source!==$('#mockupFrame').contentWindow||!e.data)return;
   const d=e.data;
   if(d.type==='minicd-mockup-ready'){mockupReady=true;sendMockupExport()}
-  if(d.type==='minicd-mockup-changed'){if(LAST?.batchKey){if(allProductRunning)allProductRerun=true;else if(!$('#batchProductDownload').hidden){batchProductsDirty=true;$('#batchProductDownload').hidden=true;$('#batchCoverOverview').hidden=true;$('#batchProductStatus').textContent='样机已调整，返回导出页时将更新商品图。'}}mockupDirty=true;if(mockupPending)mockupChangedDuringExport=true;else if(mockupUrls.length){$('#downloadMockupZip').hidden=true;$('#mockupZipStatus').textContent='样机已调整，返回导出页时将更新商品图。'}if(!$('#mod-export').hidden)queueMockupPreparation()}
+  if(d.type==='minicd-mockup-changed'){if(LAST?.batchKey){if(allProductRunning)allProductRerun=true;else if(!$('#batchProductDownload').hidden){batchProductsDirty=true;clearProductArchive($('#batchProductDownload'));$('#batchCoverOverview').hidden=true;$('#batchProductStatus').textContent='样机已调整，返回导出页时将更新商品图。'}}mockupDirty=true;if(mockupPending)mockupChangedDuringExport=true;else if(mockupUrls.length){clearProductArchive($('#downloadMockupZip'));$('#mockupZipStatus').textContent='样机已调整，返回导出页时将更新商品图。'}if(!$('#mod-export').hidden)queueMockupPreparation()}
   if(d.type==='minicd-export-progress'&&mockupPending)$('#mockupZipStatus').textContent=d.message;
   if(d.type==='minicd-export-image'&&mockupPending&&d.blob instanceof Blob){const url=URL.createObjectURL(d.blob);mockupUrls.push(url);$('#mockupGallery').append(makeProductRow(d,url))}
-  if(d.type==='minicd-export-done'&&mockupPending&&d.blob instanceof Blob){clearTimeout(mockupTimer);mockupPending=false;$('#refreshMockupImages').disabled=false;mockupDirty=mockupChangedDuringExport||mockupExportKey!==currentMockupKey();if(mockupExportKey!==currentMockupKey())clearMockupImages();else{const url=URL.createObjectURL(d.blob);mockupUrls.push(url);const link=$('#downloadMockupZip');link.href=url;link.download=d.name;link.hidden=mockupDirty}$('#mockupZipStatus').textContent=mockupDirty?'样机已调整，返回导出页时将更新商品图。':(d.warning||'商品图已生成，可打开查看或与原有素材一起下载。');if(mockupDirty&&!$('#mod-export').hidden)queueMockupPreparation()}
+  if(d.type==='minicd-export-done'&&mockupPending&&d.blob instanceof Blob){
+   clearTimeout(mockupTimer);
+   mockupPending=false;
+   $('#refreshMockupImages').disabled=false;
+   const status=$('#mockupZipStatus'),link=$('#downloadMockupZip');
+   mockupDirty=mockupChangedDuringExport||mockupExportKey!==currentMockupKey();
+   if(mockupExportKey!==currentMockupKey())clearMockupImages();
+   if(mockupDirty){
+    status.textContent='样机已调整，返回导出页时将更新商品图。';
+    if(!$('#mod-export').hidden)queueMockupPreparation();
+    return;
+   }
+   try{
+    if(await prepareProductArchive(link,d.blob,d.name,status)){
+     status.textContent=d.warning||'商品图和 ZIP 已准备好，可以下载。';
+    }
+   }catch(error){
+    mockupDirty=true;
+    status.textContent=error.message;
+   }
+  }
   if(d.type==='minicd-export-error'&&mockupPending){clearTimeout(mockupTimer);mockupPending=false;mockupDirty=true;$('#refreshMockupImages').disabled=false;$('#mockupZipStatus').textContent=d.message}
 });
 
@@ -1501,7 +1552,7 @@ async function generateAllBatchProducts(){
  const status=$('#batchProductStatus'),gallery=$('#batchProducts'),button=$('#batchProductRefresh'),link=$('#batchProductDownload');
  const overview=$('#batchCoverOverview'),covers=new Array(albums.length);
  let overviewError='';
- button.disabled=true;link.hidden=true;overview.hidden=true;overview.replaceChildren();gallery.replaceChildren();for(const u of allProductUrls)URL.revokeObjectURL(u);allProductUrls=[];
+ button.disabled=true;clearProductArchive(link);overview.hidden=true;overview.replaceChildren();gallery.replaceChildren();for(const u of allProductUrls)URL.revokeObjectURL(u);allProductUrls=[];
  try{
   for(let i=0;i<albums.length;i++){
    const item=albums[i],folder=String(i+1).padStart(2,'0')+'-'+safeProductFolder([item.artist,item.album].filter(Boolean).join(' · '));
@@ -1538,7 +1589,9 @@ async function generateAllBatchProducts(){
   }
   status.textContent='正在打包所有专辑…';const groups=[...new Set(albums.map(x=>x.jid))],bases=[];
   for(let i=0;i<groups.length;i++){const r=await fetch('/api/design/zip?jid='+encodeURIComponent(groups[i]));if(!r.ok)throw Error('原有素材包获取失败');const groupAlbums=albums.filter(a=>a.jid===groups[i]),a=groupAlbums[0],folder=String(albums.indexOf(a)+1).padStart(2,'0')+'-'+safeProductFolder([a.artist,a.album].filter(Boolean).join(' · '));bases.push({blob:await r.blob(),prefix:'原有素材和打印文件/'+(groupAlbums.length===1&&!a.batchNo?folder+'/':'')})}
-  const {createZip}=await import('/mini-mockup/zip-store.js');const zip=await createZip(files,bases),url=URL.createObjectURL(zip);allProductUrls.push(url);link.href=url;link.download='批量专辑-素材和商品图.zip';link.hidden=false;
+  const {createZip}=await import('/mini-mockup/zip-store.js');
+  const zip=await createZip(files,bases);
+  if(!await prepareProductArchive(link,zip,'批量专辑-素材和商品图.zip',status))return;
   status.textContent=overviewError?`封面总览未生成（${overviewError}）。其余商品图可一起下载。`:`已生成 ${albums.length} 张专辑的商品图和 ${overview.childElementCount} 张封面总览，可一起下载。`;
  }catch(e){status.textContent='生成失败：'+e.message+'，请点击重新生成全部商品图。'}finally{allProductRunning=false;button.disabled=false;if(allProductRerun)generateAllBatchProducts()}
 }

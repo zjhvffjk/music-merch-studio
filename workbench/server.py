@@ -98,7 +98,9 @@ from design_service import SERVICE as DESIGN  # noqa: E402
 # 必须拿到它的 OUT_DIR / list_projects / trash_project 才能并进同一份列表。
 import design_service as DSDESIGN  # noqa: E402
 import artist_catalog  # noqa: E402
-from product_export import MAX_PRODUCT_BYTES, encode_product_jpeg  # noqa: E402
+from product_export import (  # noqa: E402
+    MAX_PRODUCT_ARCHIVE_BYTES, MAX_PRODUCT_BYTES, encode_product_jpeg, save_product_archive,
+)
 
 from fetch163 import (  # noqa: E402
     API, artist_top_songs, album_songs, cover_url, download, get_json,
@@ -2426,6 +2428,43 @@ class Handler(BaseHTTPRequestHandler):
         n = int(self.headers.get("Content-Length") or 0)
         return self.rfile.read(n) if n else b""
 
+    def _prepare_product_archive(self, name):
+        host = self.headers.get("Host", "")
+        origin = self.headers.get("Origin")
+        if not host or origin not in ("http://" + host, "https://" + host):
+            self.close_connection = True
+            return self._json({"error": "请在工作台页面内下载商品图"}, 403)
+        size = int(self.headers.get("Content-Length") or 0)
+        if not 22 <= size <= MAX_PRODUCT_ARCHIVE_BYTES:
+            self.close_connection = True
+            return self._json({"error": "ZIP 文件大小超出范围"}, 413)
+        if self.headers.get("Content-Type") != "application/zip":
+            self.close_connection = True
+            return self._json({"error": "下载请求缺少 ZIP"}, 400)
+        folder = os.path.join(OUT_ROOT, "_product_downloads")
+        os.makedirs(folder, exist_ok=True)
+        cutoff = time.time() - 24 * 60 * 60
+        with os.scandir(folder) as entries:
+            for entry in entries:
+                try:
+                    if entry.is_file() and entry.stat().st_mtime < cutoff:
+                        os.unlink(entry.path)
+                except OSError:
+                    pass
+        token = uuid.uuid4().hex
+        path = os.path.join(folder, token + ".zip")
+        upload = path + ".part"
+        try:
+            save_product_archive(size, self.rfile, upload)
+            os.replace(upload, path)
+        except ValueError as exc:
+            self.close_connection = True
+            return self._json({"error": str(exc)}, 400)
+        finally:
+            if os.path.isfile(upload):
+                os.unlink(upload)
+        return self._json({"url": "/api/product-download?archive=" + token + "&name=" + quote(name)})
+
     # ---------- OPTIONS（跨来源预检） ----------
     def do_OPTIONS(self):
         self._sent = False
@@ -2452,6 +2491,16 @@ class Handler(BaseHTTPRequestHandler):
             slog("REQ", "GET %s | UA=%s | REF=%s"
                  % (self.path[:110], _ua, _rf))
         try:
+            if p == "/api/product-download":
+                token = (q.get("archive") or [""])[0]
+                if len(token) != 32 or any(c not in "0123456789abcdef" for c in token):
+                    return self._json({"error": "下载文件不存在"}, 404)
+                name = (q.get("name") or ["商品图.zip"])[0]
+                if (not name.lower().endswith(".zip") or len(name) > 160 or
+                        not name.isprintable() or any(c in name for c in '/\\:*?"<>|')):
+                    name = "商品图.zip"
+                path = os.path.join(OUT_ROOT, "_product_downloads", token + ".zip")
+                return self._file(path, name=name)
             if DESIGN.handle(self, p, q, "GET"):
                 return
             # 注：/packaging 与 /api/packaging/* 已按用户要求断开（包装工坊是独立工作台）
@@ -2856,6 +2905,8 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if DESIGN.handle(self, p, q, "POST"):
                 return
+            if p == "/api/product-download":
+                return self._prepare_product_archive((q.get("name") or ["商品图.zip"])[0])
             if p == "/api/product-export":
                 origin = self.headers.get("Origin")
                 if origin and origin != "http://" + self.headers.get("Host", ""):
