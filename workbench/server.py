@@ -2465,6 +2465,16 @@ class Handler(BaseHTTPRequestHandler):
                 if not target.startswith(base + os.sep) or not os.path.isfile(target):
                     return self._json({"error": "not found"}, 404)
                 return self._file(target)
+            if p in ("/mini3d", "/mini3d/", "/mini3d/index.html"):
+                return self._file(os.path.join(HERE, "mini3d", "index.html"))
+            for mini3d_dir in ("assets", "reference"):
+                prefix = "/mini3d/" + mini3d_dir + "/"
+                if p.startswith(prefix):
+                    base = os.path.realpath(os.path.join(HERE, "mini3d", mini3d_dir))
+                    target = os.path.realpath(os.path.join(base, unquote(p[len(prefix):])))
+                    if not target.startswith(base + os.sep) or not os.path.isfile(target):
+                        return self._json({"error": "not found"}, 404)
+                    return self._file(target)
             if p == "/api/ping":
                 kc_ok, kc_why = keychain_ready()
                 sh_ok, sh_why = shop_ready()
