@@ -151,12 +151,16 @@ function frontRetainerPair(size, y) {
   return path;
 }
 
+export function frontUpperRetainerMask(size) {
+  return frontRetainerPair(size, 770);
+}
+
 export function frontLowerRetainerMask(size) {
   return frontRetainerPair(size, 2413);
 }
 
 export function frontRetainerMask(size) {
-  const path = frontRetainerPair(size, 770);
+  const path = frontUpperRetainerMask(size);
   path.addPath(frontLowerRetainerMask(size));
   for (const x of [827, 2499]) for (const y of [939, 1818]) {
     const [left, top] = frontPoint(x, y, size);

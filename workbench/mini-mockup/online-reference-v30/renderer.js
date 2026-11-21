@@ -1,5 +1,5 @@
 import{views,surfaces,MAIN_VIEW_COUNT,DISC,loadImage,previewFrame}from'./model.js?rev=materials-23-neutral-tray';
-import { composeFrontShell, frontLowerRetainerMask, frontRetainerMask, frontSlotWindow, prepareFrontEyelet } from '../front-shell.js';
+import { composeFrontShell, frontLowerRetainerMask, frontRetainerMask, frontSlotWindow, frontUpperRetainerMask, prepareFrontEyelet } from '../front-shell.js';
 export const BASE=1254;
 const imgCache=new Map();const textureCache=new Map();
 let shellResolutionCache=null,textureResolution=1200;
@@ -56,7 +56,7 @@ textureCache.set(id,{key,canvas:c});while(textureCache.size>3)textureCache.delet
 function slotTexture(state,slot){const full=texture(state,slot.id);if(!full||!slot.sourceCrop)return full;const key=slot.id+'-crop-'+slot.sourceCrop.join(','),cached=textureCache.get(key);if(cached?.source===full)return cached.canvas;const[x,y,w,h]=slot.sourceCrop,c=document.createElement('canvas');c.width=Math.max(1,Math.round(full.width*w));c.height=Math.max(1,Math.round(full.height*h));c.getContext('2d').drawImage(full,x*full.width,y*full.height,w*full.width,h*full.height,0,0,c.width,c.height);textureCache.set(key,{source:full,canvas:c});return c}
 // Isolate local plastic edges and highlights from the photographed grey backdrop.
 // A flat clear area becomes transparent, so adding the carrier cannot tint the paper below.
-export function transparentHardware(c, lowerHighlights){const x=c.getContext('2d'),w=c.width,h=c.height,p=x.getImageData(0,0,w,h),stride=w+1,sum=new Float64Array(stride*(h+1)),gray=new Float32Array(w*h);
+export function transparentHardware(c, retainerHighlights){const x=c.getContext('2d'),w=c.width,h=c.height,p=x.getImageData(0,0,w,h),stride=w+1,sum=new Float64Array(stride*(h+1)),gray=new Float32Array(w*h);
  for(let y=0;y<h;y++){let row=0;for(let a=0;a<w;a++){const i=y*w+a,k=i*4;gray[i]=(p.data[k]+p.data[k+1]+p.data[k+2])/3;row+=gray[i];sum[(y+1)*stride+a+1]=sum[y*stride+a+1]+row}}
  const localMean=(a,y,radius)=>{
    const l=Math.max(0,a-radius),r=Math.min(w,a+radius+1),t=Math.max(0,y-radius),b=Math.min(h,y+radius+1);
@@ -65,10 +65,10 @@ export function transparentHardware(c, lowerHighlights){const x=c.getContext('2d
  for(let y=0;y<h;y++)for(let a=0;a<w;a++){
    const i=y*w+a,k=i*4,value=gray[i],delta=value-localMean(a,y,18),light=delta>0;
    let alpha=Math.min(light?210:190,Math.max(0,Math.abs(delta)-2)*(light?5:1.35));
-   const coverage=light&&lowerHighlights?lowerHighlights[k+3]/255:0;
+   const coverage=light&&retainerHighlights?retainerHighlights[k+3]/255:0;
    if(coverage){
      // The wide filter brightens the paper beside a dark arc. Limit the
-     // lower clips to the narrow specular detail next to the plastic edge.
+     // clips to the narrow specular detail next to the plastic edge.
      const fineAlpha=Math.min(alpha,Math.max(0,value-localMean(a,y,6)-2)*4);
      alpha+=(fineAlpha*.6-alpha)*coverage;
    }
@@ -100,6 +100,7 @@ function frontRimOptics(){
  const mask=document.createElement('canvas');mask.width=mask.height=BASE;
  const m=mask.getContext('2d');
  m.fill(frontLowerRetainerMask(BASE));
+ m.fill(frontUpperRetainerMask(BASE));
  transparentHardware(canvas,m.getImageData(0,0,BASE,BASE).data);
  m.clearRect(0,0,BASE,BASE);
  for(const slot of views[0].slots){
