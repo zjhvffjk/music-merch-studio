@@ -1184,8 +1184,73 @@ def build_contact_sheet(rows, out_path, artist="", title="多专辑设计对照�
     f_f = T.font("sans", 16 * S, foot)
     T.tracked(d, (M, H - M - 24 * S), foot, f_f, _DIM, 0.3)
 
-    im.resize((W // S, H // S), Image.LANCZOS).save(out_path)
+    im.resize((W // S, H // S), Image.LANCZOS).save(out_path, "PNG")
     return out_path
+
+
+def build_batch_comparison(data):
+    """Build a comparison page from completed jobs without regenerating their artwork."""
+    projects = data.get("projects")
+    if not isinstance(projects, list) or not 1 <= len(projects) <= MAX_BATCH:
+        raise ValueError("每张对照图需包含 1 至 %d 张专辑" % MAX_BATCH)
+    start = int(data.get("start", 1))
+    if start < 1:
+        raise ValueError("专辑序号无效")
+
+    root = OUT_DIR.resolve()
+    rows = []
+    for index, project in enumerate(projects, start):
+        if not isinstance(project, dict):
+            raise ValueError("专辑项目无效")
+        jid = _safe_jid(str(project.get("jid") or ""))
+        tag = str(project.get("batchNo") or "")
+        if not jid or (tag and not re.fullmatch(r"\d{1,3}", tag, re.ASCII)):
+            raise ValueError("专辑项目编号无效")
+        directory = root / jid
+        if directory.resolve() != directory:
+            raise ValueError("专辑项目目录无效")
+        try:
+            meta_path = directory / "meta.json"
+            if meta_path.resolve() != meta_path:
+                raise ValueError("专辑项目资料无效")
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            if not isinstance(meta, dict):
+                raise ValueError("专辑项目资料无效")
+            if tag:
+                albums = meta.get("albums", [])
+                if not isinstance(albums, list) or not all(isinstance(album, dict) for album in albums):
+                    raise ValueError("批量项目资料无效")
+                if start == 1 and index == 1 and len(albums) == len(projects) and all(
+                    isinstance(ref, dict) and ref.get("jid") == jid and
+                    str(ref.get("batchNo") or "") == str(album.get("no") or "")
+                    for ref, album in zip(projects, albums)
+                ):
+                    saved = directory / BATCH_SHEET
+                    if saved.is_file() and saved.resolve() == saved:
+                        return saved.read_bytes()
+                meta = next((album for album in albums if str(album.get("no")) == tag), {})
+            row = {"no": "%02d" % index, "album": str(meta.get("album") or ""),
+                   "artist": str(meta.get("artist") or ""),
+                   "date": str(meta.get("releaseDate") or meta.get("date") or ""),
+                   "mood": str(meta.get("mood") or ""), "style": str(meta.get("style") or "")}
+            prefix = tag + "-" if tag else "part-"
+            for part in ("disc", "cover", "strip"):
+                path = directory / (prefix + part + ".png")
+                if path.resolve() != path:
+                    raise ValueError("专辑组件路径无效")
+                with Image.open(path) as image:
+                    image.thumbnail((2400, 600), Image.Resampling.LANCZOS)
+                    row[part] = image.copy()
+        except FileNotFoundError as exc:
+            raise ValueError("专辑 %s 的三件套尚未生成或已清理" % jid) from exc
+        rows.append(row)
+
+    artists = list(dict.fromkeys(row["artist"] for row in rows if row["artist"]))
+    caption = artists[0] if len(artists) == 1 else "多位歌手"
+    output = io.BytesIO()
+    # The original renderer also accepts files and uses the same row layout.
+    build_contact_sheet(rows, output, caption)
+    return output.getvalue()
 
 
 def build_batch(data):
@@ -1842,6 +1907,15 @@ def handle(handler, path, query, method):
                 return True
             if path == "/api/design/batch":
                 handler._json(build_batch(data))
+                return True
+            if path == "/api/design/batch-comparison":
+                png = build_batch_comparison(data)
+                handler.send_response(200)
+                handler.send_header("Content-Type", "image/png")
+                handler.send_header("Content-Length", str(len(png)))
+                handler.send_header("Cache-Control", "no-store")
+                handler.end_headers()
+                handler.wfile.write(png)
                 return True
             if path == "/api/design/preview":
                 handler._json(build_preview(data))

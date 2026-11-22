@@ -5,10 +5,15 @@
 且每本只有 5 样东西，跟「单独生成一张专辑」出来的不一样 —— 用户还得自己
 按编号分拣才知道哪个文件属于哪张专辑（2026-11-01 用户要求）。
 """
+import io
+import json
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
+
+from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "workbench"))
 import design_service as DS
@@ -123,6 +128,47 @@ class BatchZipPlanTests(unittest.TestCase):
         self._fill()
         for arc in self._arcs():
             self.assertNotIn("盘面拼版-A4", arc)
+
+
+class BatchComparisonTests(unittest.TestCase):
+    def test_uses_latest_saved_components_in_selection_order(self):
+        with tempfile.TemporaryDirectory() as folder, patch.object(DS, "OUT_DIR", Path(folder)):
+            projects = []
+            for jid, tag, title, colour in (("single", "", "新专辑", "red"),
+                                             ("batch", "07", "历史专辑", "blue")):
+                directory = Path(folder) / jid
+                directory.mkdir()
+                album = {"album": title, "artist": "歌手", "releaseDate": "2026-10-02"}
+                meta = {"albums": [{**album, "no": tag}]} if tag else album
+                (directory / "meta.json").write_text(json.dumps(meta), encoding="utf-8")
+                prefix = tag + "-" if tag else "part-"
+                for part, size in (("disc", (20, 20)), ("cover", (40, 20)), ("strip", (58, 20))):
+                    Image.new("RGB", size, colour).save(directory / (prefix + part + ".png"))
+                projects.append({"jid": jid, "batchNo": tag})
+
+            with patch.object(DS, "build_contact_sheet", wraps=DS.build_contact_sheet) as render:
+                data = DS.build_batch_comparison({"projects": projects, "start": 13})
+            rows, _, artist = render.call_args.args
+            self.assertEqual([(row["no"], row["album"], row["date"]) for row in rows],
+                             [("13", "新专辑", "2026-10-02"), ("14", "历史专辑", "2026-10-02")])
+            self.assertEqual([row["disc"].getpixel((0, 0)) for row in rows], [(255, 0, 0), (0, 0, 255)])
+            self.assertEqual(artist, "歌手")
+            with Image.open(io.BytesIO(data)) as image:
+                self.assertEqual(image.format, "PNG")
+                image.verify()
+
+    def test_restored_batch_keeps_its_original_comparison(self):
+        with tempfile.TemporaryDirectory() as folder, patch.object(DS, "OUT_DIR", Path(folder)):
+            directory = Path(folder) / "batch"
+            directory.mkdir()
+            meta = {"albums": [{"no": "01"}, {"no": "02"}]}
+            (directory / "meta.json").write_text(json.dumps(meta), encoding="utf-8")
+            saved = directory / DS.BATCH_SHEET
+            Image.new("RGB", (40, 30), "yellow").save(saved)
+            result = DS.build_batch_comparison({
+                "projects": [{"jid": "batch", "batchNo": tag} for tag in ("01", "02")]
+            })
+            self.assertEqual(result, saved.read_bytes())
 
 
 if __name__ == "__main__":

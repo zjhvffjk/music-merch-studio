@@ -569,6 +569,7 @@ body.mockup-mode .studio,body.embed.mockup-mode .studio{display:block;max-width:
         <div class="body">
           <p class="muted">封面总览每张最多排 8 张专辑，超出后自动分成多张。下载 ZIP 时会一并打包各专辑的商品图、素材和打印文件。</p>
           <div class="dlRow"><a id="batchProductDownload" class="btn" hidden>下载全部专辑文件 ZIP</a><button id="batchProductRefresh" class="plain" type="button">重新生成全部商品图</button><span id="batchProductStatus" class="muted" role="status"></span></div>
+          <div id="batchComparison" hidden></div>
           <div id="batchCoverOverview" hidden></div>
           <div id="batchProducts"></div>
         </div>
@@ -576,12 +577,6 @@ body.mockup-mode .studio,body.embed.mockup-mode .studio{display:block;max-width:
       <section class="card" id="batchRes" hidden>
         <div class="head"><h2>导出 · 批量</h2></div>
         <div class="body">
-          <div class="dlRow">
-            <a id="lnkBatchSheet" class="btn" target="_blank">打开多专辑对照图</a>
-            <a id="lnkBatchZip" class="plain" target="_blank">下载 ZIP 打包</a>
-          </div>
-          <div class="sheetBox"><img id="batchSheet" alt="">
-            <div class="cap">多专辑对照图（每行一张：左列专辑信息 + 右侧 ①②③ 三件，自带文字标注）</div></div>
           <div id="batchGallery" class="batchGal"></div>
         </div>
       </section>
@@ -999,12 +994,12 @@ async function prepareProductArchive(link,blob,name,status){
   throw error;
  }
 }
-function makeProductRow(data,url){
+function makeProductRow(data,url,{showThumbnail=Boolean(data.downloadName)}={}){
  const row=document.createElement('div'),icon=document.createElement('div'),text=document.createElement('div'),title=document.createElement('b'),detail=document.createElement('small'),open=document.createElement('a');
- row.className='dlItem';icon.className='ic';icon.textContent='JPEG';text.className='t';title.textContent=data.label;
+ row.className='dlItem';icon.className='ic';icon.textContent=data.name.toLowerCase().endsWith('.png')?'PNG':'JPEG';text.className='t';title.textContent=data.label;
  detail.textContent=data.detail||(data.name.includes('三视图总预览')?'三视图总预览 · 4096 × 4096':data.name.includes('九视图总预览')?'九视图总预览 · 4096 × 4096':'独立商品图 · 4096 × 4096');
  text.append(title,detail);open.className='plain sm';open.href=url;open.target='_blank';open.rel='noopener';open.textContent='打开';row.append(icon,text,open);
- if(data.downloadName){
+ if(showThumbnail){
   const thumb=document.createElement('img');
   thumb.className='coverProductThumb';thumb.src=url;thumb.alt='';icon.replaceWith(thumb);
  }
@@ -1536,7 +1531,7 @@ $('#btnSpec').onclick=()=>{
 
 /* ---------------- 批量模式（?batch=1）---------------- */
 const BATCH=q.get('batch')==='1';
-/* 与 design_service.MAX_BATCH 一致：服务端一次只吃 12 张，选多了要分组跑。 */
+/* 对照图每页的张数与 design_service.MAX_BATCH 一致。 */
 const BATCH_CHUNK=12;
 let batchList=[],batchRunning=false,batchMockups=[];
 function updateBatchSelectors(){
@@ -1546,13 +1541,43 @@ function updateBatchSelectors(){
 function chooseBatchMockup(index){const item=batchMockups[index];if(!item)return;if(mockupPending){clearTimeout(mockupTimer);mockupPending=false;$('#refreshMockupImages').disabled=false}LAST={jid:item.jid,batchNo:item.batchNo,batchKey:item.key,syncRevision:item.syncRevision,album:item.album,artist:item.artist};mockupDirty=true;ensureMockup();updateBatchSelectors();if(!item.key&&!$('#mod-export').hidden&&!mockupPending)startMockupExport()}
 document.querySelectorAll('.batchMockupSelect').forEach(select=>select.onchange=()=>chooseBatchMockup(Number(select.value)));
 let batchProductsDirty=false,allProductRunning=false,allProductRerun=false,allProductUrls=[],batchProductFrame=null;
+const BATCH_COMPARISON_NAME='★多专辑对照图.png';
+async function prepareBatchComparison(albums){
+ const pages=[];
+ for(let start=0;start<albums.length;start+=BATCH_CHUNK){
+   const projects=albums.slice(start,start+BATCH_CHUNK).map(({jid,batchNo})=>({jid,batchNo}));
+   const response=await fetch('/api/design/batch-comparison',{
+     method:'POST',headers:{'Content-Type':'application/json'},
+     body:JSON.stringify({projects,start:start+1}),
+   });
+   if(!response.ok){
+     const error=await response.json().catch(()=>null);
+     throw Error(error?.error||'无法生成多专辑对照图');
+   }
+   const blob=await response.blob();
+   if(blob.type!=='image/png'||!blob.size)throw Error('未收到对照图');
+   const label='多专辑设计对照图'+(albums.length>BATCH_CHUNK?`（第 ${pages.length+1} 张）`:'');
+   const name=albums.length>BATCH_CHUNK?`★${label}.png`:BATCH_COMPARISON_NAME;
+   const detail=`${projects.length} 张专辑 · 盘面、封面折件、封底条`;
+   pages.push({name,label,detail,blob});
+ }
+ const panel=$('#batchComparison');
+ for(const page of pages){
+   const url=URL.createObjectURL(page.blob);
+   allProductUrls.push(url);
+   panel.append(makeProductRow(page,url));
+ }
+ panel.hidden=false;
+ return pages;
+}
 function safeProductFolder(s){return String(s||'未命名').replace(/[<>:"/\\|?*\x00-\x1f]/g,'-').slice(0,70)}
 async function generateAllBatchProducts(){
  if(allProductRunning){allProductRerun=true;return}if(!batchMockups.length)return;allProductRunning=true;allProductRerun=false;const albums=batchMockups.map(x=>({...x})),files=[];
  const status=$('#batchProductStatus'),gallery=$('#batchProducts'),button=$('#batchProductRefresh'),link=$('#batchProductDownload');
- const overview=$('#batchCoverOverview'),covers=new Array(albums.length);
- let overviewError='';
- button.disabled=true;clearProductArchive(link);overview.hidden=true;overview.replaceChildren();gallery.replaceChildren();for(const u of allProductUrls)URL.revokeObjectURL(u);allProductUrls=[];
+ const overview=$('#batchCoverOverview'),comparison=$('#batchComparison'),covers=new Array(albums.length);
+ let overviewError='',comparisonError='';
+ button.disabled=true;clearProductArchive(link);overview.hidden=true;overview.replaceChildren();comparison.hidden=true;comparison.replaceChildren();gallery.replaceChildren();for(const u of allProductUrls)URL.revokeObjectURL(u);allProductUrls=[];
+ const comparisonTask=prepareBatchComparison(albums).catch(error=>{comparisonError=error.message;return []});
  try{
   for(let i=0;i<albums.length;i++){
    const item=albums[i],folder=String(i+1).padStart(2,'0')+'-'+safeProductFolder([item.artist,item.album].filter(Boolean).join(' · '));
@@ -1580,20 +1605,24 @@ async function generateAllBatchProducts(){
     for(const poster of posters){
      const {name,blob}=poster,url=URL.createObjectURL(blob);
      allProductUrls.push(url);
-     overview.append(makeProductRow(poster,url));
+     overview.append(makeProductRow(poster,url,{showThumbnail:false}));
      posterFiles.push({name:'九视图商品图/00-'+name,blob});
     }
     files.unshift(...posterFiles);
     overview.hidden=false;
    }catch(error){overviewError=error.message}
   }
-  status.textContent='正在打包所有专辑…';const groups=[...new Set(albums.map(x=>x.jid))],bases=[];
-  for(let i=0;i<groups.length;i++){const r=await fetch('/api/design/zip?jid='+encodeURIComponent(groups[i]));if(!r.ok)throw Error('原有素材包获取失败');const groupAlbums=albums.filter(a=>a.jid===groups[i]),a=groupAlbums[0],folder=String(albums.indexOf(a)+1).padStart(2,'0')+'-'+safeProductFolder([a.artist,a.album].filter(Boolean).join(' · '));bases.push({blob:await r.blob(),prefix:'原有素材和打印文件/'+(groupAlbums.length===1&&!a.batchNo?folder+'/':'')})}
+  status.textContent='正在打包所有专辑…';
+  const comparisonFiles=await comparisonTask;
+  files.unshift(...comparisonFiles);
+  const groups=[...new Set(albums.map(x=>x.jid))],bases=[];
+  for(let i=0;i<groups.length;i++){const r=await fetch('/api/design/zip?jid='+encodeURIComponent(groups[i]));if(!r.ok)throw Error('原有素材包获取失败');const groupAlbums=albums.filter(a=>a.jid===groups[i]),a=groupAlbums[0],folder=String(albums.indexOf(a)+1).padStart(2,'0')+'-'+safeProductFolder([a.artist,a.album].filter(Boolean).join(' · '));bases.push({blob:await r.blob(),prefix:'原有素材和打印文件/'+(groupAlbums.length===1&&!a.batchNo?folder+'/':''),exclude:comparisonFiles.length?[BATCH_COMPARISON_NAME]:[]})}
   const {createZip}=await import('/mini-mockup/zip-store.js');
   const zip=await createZip(files,bases);
   if(!await prepareProductArchive(link,zip,'批量专辑-素材和商品图.zip',status))return;
-  status.textContent=overviewError?`封面总览未生成（${overviewError}）。其余商品图可一起下载。`:`已生成 ${albums.length} 张专辑的商品图和 ${overview.childElementCount} 张封面总览，可一起下载。`;
- }catch(e){status.textContent='生成失败：'+e.message+'，请点击重新生成全部商品图。'}finally{allProductRunning=false;button.disabled=false;if(allProductRerun)generateAllBatchProducts()}
+  const warnings=[overviewError&&`封面总览未生成（${overviewError}）`,comparisonError&&`设计对照图未生成（${comparisonError}）`].filter(Boolean);
+  status.textContent=warnings.length?warnings.join('；')+'。其余文件可一起下载。':`已生成 ${albums.length} 张专辑的商品图、${overview.childElementCount} 张封面总览和设计对照图，可一起下载。`;
+ }catch(e){status.textContent='生成失败：'+e.message+'，请点击重新生成全部商品图。'}finally{await comparisonTask;allProductRunning=false;button.disabled=false;if(allProductRerun)generateAllBatchProducts()}
 }
 $('#batchProductRefresh').onclick=generateAllBatchProducts;
 
@@ -1673,7 +1702,7 @@ async function runBatch(){
         $('#batchGallery').innerHTML=batchGalleryHtml(results);updateBatchSelectors();
       }catch(e){failures.push((body.album||a.album)+'：'+e.message)}
     }
-    if(batchMockups.length){renderBatchPrint(results);chooseBatchMockup(0);$('#batchProductCard').hidden=false;$('#singleExportCard').hidden=true;$('#lnkBatchSheet').hidden=true;$('#lnkBatchZip').hidden=true;$('#batchSheet').closest('.sheetBox').hidden=true;}
+    if(batchMockups.length){renderBatchPrint(results);chooseBatchMockup(0);$('#batchProductCard').hidden=false;$('#singleExportCard').hidden=true;}
     status.textContent=`已生成 ${results.length}/${batchList.length} 张专辑`+(failures.length?'；失败：'+failures.join('、'):'');$('#batchState').textContent=status.textContent;
     if(batchMockups.length)generateAllBatchProducts();
     if(results.length===batchList.length&&!failures.length)showMod('print');
@@ -1687,7 +1716,7 @@ async function recoverBatch(jid){
  const fu=name=>'/api/design/file?jid='+encodeURIComponent(jid)+'&name='+encodeURIComponent(name);
  const items=meta.albums.map(a=>({...a,parts:['disc','cover','strip'].map(part=>fu(a.no+'-'+part+'.png')),printUrl:fu(a.no+'-打印拼版-A4竖版7套.png'),printPdfUrl:fu(a.no+'-打印拼版-A4竖版7套.pdf'),sheetUrl:fu(a.no+'-★版面总览-1比1.png')}));
  batchList=meta.albums.map(a=>({...a,pic:location.origin+fu(a.no+'-封面.png')}));renderBatch();renderBatchDesign();$('#btnBatch').hidden=true;document.querySelectorAll('#batchList .bx').forEach(button=>button.hidden=true);batchMockups=meta.albums.map(a=>({jid,batchNo:String(a.no),key:String(meta.albums.indexOf(a)),album:a.album,artist:a.artist}));
- $('#batchRes').hidden=false;renderBatchPrint(items);$('#batchGallery').innerHTML=batchGalleryHtml(items);$('#lnkBatchSheet').href=fu(meta.sheet);$('#batchSheet').src=fu(meta.sheet);$('#lnkBatchZip').href='/api/design/zip?jid='+encodeURIComponent(jid);
+ $('#batchRes').hidden=false;renderBatchPrint(items);$('#batchGallery').innerHTML=batchGalleryHtml(items);
  $('#batchState').textContent='已恢复批量结果 · 共 '+items.length+' 张';$('#singleExportCard').hidden=true;$('#batchProductCard').hidden=false;chooseBatchMockup(0);generateAllBatchProducts();
 }
 if(BATCH){
