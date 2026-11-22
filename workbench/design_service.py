@@ -51,7 +51,6 @@ import zipfile
 from collections import OrderedDict
 from pathlib import Path
 from urllib.parse import quote
-from urllib.request import Request, urlopen
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -96,6 +95,7 @@ except Exception:
     pass
 
 import spec_minicd as SP
+from cover_download import fetch_cover_bytes
 import make_minicd as MC
 import design_parts as DP
 import copy_typography as CT
@@ -371,12 +371,10 @@ def _fetch_cover(pic):
             cacheable = pic.startswith(("https://", "http://"))
             image = _read_cached_cover(path, key) if cacheable else None
             if image is None:
-                req = Request(pic, headers={
+                data = fetch_cover_bytes(pic, {
                     "User-Agent": "Mozilla/5.0",
                     "Referer": "https://music.163.com/",
                 })
-                with urlopen(req, timeout=25) as r:
-                    data = r.read()
                 image = Image.open(io.BytesIO(data)).convert("RGB")
                 if cacheable:
                     _store_cached_cover(path, key, data)
@@ -898,6 +896,9 @@ def build_job(data):
     artist = str(data.get("artist") or "")
     album = str(data.get("album") or "")
     pic = data.get("pic") or ""
+    cover = _fetch_cover(pic)
+    if cover is None:
+        raise ValueError("封面读取失败：图片暂时无法完整下载，请重试或换用本地封面")
     company, release_year, release_date = _release_metadata(
         data, artist, album, str(data.get("company") or ""))
     mood = str(data.get("mood") or "")
@@ -908,9 +909,6 @@ def build_job(data):
     copyright_text = str(data.get("copyright") or "")
     copy_settings = CT.normalize_copy_settings(data)
     bands = _parse_bands(data.get("safeBands"))
-    cover = _fetch_cover(pic)
-    if cover is None:
-        raise ValueError("封面拉取失败（URL 不可达或被代理拦截）：%s" % pic)
     D = _read_design(cover, mood, style, bands)
     if not any(copy_settings["conceptCopy"].values()):
         zh, en, short = CT.auto_concept_copy(album, D)
@@ -974,7 +972,7 @@ def build_job(data):
 
     # 实体专辑打印拼版（默认版式）：竖版 7套/页（封面折件+封底条，无盘面）+ 盘面单独页
     p7 = MC.build_page_portrait7(fold, strip, DPI, artist, album, sets=7)
-    p7.save(str(d / "打印拼版-A4竖版7套.png"), dpi=(DPI, DPI))
+    p7.save(str(d / "打印拼版-A4竖版7套.png"), dpi=(DPI, DPI), compress_level=3)
     p7.save(str(d / "打印拼版-A4竖版7套.pdf"), "PDF", resolution=DPI)
     dpage = MC.build_disc_page(disc, DPI, artist, album)
     dpage.save(str(d / "盘面拼版-A4.png"), dpi=(DPI, DPI))
@@ -1019,7 +1017,8 @@ def build_job(data):
 
     # 打包 ZIP
     zip_path = OUT_DIR / ("%s.zip" % jid)
-    with zipfile.ZipFile(str(zip_path), "w", zipfile.ZIP_DEFLATED) as z:
+    # The print assets are already compressed PNGs and PDFs.
+    with zipfile.ZipFile(str(zip_path), "w", zipfile.ZIP_STORED) as z:
         for f in _album_zip_members():
             p = d / f
             if p.is_file():

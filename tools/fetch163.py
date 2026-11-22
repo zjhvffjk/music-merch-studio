@@ -25,6 +25,7 @@ import sys
 import time
 
 import requests
+from cover_download import fetch_cover_bytes
 
 try:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -99,17 +100,13 @@ def cover_url(pic_url: str, size: int) -> str:
 def download(url: str, path: str) -> int:
     """下载封面, 返回字节数"""
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    for i in range(3):
-        try:
-            r = S.get(url, timeout=40)
-            if r.status_code == 200 and len(r.content) > 2000:
-                with open(path, "wb") as f:
-                    f.write(r.content)
-                return len(r.content)
-        except Exception:
-            pass
-        time.sleep(0.8 * (i + 1))
-    return 0
+    try:
+        data = fetch_cover_bytes(url, S.headers, minimum=2001)
+        with open(path, "wb") as f:
+            f.write(data)
+        return len(data)
+    except Exception:
+        return 0
 
 
 # ---------- 各子命令 ----------

@@ -845,7 +845,7 @@ def keychain_ready():
     return True, None
 
 
-def render_keychain(job, base, cpath, ppath, style="classic"):
+def render_keychain(job, base, cpath, ppath, style="classic", product_base=None):
     """给一首歌追加一张钥匙扣商品图。返回 (相对路径, 失败原因)"""
     if KC is None:
         return None, f"钥匙扣模块不可用（{_KC_IMPORT_ERR}）"
@@ -856,7 +856,7 @@ def render_keychain(job, base, cpath, ppath, style="classic"):
     suffix = "" if style == "classic" else "-" + KC.style_info(style)["tag"]
     kpath = os.path.join(job["dir"], "keychain", base + "-钥匙扣" + suffix + ".jpg")
     try:
-        KC.compose(cpath, ppath, kpath, overlay, lut, style=style)
+        KC.compose(cpath, ppath, kpath, overlay, lut, style=style, product_base=product_base)
     except Exception as e:
         return None, f"{type(e).__name__}: {e}"
     return os.path.relpath(kpath, job["dir"]), None
@@ -1220,8 +1220,15 @@ def render_song(job, s, rank, opt):
     # --- 3) 钥匙扣商品图（可选，复用上面刚出的封面 + 播放界面）---
     kc_rel = {}
     if opt.get("keychain"):
-        for style in keychain_styles(opt):
-            rel, kc_err = render_keychain(job, base, cpath, ppath, style)
+        styles = keychain_styles(opt)
+        product_base = None
+        if KC is not None and len(styles) > 1:
+            try:
+                product_base = KC.prepare_product_base(cpath)
+            except Exception as exc:
+                log(job, f"钥匙扣共用背景生成失败：{type(exc).__name__}: {exc}", "warn")
+        for style in styles:
+            rel, kc_err = render_keychain(job, base, cpath, ppath, style, product_base)
             if rel:
                 kc_rel[style] = rel
             else:

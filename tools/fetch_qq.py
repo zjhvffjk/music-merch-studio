@@ -36,6 +36,7 @@ import time
 import urllib.parse
 import urllib.request
 from collections import Counter
+from cover_download import fetch_cover_bytes
 
 UA = {
     "User-Agent": ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -319,17 +320,13 @@ def download(url, path, tries=4):
     if not url:
         return False
     os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
-    for i in range(tries):
-        try:
-            data = _get(url, timeout=30)
-            if len(data) < 1500:            # 占位/错误页
-                return False
-            with open(path, "wb") as f:
-                f.write(data)
-            return True
-        except Exception:
-            time.sleep(0.6 * (i + 1))
-    return False
+    try:
+        data = fetch_cover_bytes(url, UA, minimum=1500, attempts=tries)
+        with open(path, "wb") as f:
+            f.write(data)
+        return True
+    except Exception:
+        return False
 
 
 def singer_top(name, n=10):

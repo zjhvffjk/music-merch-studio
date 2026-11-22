@@ -178,7 +178,7 @@ def dim_background(canvas):
     return canvas
 
 
-def build_canvas(cov, player_rgb, player_box=(PL_X, PL_Y, PL_W, PL_H), dim=True, render_scale=1):
+def build_canvas(cov, player_rgb=None, player_box=(PL_X, PL_Y, PL_W, PL_H), dim=True, render_scale=1):
     """按版式常量拼出「无钥匙扣」底图（1920×1920 float32）。
 
     唯一实现，生产（compose）与标定（keychain_build.build_base）共用，
@@ -203,13 +203,20 @@ def build_canvas(cov, player_rgb, player_box=(PL_X, PL_Y, PL_W, PL_H), dim=True,
     canvas[cover_in:cover_in + cover_size, cover_in:cover_in + cover_size] = \
         np.asarray(cov.resize((cover_size, cover_size), Image.LANCZOS)).astype(np.float32)
     # 播放界面图
-    px, py, pw, ph = player_box
-    canvas[py:py + ph, px:px + pw] = player_rgb
+    if player_rgb is not None:
+        px, py, pw, ph = player_box
+        canvas[py:py + ph, px:px + pw] = player_rgb
     return canvas
 
 
+def prepare_product_base(cover_path, render_scale=2):
+    with Image.open(cover_path) as cover:
+        canvas = build_canvas(cover.convert("RGB"), render_scale=render_scale)
+    return Image.fromarray(np.clip(canvas, 0, 255).astype(np.uint8)).convert("RGBA")
+
+
 def compose(cover_path, player_path, out_path, overlay=None, lut=None, curve=None,
-            style="classic", render_scale=2):
+            style="classic", render_scale=2, product_base=None):
     """合成一张钥匙扣商品图。
 
     curve：播放界面曲线强度 0~1。None = 用模块默认 CURVE_STRENGTH（0，原生效果）。
@@ -218,18 +225,15 @@ def compose(cover_path, player_path, out_path, overlay=None, lut=None, curve=Non
     px, py, pw, ph = style_info(style)["player"]
     px, py, pw, ph = (v * render_scale for v in (px, py, pw, ph))
     strength = CURVE_STRENGTH if curve is None else float(curve)
-    cov = Image.open(cover_path).convert("RGB")
-
     # 播放界面图（默认原样贴入；曲线强度由 CURVE_STRENGTH / --curve 决定）
     pl = np.asarray(Image.open(player_path).convert("RGB")
                     .resize((pw, ph), Image.LANCZOS)).astype(np.float32)
     if lut is not None and strength > 0:
         pl = apply_curve(pl, lut, strength)
 
-    canvas = build_canvas(cov, pl, (px, py, pw, ph), render_scale=render_scale)
-
     # 钥匙扣叠加（overlay 可以是路径，也可以是已经加载好的 RGBA 图）
-    base = Image.fromarray(np.clip(canvas, 0, 255).astype(np.uint8)).convert("RGBA")
+    base = prepare_product_base(cover_path, render_scale) if product_base is None else product_base.copy()
+    base.paste(Image.fromarray(np.clip(pl, 0, 255).astype(np.uint8)), (px, py))
     ov = overlay if isinstance(overlay, Image.Image) else load_overlay(overlay, style)
     if ov.size != base.size:
         ov = ov.resize(base.size, Image.LANCZOS)

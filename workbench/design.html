@@ -1296,15 +1296,24 @@ async function ensureHotTracks(){
   return currentTrackData();
 }
 /* 🔴 let 而不是 const：从项目库 ?jid= 进来时要回填留档里的封面（有封面才能重跑） */
+function coverThumbnailUrl(source){
+  try{
+    const url=new URL(source);
+    if(!/^https?:$/.test(url.protocol)||!/^p[1-4]\.music\.126\.net$/i.test(url.host))return source;
+    const size=/^(\d+)y(\d+)$/.exec(url.searchParams.get('param')||'');
+    if(!size||Math.max(Number(size[1]),Number(size[2]))>800)url.searchParams.set('param','800y800');
+    return url.href;
+  }catch(e){return source}
+}
 let PIC=q.get('pic')||'';
 if(PIC){
-  $('#cover').src=PIC;$('#cover').hidden=false;$('#coverBlank').hidden=true;
+  $('#cover').src=coverThumbnailUrl(PIC);$('#cover').hidden=false;$('#coverBlank').hidden=true;
 $('#picNote').textContent='用于生成三件套 · 来源：'+(q.get('id')?'专辑 ID '+q.get('id'):'上传/外部链接');
 }
 function syncRail(){
   const a=$('#album').value.trim()||'未选择', s=$('#artist').value.trim()||'—';
   $('#railAlbum').textContent=a;$('#railArtist').textContent=s;
-  if(PIC){$('#railCover').src=PIC;$('#railCover').hidden=false;}
+  if(PIC){$('#railCover').src=coverThumbnailUrl(PIC);$('#railCover').hidden=false;}
 }
 function syncBuildEnabled(){
   const ready=Boolean($('#album').value.trim() && $('#artist').value.trim() && PIC);
@@ -1606,7 +1615,7 @@ async function generateAllBatchProducts(){
      const {name,blob}=poster,url=URL.createObjectURL(blob);
      allProductUrls.push(url);
      overview.append(makeProductRow(poster,url,{showThumbnail:false}));
-     posterFiles.push({name:'九视图商品图/00-'+name,blob});
+     posterFiles.push({name:'00-'+name,blob});
     }
     files.unshift(...posterFiles);
     overview.hidden=false;
@@ -1619,7 +1628,9 @@ async function generateAllBatchProducts(){
   for(let i=0;i<groups.length;i++){const r=await fetch('/api/design/zip?jid='+encodeURIComponent(groups[i]));if(!r.ok)throw Error('原有素材包获取失败');const groupAlbums=albums.filter(a=>a.jid===groups[i]),a=groupAlbums[0],folder=String(albums.indexOf(a)+1).padStart(2,'0')+'-'+safeProductFolder([a.artist,a.album].filter(Boolean).join(' · '));bases.push({blob:await r.blob(),prefix:'原有素材和打印文件/'+(groupAlbums.length===1&&!a.batchNo?folder+'/':''),exclude:comparisonFiles.length?[BATCH_COMPARISON_NAME]:[]})}
   const {createZip}=await import('/mini-mockup/zip-store.js');
   const zip=await createZip(files,bases);
-  if(!await prepareProductArchive(link,zip,'批量专辑-素材和商品图.zip',status))return;
+  const artists=[...new Set(albums.map(album=>String(album.artist||'').trim()).filter(Boolean))];
+  const archiveName=safeProductFolder(artists.join('、')||'批量专辑')+'.zip';
+  if(!await prepareProductArchive(link,zip,archiveName,status))return;
   const warnings=[overviewError&&`封面总览未生成（${overviewError}）`,comparisonError&&`设计对照图未生成（${comparisonError}）`].filter(Boolean);
   status.textContent=warnings.length?warnings.join('；')+'。其余文件可一起下载。':`已生成 ${albums.length} 张专辑的商品图、${overview.childElementCount} 张封面总览和设计对照图，可一起下载。`;
  }catch(e){status.textContent='生成失败：'+e.message+'，请点击重新生成全部商品图。'}finally{await comparisonTask;allProductRunning=false;button.disabled=false;if(allProductRerun)generateAllBatchProducts()}
@@ -1636,7 +1647,7 @@ function renderBatch(){
   $('#batchCount').textContent=n;
   $('#batchList').innerHTML=n?batchList.map((a,i)=>`
     <div class="batchItem"><span class="bi">${String(i+1).padStart(2,'0')}</span>
-      <img class="bth" src="${esc(a.pic||'')}" alt="">
+      <img class="bth" src="${esc(coverThumbnailUrl(a.pic||''))}" alt="">
       <span class="bt"><b>${esc(a.album||'')}</b><small>${esc(a.artist||'')}${a.date?' · '+esc(a.date):''}</small></span>
       <button class="plain sm bx" data-i="${i}">移除</button></div>`).join('')
     :'<p class="muted" style="margin:0;font-size:12.5px">没有选中专辑 —— 回专辑列表勾选后重进。</p>';
@@ -1681,31 +1692,59 @@ async function runBatch(){
   if(batchRunning||!batchList.length)return;
   batchRunning=true;renderBatch();err('');$('#batchDesignBuild').disabled=true;const status=$('#batchDesignStatus');
   const previous=batchMockups;batchMockups=[];updateBatchSelectors();$('#batchRes').hidden=false;$('#batchGallery').replaceChildren();
-  const results=[],failures=[];
+  const results=[],mockups=[],failures=[];
   try{
-    for(let i=0;i<batchList.length;i++){
-      const a=batchList[i],frame=$('#batchDesignFrames').querySelector('iframe[data-index="'+i+'"]');
+    const drafts=batchList.map((a,i)=>{
+      const frame=$('#batchDesignFrames').querySelector('iframe[data-index="'+i+'"]');
       let body={artist:a.artist||'',album:a.album||'',id:String(a.id||''),pic:a.pic||'',company:a.company||'',date:a.date||''};
       if(frame&&typeof frame.contentWindow.collectBatchDraft==='function')body=frame.contentWindow.collectBatchDraft();
       body.id=String(body.id||'');
-      if(body.id&&!(Array.isArray(body.trackData)&&body.trackData.length)&&!String(body.tracks||'').trim()){
-        try{const response=await fetch('/api/album_songs?id='+encodeURIComponent(body.id));if(response.ok){const data=await response.json();body.trackData=(data.songs||[]).slice(0,10).map((song,j)=>({rank:j+1,title:song.name||'',duration:song.dur||''})).filter(song=>song.title)}}catch(e){console.warn('专辑曲目获取失败',e)}
-      }
-      status.textContent=`正在生成 ${i+1}/${batchList.length}：${body.album||a.album}…`;
+      return body;
+    });
+    let cursor=0,completed=0;
+    const count=drafts.length;
+    function setProgress(){
+      status.textContent=`正在生成三件套 · 已处理 ${completed}/${count} 张…`;
       $('#batchState').textContent=status.textContent;
+    }
+    async function buildAlbum(i){
+      const body=drafts[i];
+      if(body.id&&!(Array.isArray(body.trackData)&&body.trackData.length)&&!String(body.tracks||'').trim()){
+        try{
+          const response=await fetch('/api/album_songs?id='+encodeURIComponent(body.id));
+          if(response.ok){
+            const data=await response.json();
+            body.trackData=(data.songs||[]).slice(0,10).map((song,j)=>({rank:j+1,title:song.name||'',duration:song.dur||''})).filter(song=>song.title);
+            body.company ||= data.album?.company || '';
+            body.date ||= data.album?.date || '';
+          }
+        }catch(e){console.warn('专辑曲目获取失败',e)}
+      }
       try{
         const r=await fetch('/api/design/build',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}),d=await r.json();
         if(!r.ok)throw Error(d.error||('HTTP '+r.status));
-        const item={jid:String(d.jid),batchNo:'',key:String(i),syncRevision:String(Date.now())+'-'+i,album:body.album,artist:body.artist};batchMockups.push(item);
+        mockups[i]={jid:String(d.jid),batchNo:'',key:String(i),syncRevision:String(Date.now())+'-'+i,album:body.album,artist:body.artist};
         const fu=name=>'/api/design/file?jid='+encodeURIComponent(d.jid)+'&name='+encodeURIComponent(name);
-        results.push({no:String(i+1).padStart(2,'0'),album:body.album,artist:body.artist,mood:'',style:'',parts:['part-disc.png','part-cover.png','part-strip.png'].map(fu),printUrl:d.printPortraitUrl||d.printUrl,printPdfUrl:d.printPortraitPdfUrl||d.printPdfUrl,sheetUrl:fu('★版面总览-1比1.png')});
-        $('#batchGallery').innerHTML=batchGalleryHtml(results);updateBatchSelectors();
-      }catch(e){failures.push((body.album||a.album)+'：'+e.message)}
+        results[i]={no:String(i+1).padStart(2,'0'),album:body.album,artist:body.artist,mood:'',style:'',parts:['part-disc.png','part-cover.png','part-strip.png'].map(fu),printUrl:d.printPortraitUrl||d.printUrl,printPdfUrl:d.printPortraitPdfUrl||d.printPdfUrl,sheetUrl:fu('★版面总览-1比1.png')};
+        $('#batchGallery').innerHTML=batchGalleryHtml(results.filter(Boolean));
+      }catch(e){failures[i]=body.album+'：'+e.message}
+      completed++;
+      setProgress();
     }
-    if(batchMockups.length){renderBatchPrint(results);chooseBatchMockup(0);$('#batchProductCard').hidden=false;$('#singleExportCard').hidden=true;}
-    status.textContent=`已生成 ${results.length}/${batchList.length} 张专辑`+(failures.length?'；失败：'+failures.join('、'):'');$('#batchState').textContent=status.textContent;
+    async function worker(){
+      while(cursor<count)await buildAlbum(cursor++);
+    }
+    // Duplicate album IDs write to the same project directory.
+    const ids=drafts.map(body=>body.id).filter(Boolean);
+    const concurrency=new Set(ids).size===ids.length?Math.min(count,2):1;
+    setProgress();
+    await Promise.all(Array.from({length:concurrency},worker));
+    batchMockups=mockups.filter(Boolean);
+    const successful=results.filter(Boolean),failed=failures.filter(Boolean);
+    if(batchMockups.length){renderBatchPrint(successful);chooseBatchMockup(0);$('#batchProductCard').hidden=false;$('#singleExportCard').hidden=true;}
+    status.textContent=`已生成 ${successful.length}/${count} 张专辑`+(failed.length?'；失败：'+failed.join('、'):'');$('#batchState').textContent=status.textContent;
     if(batchMockups.length)generateAllBatchProducts();
-    if(results.length===batchList.length&&!failures.length)showMod('print');
+    if(successful.length===count)showMod('print');
   }catch(e){batchMockups=previous;status.textContent='批量生成失败：'+e.message;$('#batchState').textContent=status.textContent}
   finally{batchRunning=false;$('#batchDesignBuild').disabled=false;renderBatch()}
 }
@@ -1835,7 +1874,7 @@ async function loadProject(jid){
   }
   if(m.pic && !PIC){
     PIC = m.pic;
-    $('#cover').src = PIC; $('#cover').hidden = false; $('#coverBlank').hidden = true;
+    $('#cover').src = coverThumbnailUrl(PIC); $('#cover').hidden = false; $('#coverBlank').hidden = true;
     $('#picNote').textContent = '来自项目留档（可直接重跑）';
   }
   syncRail();
