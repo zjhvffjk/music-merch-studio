@@ -131,18 +131,43 @@ const [trayRight, trayBottom] = frontPoint(738, 2391);
 export const frontTrayQuad = rectQuad(trayX, trayY, trayRight - trayX, trayBottom - trayY);
 
 const windows = { front: [841, 772, 2558, 2414], tray: [520, 807, 751, 2376] };
-export function frontSlotWindow(id, size) {
+export function frontSlotBounds(id, size) {
   const [x0, y0, x1, y1] = windows[id];
   const [x, y] = frontPoint(x0, y0, size);
   const [right, bottom] = frontPoint(x1, y1, size);
+  return [x, y, right - x, bottom - y];
+}
+
+export function frontSlotWindow(id, size) {
   const path = new Path2D();
-  path.roundRect(x, y, right - x, bottom - y, size * .006);
+  path.roundRect(...frontSlotBounds(id, size), size * .006);
   return path;
+}
+
+const retainerCenters = [1168, 2088];
+const upperRetainerRail = 770;
+const lowerRetainerRail = 2413;
+
+export function frontRetainerPhotoRegions(image) {
+  const sx = image.width / (texture.right - texture.left);
+  const sy = image.height / (texture.bottom - texture.top);
+  const anchorOffset = 165;
+  return [
+    { y: upperRetainerRail, above: 116, below: 176 },
+    { y: lowerRetainerRail, above: 168, below: 116 },
+  ].map(({ y, above, below }) => retainerCenters.map(x => ({
+    source: [(x - anchorOffset - texture.left) * sx, (y - above - texture.top) * sy,
+      anchorOffset * 2 * sx, (above + below) * sy],
+    width: anchorOffset * 2,
+    height: above + below,
+    anchorX: anchorOffset,
+    anchorY: above,
+  })));
 }
 
 function frontRetainerPair(size, y) {
   const path = new Path2D();
-  for (const x of [1168, 2088]) {
+  for (const x of retainerCenters) {
     const [cx, cy] = frontPoint(x, y, size);
     const [right, bottom] = frontPoint(x + 132, y + 145, size);
     path.moveTo(right, cy);
@@ -152,21 +177,27 @@ function frontRetainerPair(size, y) {
 }
 
 export function frontUpperRetainerMask(size) {
-  return frontRetainerPair(size, 770);
+  return frontRetainerPair(size, upperRetainerRail);
 }
 
 export function frontLowerRetainerMask(size) {
-  return frontRetainerPair(size, 2413);
+  return frontRetainerPair(size, lowerRetainerRail);
 }
 
-export function frontRetainerMask(size) {
-  const path = frontUpperRetainerMask(size);
-  path.addPath(frontLowerRetainerMask(size));
+export function frontSideRetainerMask(size) {
+  const path = new Path2D();
   for (const x of [827, 2499]) for (const y of [939, 1818]) {
     const [left, top] = frontPoint(x, y, size);
     const [right, bottom] = frontPoint(x + 75, y + 384, size);
     path.roundRect(left, top, right - left, bottom - top, size * .009);
   }
+  return path;
+}
+
+export function frontRetainerMask(size) {
+  const path = frontUpperRetainerMask(size);
+  path.addPath(frontLowerRetainerMask(size));
+  path.addPath(frontSideRetainerMask(size));
   return path;
 }
 

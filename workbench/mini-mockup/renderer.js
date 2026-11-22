@@ -53,7 +53,6 @@ if(id!=='disc'&&id!=='inside'&&!plain&&state.lighting){
   // the uploaded artwork remains the source of its colour and detail.
   x.save();x.globalCompositeOperation='source-atop';
   const shade=x.createLinearGradient(0,0,w,sz);shade.addColorStop(0,'rgba(0,0,0,.035)');shade.addColorStop(.48,'rgba(0,0,0,0)');shade.addColorStop(1,'rgba(0,0,0,.055)');x.fillStyle=shade;x.fillRect(0,0,w,sz);
-  const reflection=x.createLinearGradient(0,0,w,sz*.45);reflection.addColorStop(0,'rgba(255,255,255,0)');reflection.addColorStop(.22,'rgba(255,255,255,.065)');reflection.addColorStop(.48,'rgba(255,255,255,0)');x.fillStyle=reflection;x.fillRect(0,0,w,sz);
   const edge=x.createLinearGradient(0,0,0,sz);edge.addColorStop(0,'rgba(0,0,0,.16)');edge.addColorStop(.014,'rgba(0,0,0,0)');edge.addColorStop(.985,'rgba(0,0,0,0)');edge.addColorStop(1,'rgba(0,0,0,.10)');x.fillStyle=edge;x.fillRect(0,0,w,sz);x.restore();
 }
 if(id==='disc'){
@@ -64,7 +63,7 @@ textureCache.set(id,{key,canvas:c});while(textureCache.size>3)textureCache.delet
 function project(q,u,v){const [p0,p1,p2,p3]=q;const dx1=p1[0]-p2[0],dx2=p3[0]-p2[0],dx3=p0[0]-p1[0]+p2[0]-p3[0],dy1=p1[1]-p2[1],dy2=p3[1]-p2[1],dy3=p0[1]-p1[1]+p2[1]-p3[1];let g=0,h=0;const den=dx1*dy2-dx2*dy1;if(Math.abs(den)>1e-9){g=(dx3*dy2-dx2*dy3)/den;h=(dx1*dy3-dx3*dy1)/den}const a=p1[0]-p0[0]+g*p1[0],b=p3[0]-p0[0]+h*p3[0],d=p1[1]-p0[1]+g*p1[1],e=p3[1]-p0[1]+h*p3[1];const z=g*u+h*v+1;return[(a*u+b*v+p0[0])/z,(d*u+e*v+p0[1])/z]}
 function triangle(ctx,img,s,d){const[x0,y0]=s[0],[x1,y1]=s[1],[x2,y2]=s[2],[u0,v0]=d[0],[u1,v1]=d[1],[u2,v2]=d[2];const den=x0*(y1-y2)+x1*(y2-y0)+x2*(y0-y1);if(Math.abs(den)<1e-9)return;const a=(u0*(y1-y2)+u1*(y2-y0)+u2*(y0-y1))/den,b=(v0*(y1-y2)+v1*(y2-y0)+v2*(y0-y1))/den,c=(u0*(x2-x1)+u1*(x0-x2)+u2*(x1-x0))/den,dv=(v0*(x2-x1)+v1*(x0-x2)+v2*(x1-x0))/den,e=(u0*(x1*y2-x2*y1)+u1*(x2*y0-x0*y2)+u2*(x0*y1-x1*y0))/den,f=(v0*(x1*y2-x2*y1)+v1*(x2*y0-x0*y2)+v2*(x0*y1-x1*y0))/den;
 ctx.save();ctx.beginPath();const mx=(u0+u1+u2)/3,my=(v0+v1+v2)/3;const grow=(u,v)=>{const l=Math.hypot(u-mx,v-my)||1;return[u+(u-mx)/l*.8,v+(v-my)/l*.8]};ctx.moveTo(...grow(u0,v0));ctx.lineTo(...grow(u1,v1));ctx.lineTo(...grow(u2,v2));ctx.closePath();ctx.clip();ctx.transform(a,b,c,dv,e,f);ctx.drawImage(img,0,0);ctx.restore()}
-export function warp(ctx,img,quad,sourceX=0){const n=14,q=quad.map(p=>p.map(x=>x*BASE));ctx.save();ctx.beginPath();q.forEach((p,i)=>i?ctx.lineTo(...p):ctx.moveTo(...p));ctx.closePath();ctx.clip();for(let row=0;row<n;row++)for(let col=0;col<n;col++){const u=col/n,v=row/n,un=(col+1)/n,vn=(row+1)/n;const uv=[[u,v],[un,v],[un,vn],[u,vn]],src=uv.map(([s,t])=>[(sourceX+(1-sourceX)*s)*img.width,t*img.height]),dst=uv.map(([s,t])=>project(q,s,t));triangle(ctx,img,[src[0],src[1],src[2]],[dst[0],dst[1],dst[2]]);triangle(ctx,img,[src[0],src[2],src[3]],[dst[0],dst[2],dst[3]])}ctx.restore()}
+export function warp(ctx,img,quad,sourceX=0){if(sourceX===0)return online.warp(ctx,img,quad);const n=14,q=quad.map(p=>p.map(x=>x*BASE));ctx.save();ctx.beginPath();q.forEach((p,i)=>i?ctx.lineTo(...p):ctx.moveTo(...p));ctx.closePath();ctx.clip();for(let row=0;row<n;row++)for(let col=0;col<n;col++){const u=col/n,v=row/n,un=(col+1)/n,vn=(row+1)/n;const uv=[[u,v],[un,v],[un,vn],[u,vn]],src=uv.map(([s,t])=>[(sourceX+(1-sourceX)*s)*img.width,t*img.height]),dst=uv.map(([s,t])=>project(q,s,t));triangle(ctx,img,[src[0],src[1],src[2]],[dst[0],dst[1],dst[2]]);triangle(ctx,img,[src[0],src[2],src[3]],[dst[0],dst[2],dst[3]])}ctx.restore()}
 function blankDisc(){const c=document.createElement('canvas');c.width=c.height=1200;const x=c.getContext('2d'),g=x.createLinearGradient(0,0,1200,1200);g.addColorStop(0,'#c6ccd1');g.addColorStop(.3,'#eef0f0');g.addColorStop(.5,'#b4bac2');g.addColorStop(.72,'#dce2e4');g.addColorStop(1,'#b1b9bf');x.fillStyle=g;x.beginPath();x.arc(600,600,590,0,Math.PI*2);x.fill();x.globalCompositeOperation='destination-out';x.beginPath();x.arc(600,600,86,0,Math.PI*2);x.fill();return c}const blank=blankDisc();
 let frontGlass;
 const opticsCache=new Map();
@@ -125,6 +124,7 @@ function overlayPlastic(ctx,state,view,slot,shell){
     ctx.save();ctx.globalAlpha=.42;warp(ctx,online.paperRecess(view,slot.id,false),q);ctx.restore();
   }
   if(slot.id.startsWith('side')||(slot.id==='front'&&view===4)||slot.id==='tray'){
+    ctx.globalCompositeOperation='multiply';
     ctx.drawImage(photoOptics(shell,view),0,0);
   }else if(slot.id==='back'){
     // An opaque back insert hides the tray ring and hub behind it.
