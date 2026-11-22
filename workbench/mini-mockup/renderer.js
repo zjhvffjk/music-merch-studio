@@ -110,7 +110,7 @@ function exposedPaperHardware(ctx,state,view,slot,shell){
   // The reverse of the cover faces the open case directly. Only retaining
   // hardware and the rim sit in front of it; the broad lid lies behind it.
   warp(ctx,online.paperRecess(view,'inside',false),q);
-  if(view===1||view===8){online.drawInsideRetainersOnQuad(ctx,q);return}
+  if(view===1||view===8){online.drawInsideRetainersOnQuad(ctx,q,state.lighting);return}
   const mask=projectedInsideMask.getContext('2d');mask.clearRect(0,0,BASE,BASE);warp(mask,insideHardwareMask(view),q);
   const x=insideRelief.getContext('2d');x.globalCompositeOperation='source-over';x.clearRect(0,0,BASE,BASE);x.drawImage(photoOptics(shell,view),0,0);
   x.globalCompositeOperation='destination-in';x.drawImage(projectedInsideMask,0,0);ctx.drawImage(insideRelief,0,0);

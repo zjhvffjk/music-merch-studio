@@ -80,7 +80,7 @@ export function transparentHardware(c){const x=c.getContext('2d'),w=c.width,h=c.
 
 // A narrow ridge is lighter or darker than the pixels on both sides.
 // Comparing both sides rejects the haze next to a dark edge in the photo.
-function extractRetainerEdges(canvas){
+function extractRetainerEdges(canvas,{glintsOnly=false}={}){
  const ctx=canvas.getContext('2d');
  const {width,height}=canvas;
  const pixels=ctx.getImageData(0,0,width,height);
@@ -89,7 +89,7 @@ function extractRetainerEdges(canvas){
  for(let i=0,k=0;i<luminance.length;i++,k+=4){
    luminance[i]=(data[k]+data[k+1]+data[k+2])/3;
  }
- const radius=4;
+ const radius=glintsOnly?2:4;
  const offsets=[radius,radius*width,radius*(width-1),radius*(width+1)];
  for(let y=0;y<height;y++)for(let x=0;x<width;x++){
    const i=y*width+x,k=i*4;
@@ -101,12 +101,38 @@ function extractRetainerEdges(canvas){
        shadow=Math.max(shadow,Math.min(a,b)-value);
      }
    }
+   if(glintsOnly){
+     // A specular line must be a bright peak within two pixels, excluding
+     // the diffuse gray and white areas inside the photographed clip.
+     data[k]=data[k+1]=data[k+2]=255;
+     data[k+3]=Math.min(142,Math.max(0,highlight-9)*4.6);
+     continue;
+   }
    const light=highlight>=shadow;
    const contrast=Math.max(0,(light?highlight:shadow)-5);
    data[k]=data[k+1]=data[k+2]=light?255:23;
    data[k+3]=Math.min(light?112:155,contrast*(light?2.7:2.15));
  }
  ctx.putImageData(pixels,0,0);
+}
+function retainerGlints(view,mask){
+ const key=`retainer-glints-${view}`;
+ const cached=imgCache.get(key);
+ if(cached)return cached;
+ const canvas=document.createElement('canvas');canvas.width=canvas.height=BASE;
+ const ctx=canvas.getContext('2d',{willReadFrequently:true});
+ ctx.drawImage(imgCache.get(`shell-${view}`),0,0,BASE,BASE);
+ extractRetainerEdges(canvas,{glintsOnly:true});
+ ctx.globalCompositeOperation='destination-in';
+ if(mask)ctx.drawImage(mask,0,0);
+ else ctx.fill(frontRetainerMask(BASE));
+ imgCache.set(key,canvas);
+ return canvas;
+}
+function drawRetainerGlints(ctx,state,glints){
+ ctx.globalCompositeOperation='screen';
+ ctx.globalAlpha=state.lighting?.84:.50;
+ ctx.drawImage(glints,0,0);
 }
 const recessCache=new Map();
 export function paperRecess(view,id,lighting){
@@ -165,6 +191,7 @@ function drawFrontRecess(ctx,state){
    ctx.globalCompositeOperation='multiply';
    ctx.globalAlpha=state.lighting?.72:.40;
    ctx.drawImage(frontRimOptics(slot.id),0,0);
+   if(slot.id==='front')drawRetainerGlints(ctx,state,retainerGlints(0));
    ctx.restore();
  }
 }
@@ -206,8 +233,10 @@ function coverRimOptics(view){
  extractRetainerEdges(rim);
  r.globalCompositeOperation='destination-in';
  r.drawImage(mask,0,0);
- imgCache.set(key,rim);
- return rim;
+ const glints=views[view].slots.some(slot=>slot.id==='front')?retainerGlints(view,mask):null;
+ const optics={rim,glints};
+ imgCache.set(key,optics);
+ return optics;
 }
 function obliqueSideRetainers(slot){
  const key='oblique-side-retainers';
@@ -236,8 +265,10 @@ function drawExteriorPaperRims(ctx,state,view){
      clipQuad(ctx,quad);
      ctx.globalCompositeOperation='multiply';
      ctx.globalAlpha=state.lighting?.95:.60;
-     ctx.drawImage(coverRimOptics(view),0,0);
+     const {rim,glints}=coverRimOptics(view);
+     ctx.drawImage(rim,0,0);
      if(side)ctx.drawImage(side,0,0);
+     if(slot.id==='front'&&glints)drawRetainerGlints(ctx,state,glints);
      ctx.restore();
    }
    if(side){
@@ -270,19 +301,52 @@ function drawHardware(ctx,view){const hw=views[view].hardware,img=imgCache.get(`
 async function prepareInsideRetainers(){
  const [raw,sharp]=await Promise.all([loadImage('online-reference-v30/assets/open-inner-reference.png'),loadImage('online-reference-v30/assets/front-cover-hq-v3.png')]);
  const c=document.createElement('canvas');c.width=660;c.height=550;const x=c.getContext('2d');
- const shell=document.createElement('canvas');shell.width=raw.width;shell.height=raw.height;const s=shell.getContext('2d');s.drawImage(raw,0,0);
+ const glints=document.createElement('canvas');glints.width=c.width;glints.height=c.height;
+ const g=glints.getContext('2d');
+ const shell=document.createElement('canvas');shell.width=raw.width;shell.height=raw.height;const s=shell.getContext('2d',{willReadFrequently:true});s.drawImage(raw,0,0);
  const parts=[{dst:[226,218,88,46],bottom:false},{dst:[676,218,88,46],bottom:false},{dst:[226,728,88,46],bottom:true},{dst:[676,728,88,46],bottom:true}];
- for(const p of parts){const [dx,dy,w,h]=p.dst,patch=document.createElement('canvas');patch.width=w;patch.height=h;const px=patch.getContext('2d');if(p.bottom){px.translate(0,h);px.scale(1,-1)}px.beginPath();px.ellipse(w/2,0,w/2,w/2,0,0,Math.PI*2);px.clip();px.drawImage(sharp,394,330,88,46,0,0,w,h);
+ // Sample the ridge before masking the tab so the cutout itself cannot produce a bright halo.
+ const [sourceX,sourceY,width,height]=[394,330,88,46];
+ const padding=2;
+ const sample=document.createElement('canvas');
+ sample.width=width+padding*2;sample.height=height+padding*2;
+ sample.getContext('2d',{willReadFrequently:true}).drawImage(sharp,sourceX-padding,sourceY-padding,sample.width,sample.height,0,0,sample.width,sample.height);
+ extractRetainerEdges(sample,{glintsOnly:true});
+ const outline=new Path2D();
+ outline.ellipse(width/2,0,width/2,width/2,0,0,Math.PI*2);
+ for(const p of parts){const [dx,dy,w,h]=p.dst,patch=document.createElement('canvas');patch.width=w;patch.height=h;const px=patch.getContext('2d');if(p.bottom){px.translate(0,h);px.scale(1,-1)}px.clip(outline);px.drawImage(sharp,sourceX,sourceY,width,height,0,0,w,h);
   // Replace the photographed blurred tab with the adjacent clear panel before applying the sharp tab.
   const left=s.getImageData(dx-2,dy,1,h).data,right=s.getImageData(dx+w+1,dy,1,h).data,fill=s.createImageData(w,h);
   for(let row=0;row<h;row++)for(let col=0;col<w;col++){const t=(col+1)/(w+1),idx=(row*w+col)*4;for(let channel=0;channel<3;channel++)fill.data[idx+channel]=Math.round(left[row*4+channel]*(1-t)+right[row*4+channel]*t);fill.data[idx+3]=255}s.putImageData(fill,dx,dy);
   s.save();s.globalCompositeOperation='multiply';s.drawImage(patch,dx,dy);s.restore();
   x.drawImage(patch,dx-150,dy-220);
+  g.save();
+  g.translate(dx-150,dy-220+(p.bottom?h:0));
+  if(p.bottom)g.scale(1,-1);
+  g.clip(outline);
+  g.drawImage(sample,padding,padding,width,height,0,0,w,h);
+  g.restore();
  }
- imgCache.set('inside-retainers',c);imgCache.set('sharp-inner-shell',shell);
+ imgCache.set('inside-retainers',c);
+ imgCache.set('inside-retainer-glints',glints);
+ imgCache.set('sharp-inner-shell',shell);
 }
-function drawInsideRetainers(ctx,state,view){const slot=views[view].slots.find(s=>s.id==='inside'),img=imgCache.get('inside-retainers');if(!slot||!img||!state.assets.inside.src)return;ctx.save();ctx.globalCompositeOperation='multiply';warp(ctx,img,getQuad(state,view,slot));ctx.restore()}
-export function drawInsideRetainersOnQuad(ctx,quad){const img=imgCache.get('inside-retainers');if(!img)return;ctx.save();ctx.globalCompositeOperation='multiply';warp(ctx,img,quad);ctx.restore()}
+function drawInsideRetainers(ctx,state,view){
+ const slot=views[view].slots.find(s=>s.id==='inside');
+ if(slot&&state.assets.inside.src)drawInsideRetainersOnQuad(ctx,getQuad(state,view,slot),state.lighting);
+}
+export function drawInsideRetainersOnQuad(ctx,quad,lighting=true){
+ const shadows=imgCache.get('inside-retainers');
+ const glints=imgCache.get('inside-retainer-glints');
+ if(!shadows||!glints)return;
+ ctx.save();
+ ctx.globalCompositeOperation='multiply';
+ warp(ctx,shadows,quad);
+ ctx.globalCompositeOperation='screen';
+ ctx.globalAlpha=lighting?.84:.42;
+ warp(ctx,glints,quad);
+ ctx.restore();
+}
 // Preserve the established optical layers for the other camera angles.
 async function prepareUnifiedHooks(){const front=await loadImage('online-reference-v30/assets/front-cover-hq-v3.png'),hook=document.createElement('canvas');hook.width=235;hook.height=145;hook.getContext('2d').drawImage(front,510,140,235,145,0,0,235,145);
  // Reduce the photographed oblique eyelet around its attachment point; the
