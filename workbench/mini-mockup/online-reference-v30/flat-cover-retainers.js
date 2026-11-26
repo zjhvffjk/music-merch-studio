@@ -44,17 +44,28 @@ export function replaceFlatCoverRetainers(photo, frontPhoto) {
     }
     ctx.putImageData(patch, left, clearTop);
   }
-  const reference = frontRetainerPhotoRegions(frontPhoto);
+  const [, lowerReference] = frontRetainerPhotoRegions(frontPhoto);
+  const [upperRail, lowerRail] = rails;
   // Match the physical cover width and the distance between the rails.
   const sx = 640 / 1717;
   const sy = 603 / 1643;
-  rails.forEach(({y}, row) => centers.forEach((x, column) => {
-    const region = reference[row][column];
+  ctx.imageSmoothingQuality = 'high';
+  centers.forEach((x, column) => {
+    const region = lowerReference[column];
     const patch = blendPhotoEdges(frontPhoto, region);
-    ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(patch, x - region.anchorX * sx, y - region.anchorY * sy,
-      region.width * sx, region.height * sy);
-  }));
+    const left = x - region.anchorX * sx;
+    const anchorY = region.anchorY * sy;
+    const patchWidth = region.width * sx;
+    const patchHeight = region.height * sy;
+    ctx.drawImage(patch, left, lowerRail.y - anchorY, patchWidth, patchHeight);
+
+    // Reflect the same lower tab around the upper rail's mounting line.
+    ctx.save();
+    ctx.translate(left, upperRail.y + anchorY);
+    ctx.scale(1, -1);
+    ctx.drawImage(patch, 0, 0, patchWidth, patchHeight);
+    ctx.restore();
+  });
   return canvas;
 }
 
